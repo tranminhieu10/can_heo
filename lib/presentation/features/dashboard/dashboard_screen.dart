@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../market_export/market_export_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -57,17 +58,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildBody(int index) {
-    switch (index) {
-      case 0:
-        return const Center(child: Text("Màn hình Thống kê (Coming Soon)"));
-      case 1:
-        return const Center(child: Text("Màn hình XUẤT CHỢ (Sẽ làm tiếp theo)"));
-      case 2:
-        return const Center(child: Text("Màn hình NHẬP KHO (Sẽ làm tiếp theo)"));
-      case 3:
-        return const Center(child: Text("Quản lý Đối tác & Công nợ"));
-      default:
-        return const SizedBox();
-    }
+  switch (index) {
+    case 0:
+      return const Center(child: Text("Màn hình Thống kê (Coming Soon)"));
+    case 1:
+      return const MarketExportScreen(); // <--- Đã gắn màn hình Xuất Chợ vào đây
+    case 2:
+      return const Center(child: Text("Màn hình NHẬP KHO (Sẽ làm tiếp theo)"));
+    case 3:
+      return const Center(child: Text("Quản lý Đối tác & Công nợ"));
+    default:
+      return const SizedBox();
   }
 }
+} 
