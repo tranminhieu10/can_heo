@@ -13,6 +13,10 @@ import 'domain/repositories/i_partner_repository.dart';
 
 // Import Bloc
 import 'presentation/features/weighing/bloc/weighing_bloc.dart';
+import 'presentation/features/history/bloc_detail/invoice_detail_cubit.dart';
+import 'presentation/features/history/bloc/invoice_history_bloc.dart';
+import 'presentation/features/partners/bloc/partner_bloc.dart';
+
 
 // Biến toàn cục Service Locator
 final sl = GetIt.instance;
@@ -44,4 +48,13 @@ Future<void> init() async {
   sl.registerFactory(
     () => WeighingBloc(invoiceRepository: sl()),
   );
+  sl.registerFactory(
+    () => InvoiceHistoryBloc(sl()),
+  );
+  sl.registerFactory(() => InvoiceDetailCubit(sl()));
+  sl.registerFactory(
+    () => PartnerBloc(sl()),
+  );
 }
+
+

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart'; // Cần thêm intl vào pubspec.yaml nếu chưa có
+import 'package:intl/intl.dart'; 
 
-import '../../../../core/constants/enums.dart'; // Import Enum InvoiceType
-import '../../../../domain/entities/invoice.dart';
-import '../../../../injection_container.dart'; // Để lấy sl (Service Locator)
+import '../../../../core/constants/enums.dart'; 
+import '../../../../injection_container.dart'; 
 import '../weighing/bloc/weighing_bloc.dart';
 import '../weighing/bloc/weighing_event.dart';
 import '../weighing/bloc/weighing_state.dart';
@@ -14,9 +13,8 @@ class MarketExportScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Cung cấp WeighingBloc cho màn hình này
     return BlocProvider(
-      create: (_) => sl<WeighingBloc>()..add(const WeighingStarted(2)), // 2 = InvoiceType.exportMarket (Hardcode tạm, sau này dùng Enum index)
+      create: (_) => sl<WeighingBloc>()..add(const WeighingStarted(2)), // 2 = Xuất Chợ
       child: const _MarketExportView(),
     );
   }
@@ -30,7 +28,6 @@ class _MarketExportView extends StatefulWidget {
 }
 
 class _MarketExportViewState extends State<_MarketExportView> {
-  // Controller cho các ô nhập liệu
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _truckCostController = TextEditingController();
@@ -50,119 +47,149 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Text("XUẤT CHỢ"),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          // Nút Lưu Phiếu
-          BlocBuilder<WeighingBloc, WeighingState>(
-            builder: (context, state) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: FilledButton.icon(
-                  onPressed: state.items.isEmpty
-                      ? null
-                      : () {
-                          context.read<WeighingBloc>().add(WeighingSaved());
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Đang lưu phiếu...")));
-                        },
-                  icon: const Icon(Icons.save),
-                  label: const Text("LƯU PHIẾU"),
-                ),
-              );
-            },
-          )
-        ],
-      ),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ==============================
-          // CỘT TRÁI: KHU VỰC CÂN & NHẬP
-          // ==============================
-          Expanded(
-            flex: 4,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  _buildInputPanel(context),
-                  const SizedBox(height: 16),
-                  _buildKeypad(context),
-                ],
-              ),
+    return BlocListener<WeighingBloc, WeighingState>(
+      listener: (context, state) {
+        if (state.status == WeighingStatus.success) {
+          // --- XỬ LÝ KHI LƯU THÀNH CÔNG ---
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("✅ Đã lưu phiếu thành công!"),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
             ),
-          ),
+          );
+          
+          // Reset Input
+          _weightController.clear();
+          _priceController.clear();
+          _truckCostController.clear();
+          
+          // Focus lại ô cân để làm phiếu tiếp theo
+          _weightFocus.requestFocus();
 
-          // ==============================
-          // CỘT PHẢI: PHIẾU & DANH SÁCH
-          // ==============================
-          Expanded(
-            flex: 6,
-            child: Container(
-              margin: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
-                ],
-              ),
-              child: Column(
-                children: [
-                  _buildInvoiceHeader(),
-                  const Divider(height: 1),
-                  Expanded(child: _buildWeighingList()),
-                  const Divider(height: 1),
-                  _buildInvoiceFooter(context),
-                ],
+          // Tạo phiếu mới
+          context.read<WeighingBloc>().add(const WeighingStarted(2)); 
+        } else if (state.status == WeighingStatus.failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text("Lỗi: ${state.errorMessage}"), backgroundColor: Colors.red),
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey[100],
+        appBar: AppBar(
+          title: const Text("XUẤT CHỢ"),
+          backgroundColor: Colors.white,
+          elevation: 1,
+          actions: [
+            BlocBuilder<WeighingBloc, WeighingState>(
+              builder: (context, state) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 16.0),
+                  child: FilledButton.icon(
+                    // Disable nút nếu chưa có mã cân nào
+                    onPressed: state.items.isEmpty
+                        ? null
+                        : () {
+                            context.read<WeighingBloc>().add(WeighingSaved());
+                          },
+                    icon: const Icon(Icons.save),
+                    label: const Text("LƯU PHIẾU"),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blue[700],
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                  ),
+                );
+              },
+            )
+          ],
+        ),
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // CỘT TRÁI: NHẬP LIỆU
+            Expanded(
+              flex: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    _buildInputPanel(context),
+                    // Có thể thêm bàn phím số ảo ở đây nếu cần
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+
+            // CỘT PHẢI: PHIẾU & DANH SÁCH
+            Expanded(
+              flex: 6,
+              child: Container(
+                margin: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildInvoiceHeader(),
+                    const Divider(height: 1),
+                    Expanded(child: _buildWeighingList()),
+                    const Divider(height: 1),
+                    _buildInvoiceFooter(context),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // --- Widget: Khu vực nhập cân ---
   Widget _buildInputPanel(BuildContext context) {
     return Card(
       elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text("MÔ PHỎNG CÂN (Sau này kết nối Serial)",
-                style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 10),
+            const Text("NHẬP TRỌNG LƯỢNG",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
             TextField(
               controller: _weightController,
               focusNode: _weightFocus,
-              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.blue),
+              style: const TextStyle(fontSize: 56, fontWeight: FontWeight.bold, color: Colors.blue),
               textAlign: TextAlign.center,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 suffixText: "KG",
                 border: OutlineInputBorder(),
                 hintText: "0.0",
+                contentPadding: EdgeInsets.symmetric(vertical: 20),
               ),
               onSubmitted: (_) => _submitWeight(context),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             SizedBox(
               height: 60,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: () => _submitWeight(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                   foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text("GHI CÂN (ENTER)", style: TextStyle(fontSize: 20)),
+                icon: const Icon(Icons.add_circle_outline, size: 28),
+                label: const Text("GHI CÂN (ENTER)", style: TextStyle(fontSize: 20)),
               ),
             )
           ],
@@ -171,20 +198,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
     );
   }
 
-  // --- Widget: Bàn phím số ảo (Nếu dùng màn hình cảm ứng) ---
-  Widget _buildKeypad(BuildContext context) {
-    return Expanded(
-      child: Container(
-        color: Colors.white, // Placeholder cho bàn phím số
-        child: const Center(child: Text("Khu vực bàn phím số / Chọn khách hàng")),
-      ),
-    );
-  }
-
-  // --- Widget: Header Phiếu (Thông tin chung) ---
   Widget _buildInvoiceHeader() {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(20.0),
       child: BlocBuilder<WeighingBloc, WeighingState>(
         builder: (context, state) {
           return Row(
@@ -195,15 +211,17 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 children: [
                   const Text("KHÁCH HÀNG: Nguyễn Văn A (Mẫu)",
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text("Thời gian: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}"),
+                  const SizedBox(height: 4),
+                  Text("Thời gian: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}",
+                      style: TextStyle(color: Colors.grey[600])),
                 ],
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text("Tổng KL: ${_numberFormat.format(state.currentInvoice?.totalWeight ?? 0)} kg",
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.red)),
-                  Text("Tổng con: ${state.currentInvoice?.totalQuantity ?? 0}",
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.red)),
+                  Text("Số lượng: ${state.currentInvoice?.totalQuantity ?? 0} con",
                       style: const TextStyle(fontSize: 16)),
                 ],
               )
@@ -214,29 +232,42 @@ class _MarketExportViewState extends State<_MarketExportView> {
     );
   }
 
-  // --- Widget: Danh sách mã cân (Table) ---
   Widget _buildWeighingList() {
     return BlocBuilder<WeighingBloc, WeighingState>(
       builder: (context, state) {
         if (state.items.isEmpty) {
-          return const Center(child: Text("Chưa có mã cân nào", style: TextStyle(color: Colors.grey)));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.list_alt, size: 64, color: Colors.grey[300]),
+                const SizedBox(height: 16),
+                Text("Chưa có mã cân nào", style: TextStyle(color: Colors.grey[400], fontSize: 16)),
+              ],
+            ),
+          );
         }
-        return ListView.builder(
+        return ListView.separated(
           itemCount: state.items.length,
+          separatorBuilder: (ctx, i) => const Divider(height: 1),
           itemBuilder: (context, index) {
             final item = state.items[index];
             return Container(
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-                color: index % 2 == 0 ? Colors.white : Colors.grey.shade50,
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              color: index % 2 == 0 ? Colors.white : Colors.grey[50],
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
               child: Row(
                 children: [
-                  SizedBox(width: 50, child: Text("${item.sequence}", style: const TextStyle(fontWeight: FontWeight.bold))),
-                  Expanded(child: Text("${_numberFormat.format(item.weight)} kg", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-                  SizedBox(width: 80, child: Text("${item.quantity} con")),
-                  SizedBox(width: 100, child: Text(DateFormat('HH:mm:ss').format(item.time), style: const TextStyle(color: Colors.grey))),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: Colors.blue[50], shape: BoxShape.circle),
+                    child: Text("${item.sequence}", style: TextStyle(color: Colors.blue[800], fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(child: Text("${_numberFormat.format(item.weight)} kg", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+                  SizedBox(width: 80, child: Text("${item.quantity} con", style: const TextStyle(color: Colors.grey))),
+                  Text(DateFormat('HH:mm').format(item.time), style: TextStyle(color: Colors.grey[400])),
                 ],
               ),
             );
@@ -246,11 +277,13 @@ class _MarketExportViewState extends State<_MarketExportView> {
     );
   }
 
-  // --- Widget: Footer tính tiền ---
   Widget _buildInvoiceFooter(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16.0),
-      color: Colors.grey[50],
+      padding: const EdgeInsets.all(24.0),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(12), bottomRight: Radius.circular(12)),
+      ),
       child: Column(
         children: [
           Row(
@@ -259,36 +292,41 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 child: TextField(
                   controller: _priceController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Đơn giá (đ/kg)", border: OutlineInputBorder()),
-                  onChanged: (val) => setState(() {}), // Refresh để tính lại tổng
+                  decoration: const InputDecoration(
+                    labelText: "Đơn giá (đ/kg)", 
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  onChanged: (val) => _updateInvoiceCalculations(context),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 16),
               Expanded(
                 child: TextField(
                   controller: _truckCostController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: "Cước xe (đ)", border: OutlineInputBorder()),
-                  onChanged: (val) => setState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: "Cước xe (đ)", 
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  onChanged: (val) => _updateInvoiceCalculations(context),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           BlocBuilder<WeighingBloc, WeighingState>(
             builder: (context, state) {
-              // Tính toán sơ bộ trên UI (Logic chính thức nên đưa vào Bloc)
-              double price = double.tryParse(_priceController.text) ?? 0;
-              double truck = double.tryParse(_truckCostController.text) ?? 0;
-              double totalWeight = state.currentInvoice?.totalWeight ?? 0;
-              double totalMoney = (totalWeight * price) + truck;
-
+              final money = state.currentInvoice?.finalAmount ?? 0;
               return Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("THÀNH TIỀN:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text(_currencyFormat.format(totalMoney),
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue)),
+                  const Text("THÀNH TIỀN:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black54)),
+                  Text(_currencyFormat.format(money),
+                      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.blue)),
                 ],
               );
             },
@@ -304,12 +342,20 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
     final weight = double.tryParse(text);
     if (weight != null && weight > 0) {
-      // Gửi sự kiện thêm cân vào Bloc
       context.read<WeighingBloc>().add(WeighingItemAdded(weight: weight));
-      
-      // Clear input và focus lại để nhập tiếp
       _weightController.clear();
       _weightFocus.requestFocus();
     }
+  }
+
+  void _updateInvoiceCalculations(BuildContext context) {
+    // Loại bỏ các ký tự không phải số nếu cần (ví dụ dấu phẩy)
+    double price = double.tryParse(_priceController.text.replaceAll(',', '')) ?? 0;
+    double truck = double.tryParse(_truckCostController.text.replaceAll(',', '')) ?? 0;
+    
+    context.read<WeighingBloc>().add(WeighingInvoiceUpdated(
+      pricePerKg: price,
+      truckCost: truck,
+    ));
   }
 }

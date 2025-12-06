@@ -9,6 +9,10 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
   final IInvoiceRepository invoiceRepository;
   final _uuid = const Uuid();
 
+  // Biến tạm để nhớ giá và cước xe hiện tại (Giúp tính toán khi thêm cân mới)
+  double _lastPrice = 0;
+  double _lastTruckCost = 0;
+
   WeighingBloc({required this.invoiceRepository}) : super(const WeighingState()) {
     on<WeighingStarted>(_onStarted);
     on<WeighingItemAdded>(_onItemAdded);
@@ -17,7 +21,10 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
   }
 
   void _onStarted(WeighingStarted event, Emitter<WeighingState> emit) {
-    // Tạo một phiếu nháp rỗng
+    // Reset lại giá tạm khi bắt đầu phiếu mới
+    _lastPrice = 0;
+    _lastTruckCost = 0;
+
     final newInvoice = InvoiceEntity(
       id: _uuid.v4(),
       type: event.invoiceType,
@@ -27,10 +34,12 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
       finalAmount: 0,
       details: [],
     );
+    
     emit(state.copyWith(
-      status: WeighingStatus.success,
+      status: WeighingStatus.initial,
       currentInvoice: newInvoice,
       items: [],
+      errorMessage: null, // Xóa lỗi cũ nếu có
     ));
   }
 
@@ -40,16 +49,16 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
     // 1. Tạo mã cân mới
     final newItem = WeighingItemEntity(
       id: _uuid.v4(),
-      sequence: state.items.length + 1, // Tự tăng STT
+      sequence: state.items.length + 1,
       weight: event.weight,
       quantity: event.quantity,
       time: DateTime.now(),
     );
 
-    // 2. Thêm vào danh sách
-    final updatedItems = [newItem, ...state.items]; // Thêm vào đầu danh sách để hiện lên trên cùng
+    // 2. Thêm vào đầu danh sách
+    final updatedItems = [newItem, ...state.items];
 
-    // 3. Tính lại tổng trọng lượng
+    // 3. Tính lại tổng trọng lượng & số lượng
     double totalWeight = 0;
     int totalQty = 0;
     for (var item in updatedItems) {
@@ -57,18 +66,35 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
       totalQty += item.quantity;
     }
 
-    // 4. Update Invoice ảo
-    final updatedInvoice = _updateInvoiceTotals(state.currentInvoice!, totalWeight, totalQty);
+    // 4. Tính lại tiền dựa trên giá đã nhập trước đó (nếu có)
+    final newFinalAmount = (totalWeight * _lastPrice) + _lastTruckCost;
+
+    final updatedInvoice = state.currentInvoice!.copyWith(
+      totalWeight: totalWeight,
+      totalQuantity: totalQty,
+      finalAmount: newFinalAmount,
+    );
 
     emit(state.copyWith(items: updatedItems, currentInvoice: updatedInvoice));
   }
 
   void _onInvoiceUpdated(WeighingInvoiceUpdated event, Emitter<WeighingState> emit) {
     if (state.currentInvoice == null) return;
-    
-    // Logic tính tiền tạm thời (sẽ mở rộng sau)
-    // Hiện tại chỉ update partnerId...
-    // TODO: Thêm logic tính thành tiền = weight * price
+
+    // Cập nhật biến nhớ nếu có thay đổi
+    if (event.pricePerKg != null) _lastPrice = event.pricePerKg!;
+    if (event.truckCost != null) _lastTruckCost = event.truckCost!;
+
+    // Tính lại Thành tiền = (Tổng cân * Đơn giá) + Cước xe
+    final currentWeight = state.currentInvoice!.totalWeight;
+    final finalAmount = (currentWeight * _lastPrice) + _lastTruckCost;
+
+    final updatedInvoice = state.currentInvoice!.copyWith(
+      partnerId: event.partnerId ?? state.currentInvoice!.partnerId,
+      finalAmount: finalAmount,
+    );
+
+    emit(state.copyWith(currentInvoice: updatedInvoice));
   }
 
   Future<void> _onSaved(WeighingSaved event, Emitter<WeighingState> emit) async {
@@ -79,7 +105,7 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
       // 1. Lưu Header phiếu
       await invoiceRepository.createInvoice(state.currentInvoice!);
       
-      // 2. Lưu từng chi tiết (Có thể tối ưu bằng batch insert sau này)
+      // 2. Lưu từng chi tiết
       for (var item in state.items) {
         await invoiceRepository.addWeighingItem(state.currentInvoice!.id, item);
       }
@@ -89,18 +115,29 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
       emit(state.copyWith(status: WeighingStatus.failure, errorMessage: e.toString()));
     }
   }
+}
 
-  InvoiceEntity _updateInvoiceTotals(InvoiceEntity old, double newWeight, int newQty) {
+// Extension giúp copy nhanh InvoiceEntity (tránh viết lại constructor dài dòng)
+extension InvoiceEntityCopyWith on InvoiceEntity {
+  InvoiceEntity copyWith({
+    String? id,
+    int? type,
+    double? totalWeight,
+    int? totalQuantity,
+    double? finalAmount,
+    String? partnerId,
+    String? partnerName,
+  }) {
     return InvoiceEntity(
-      id: old.id,
-      type: old.type,
-      createdDate: old.createdDate,
-      totalWeight: newWeight,
-      totalQuantity: newQty,
-      finalAmount: old.finalAmount, // Chưa tính tiền vội
-      partnerId: old.partnerId,
-      partnerName: old.partnerName,
-      details: old.details,
+      id: id ?? this.id,
+      type: type ?? this.type,
+      createdDate: createdDate,
+      totalWeight: totalWeight ?? this.totalWeight,
+      totalQuantity: totalQuantity ?? this.totalQuantity,
+      finalAmount: finalAmount ?? this.finalAmount,
+      partnerId: partnerId ?? this.partnerId,
+      partnerName: partnerName ?? this.partnerName,
+      details: details,
     );
   }
 }
