@@ -1,0 +1,62 @@
+name: can_heo
+description: Phan mem quan ly Can Heo - Nhap/Xuat Kho va Cho.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- State Management (Quản lý trạng thái) ---
+  flutter_bloc: ^8.1.3
+  equatable: ^2.0.5
+  get_it: ^7.6.0
+
+  # --- Database (Drift/SQLite) ---
+  drift: ^2.13.0
+  sqlite3_flutter_libs: ^0.5.18
+  path_provider: ^2.1.1
+  path: ^1.8.3
+
+  # --- Utilities (Tiện ích) ---
+  intl: ^0.19.0
+  uuid: ^4.2.1
+  
+  # --- Printing & PDF (In ấn) ---
+  pdf: ^3.10.4
+  printing: ^5.11.1
+
+  # --- Icons ---
+  cupertino_icons: ^1.0.2
+  window_manager: ^0.5.1
+  file_picker: ^10.3.7
+  excel: ^4.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  
+  # --- Code Generation (Sinh code tự động) ---
+  build_runner: ^2.4.6
+  drift_dev: ^2.13.0
+
+flutter:
+  uses-material-design: true
+
+  # --- QUAN TRỌNG: Đã tạm khóa phần Font để chạy được App ---
+  # Khi nào bạn tải file Roboto-Regular.ttf về thư mục assets/fonts/
+  # thì mới xóa dấu # ở các dòng dưới đi nhé.
+  
+  # assets:
+  #   - assets/fonts/
+
+  # fonts:
+  #   - family: Roboto
+  #     fonts:
+  #       - asset: assets/fonts/Roboto-Regular.ttf
+  #       - asset: assets/fonts/Roboto-Bold.ttf
+  #         weight: 700

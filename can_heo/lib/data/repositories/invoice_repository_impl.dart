@@ -1,0 +1,178 @@
+import 'package:drift/drift.dart';
+
+import '../../domain/entities/invoice.dart';
+import '../../domain/repositories/i_invoice_repository.dart';
+import '../local/database.dart';
+
+class InvoiceRepositoryImpl implements IInvoiceRepository {
+  final AppDatabase _db;
+
+  InvoiceRepositoryImpl(this._db);
+
+  @override
+  Stream<List<InvoiceEntity>> watchInvoices({
+    required int type,
+    String? keyword,
+    int? daysAgo,
+  }) {
+    DateTime? fromDate;
+
+    // Tính toán ngày bắt đầu dựa trên daysAgo
+    if (daysAgo != null) {
+      final now = DateTime.now();
+      final start = daysAgo == 0
+          ? DateTime(now.year, now.month, now.day)
+          : now.subtract(Duration(days: daysAgo));
+      fromDate = start;
+    }
+
+    // We need to include at least the first detail (batch/pigType) so UI can show
+    // Số lô / Loại heo in the saved-invoices grid. Use asyncMap so we can
+    // fetch the first weighing detail per invoice.
+    return _db.invoicesDao
+        .watchInvoicesFiltered(
+          type: type,
+          keyword: keyword,
+          fromDate: fromDate,
+        )
+        .asyncMap((rows) async {
+      final results = <InvoiceEntity>[];
+      for (final row in rows) {
+        // Try to read the first detail (sequence asc) for this invoice
+        final firstDetail = await (_db.select(_db.weighingDetails)
+              ..where((t) => t.invoiceId.equals(row.invoice.id))
+              ..orderBy([(t) => OrderingTerm.asc(t.sequence)])
+              ..limit(1))
+            .getSingleOrNull();
+
+        final details = <WeighingItemEntity>[];
+        if (firstDetail != null) {
+          details.add(WeighingItemEntity(
+            id: firstDetail.id,
+            sequence: firstDetail.sequence,
+            weight: firstDetail.weight,
+            quantity: firstDetail.quantity,
+            time: firstDetail.weighingTime,
+            batchNumber: firstDetail.batchNumber,
+            pigType: firstDetail.pigType,
+          ));
+        }
+
+        results.add(InvoiceEntity(
+          id: row.invoice.id,
+          partnerId: row.partner?.id,
+          partnerName: row.partner?.name ?? 'Khách lẻ',
+          type: row.invoice.type,
+          createdDate: row.invoice.createdDate,
+          totalWeight: row.invoice.totalWeight,
+          totalQuantity: row.invoice.totalQuantity,
+          finalAmount: row.invoice.finalAmount,
+          note: row.invoice.note,
+          details: details,
+        ));
+      }
+
+      return results;
+    });
+  }
+
+  @override
+  Future<InvoiceEntity?> getInvoiceDetail(String id) async {
+    final invoiceRow = await (_db.select(_db.invoices)
+          ..where((tbl) => tbl.id.equals(id)))
+        .getSingleOrNull();
+
+    if (invoiceRow == null) return null;
+
+    String? partnerName;
+    if (invoiceRow.partnerId != null) {
+      final partner =
+          await _db.partnersDao.getPartnerById(invoiceRow.partnerId!);
+      partnerName = partner?.name;
+    }
+
+    final detailQuery = _db.select(_db.weighingDetails)
+      ..where((tbl) => tbl.invoiceId.equals(id))
+      ..orderBy([(t) => OrderingTerm.asc(t.sequence)]);
+    final detailRows = await detailQuery.get();
+
+    final details = detailRows
+        .map(
+          (d) => WeighingItemEntity(
+            id: d.id,
+            sequence: d.sequence,
+            weight: d.weight,
+            quantity: d.quantity,
+            time: d.weighingTime,
+            batchNumber: d.batchNumber,
+            pigType: d.pigType,
+          ),
+        )
+        .toList();
+
+    return InvoiceEntity(
+      id: invoiceRow.id,
+      partnerId: invoiceRow.partnerId,
+      partnerName: partnerName,
+      type: invoiceRow.type,
+      createdDate: invoiceRow.createdDate,
+      totalWeight: invoiceRow.totalWeight,
+      totalQuantity: invoiceRow.totalQuantity,
+      finalAmount: invoiceRow.finalAmount,
+      note: invoiceRow.note,
+      details: details,
+    );
+  }
+
+  @override
+  Future<void> createInvoice(InvoiceEntity invoice) async {
+    await _db.invoicesDao.createInvoice(
+      InvoicesCompanion(
+        id: Value(invoice.id),
+        partnerId: Value(invoice.partnerId),
+        type: Value(invoice.type),
+        createdDate: Value(invoice.createdDate),
+        totalWeight: Value(invoice.totalWeight),
+        totalQuantity: Value(invoice.totalQuantity),
+        note: Value(invoice.note),
+        finalAmount: Value(invoice.finalAmount),
+      ),
+    );
+  }
+
+  @override
+  Future<void> addWeighingItem(
+    String invoiceId,
+    WeighingItemEntity item,
+  ) async {
+    await _db.weighingDetailsDao.insertDetail(
+      WeighingDetailsCompanion(
+        id: Value(item.id),
+        invoiceId: Value(invoiceId),
+        sequence: Value(item.sequence),
+        weight: Value(item.weight),
+        quantity: Value(item.quantity),
+        weighingTime: Value(item.time),
+        batchNumber: Value(item.batchNumber),
+        pigType: Value(item.pigType),
+      ),
+    );
+
+    final totals = await _db.weighingDetailsDao.getInvoiceTotals(invoiceId);
+    final totalWeight = totals['totalWeight'] ?? 0.0;
+    final totalQty = totals['totalQuantity'] ?? 0.0;
+
+    await (_db.update(_db.invoices)..where((t) => t.id.equals(invoiceId)))
+        .write(
+      InvoicesCompanion(
+        totalWeight: Value(totalWeight),
+        totalQuantity: Value(totalQty.toInt()),
+      ),
+    );
+  }
+
+  @override
+  Future<void> deleteInvoice(String id) async {
+    await (_db.delete(_db.invoices)..where((tbl) => tbl.id.equals(id))).go();
+  }
+}
