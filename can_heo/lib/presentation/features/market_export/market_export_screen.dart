@@ -105,6 +105,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
   int _selectedPaymentMethod = 0; // 0 = Tiền mặt, 1 = Chuyển khoản, 2 = Nợ
   int _selectedDebtPaymentMethod = 0; // 0 = Tiền mặt, 1 = Chuyển khoản
 
+  // Resizable divider positions
+  double _leftPanelFlex = 1.0; // Scale section flex factor
+
   @override
   void initState() {
     super.initState();
@@ -197,33 +200,46 @@ class _MarketExportViewState extends State<_MarketExportView> {
               padding: const EdgeInsets.all(8),
               child: Column(
                 children: [
-                  // ========== PHẦN 1: Scale + Summary | Invoice Form (50/50) ==========
-                  Expanded(
-                    flex: 3,
+                  // ========== PHẦN 1: Scale + Summary | Invoice Form (Resizable - Fixed Height) ==========
+                  SizedBox(
+                    height: 360, // Fixed height to prevent overflow
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Left side: Scale + Summary (50%)
+                        // Left side: Scale + Summary
                         Expanded(
-                          flex: 1,
-                          child: Column(
-                            children: [
-                              // Scale Section - scrollable if needed
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  child: _buildScaleSection(context),
+                          flex: _leftPanelFlex.round(),
+                          child: _buildScaleSection(context),
+                        ),
+                        // Resizable divider
+                        MouseRegion(
+                          cursor: SystemMouseCursors.resizeColumn,
+                          child: GestureDetector(
+                            onHorizontalDragUpdate: (details) {
+                              setState(() {
+                                final containerWidth =
+                                    MediaQuery.of(context).size.width - 16;
+                                final deltaFlex =
+                                    details.delta.dx / containerWidth * 4;
+                                _leftPanelFlex = (_leftPanelFlex + deltaFlex)
+                                    .clamp(0.3, 2.5);
+                              });
+                            },
+                            child: Container(
+                              width: 8,
+                              color: Colors.grey[300],
+                              child: Center(
+                                child: Container(
+                                  width: 2,
+                                  color: Colors.grey[400],
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              // Summary totals (compact)
-                              _buildCompactSummarySection(context),
-                            ],
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        // Right side: Invoice Details Form (50%)
+                        // Right side: Invoice Details Form
                         Expanded(
-                          flex: 1,
+                          flex: (3.0 - _leftPanelFlex).round(),
                           child: _buildInvoiceDetailsSection(context),
                         ),
                       ],
@@ -232,13 +248,12 @@ class _MarketExportViewState extends State<_MarketExportView> {
                   const SizedBox(height: 8),
                   // ========== PHẦN 2: Phiếu xuất đã lưu ==========
                   Expanded(
-                    flex: 4,
                     child: _buildSavedInvoicesGrid(context),
                   ),
                   const SizedBox(height: 8),
                   // ========== PHẦN 3: Debt section (always visible) ==========
-                  Expanded(
-                    flex: 3,
+                  SizedBox(
+                    height: 280, // Fixed height for debt section
                     child: _buildDebtSection(context),
                   ),
                   // Footer
@@ -421,121 +436,215 @@ class _MarketExportViewState extends State<_MarketExportView> {
           color: _isWeightLocked ? Colors.green[50] : Colors.blue[50],
           elevation: 2,
           child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Scale display
-                Text(
-                  _isWeightLocked ? 'ĐÃ CHỐT CÂN' : 'TRỌNG LƯỢNG (kg)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 11,
-                    color: _isWeightLocked ? Colors.green[700] : Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _isWeightLocked
-                      ? _numberFormat.format(_lockedWeight)
-                      : (connected
-                          ? _numberFormat.format(weight)
-                          : 'Mất kết nối'),
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: _isWeightLocked
-                        ? Colors.green[800]
-                        : (connected ? Colors.blue[800] : Colors.red),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Manual input - compact
-                SizedBox(
-                  height: 40,
-                  child: TextField(
-                    controller: _scaleInputController,
-                    focusNode: _scaleInputFocus,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    onSubmitted: (_) => _lockWeightManual(),
-                    style: const TextStyle(fontSize: 13),
-                    decoration: const InputDecoration(
-                      labelText: 'Nhập tay (kg)',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Buttons - compact
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 32,
-                        child: OutlinedButton(
-                          onPressed: connected
-                              ? () => sl<IScaleService>().tare()
-                              : null,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            textStyle: const TextStyle(fontSize: 11),
-                          ),
-                          child: const Text('TARE'),
-                        ),
+            padding: const EdgeInsets.all(12),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ROW 1: Scale display
+                  Container(
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _isWeightLocked ? Colors.green : Colors.blue,
+                        width: 2,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: SizedBox(
-                        height: 32,
-                        child: FilledButton(
-                          onPressed: (connected && weight > 0) ||
-                                  _scaleInputController.text.isNotEmpty
-                              ? () {
-                                  if (_scaleInputController.text.isNotEmpty) {
-                                    _lockWeightManual();
-                                  } else {
-                                    _lockWeight(context);
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _isWeightLocked ? 'ĐÃ CHỐT CÂN' : 'SỐ CÂN (kg)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: _isWeightLocked
+                                ? Colors.green[700]
+                                : Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _isWeightLocked
+                              ? _numberFormat.format(_lockedWeight)
+                              : (connected
+                                  ? _numberFormat.format(weight)
+                                  : 'Mất kết nối'),
+                          style: TextStyle(
+                            fontSize: 42,
+                            fontWeight: FontWeight.bold,
+                            color: _isWeightLocked
+                                ? Colors.green[800]
+                                : (connected ? Colors.blue[800] : Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // ROW 2: TARE and Lock buttons
+                  SizedBox(
+                    height: 50,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: connected
+                                ? () => sl<IScaleService>().tare()
+                                : null,
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Text('TARE',
+                                style: TextStyle(fontSize: 14)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: (connected && weight > 0) ||
+                                    _scaleInputController.text.isNotEmpty
+                                ? () {
+                                    if (_scaleInputController.text.isNotEmpty) {
+                                      _lockWeightManual();
+                                    } else {
+                                      _lockWeight(context);
+                                    }
                                   }
-                                }
-                              : null,
-                          style: FilledButton.styleFrom(
-                            backgroundColor:
-                                _isWeightLocked ? Colors.green : null,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            textStyle: const TextStyle(fontSize: 11),
+                                : null,
+                            style: FilledButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              backgroundColor:
+                                  _isWeightLocked ? Colors.green : null,
+                            ),
+                            child: Text(
+                              _isWeightLocked ? 'HỦY CHỐT' : 'CHỐT CÂN',
+                              style: const TextStyle(fontSize: 14),
+                            ),
                           ),
-                          child: Text(_isWeightLocked ? 'CHỐT ✓' : 'CHỐT'),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-                if (_isWeightLocked)
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _isWeightLocked = false;
-                        _lockedWeight = 0;
-                      });
-                    },
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('Hủy chốt',
-                        style: TextStyle(color: Colors.red, fontSize: 11)),
                   ),
-              ],
+                  const SizedBox(height: 8),
+
+                  // ROW 3: Total pigs sold
+                  _buildScaleSummaryRow(
+                    'TỔNG SỐ HEO BÁN',
+                    Icons.pets,
+                    Colors.orange,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // ROW 4: Total weight
+                  _buildScaleSummaryRow(
+                    'TỔNG KHỐI LƯỢNG',
+                    Icons.scale,
+                    Colors.blue,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // ROW 5: Total amount
+                  _buildScaleSummaryRow(
+                    'TỔNG TIỀN',
+                    Icons.attach_money,
+                    Colors.green,
+                  ),
+                ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildScaleSummaryRow(String label, IconData icon, Color color) {
+    return RepaintBoundary(
+      child: StreamBuilder<List<InvoiceEntity>>(
+        stream: _invoiceRepo.watchInvoices(type: 2),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return _buildSummaryRowContent(label, icon, color, '0');
+          }
+
+          final invoices = snapshot.data!;
+          final today = DateTime.now();
+          final todayInvoices = invoices.where((inv) {
+            return inv.createdDate.year == today.year &&
+                inv.createdDate.month == today.month &&
+                inv.createdDate.day == today.day;
+          }).toList();
+
+          double totalWeight = 0;
+          int totalQuantity = 0;
+          double totalAmount = 0;
+
+          for (final inv in todayInvoices) {
+            totalWeight += inv.totalWeight;
+            totalQuantity += inv.totalQuantity;
+            totalAmount += inv.finalAmount;
+          }
+
+          String value;
+          if (label.contains('SỐ HEO')) {
+            value = '$totalQuantity con';
+          } else if (label.contains('KHỐI LƯỢNG')) {
+            value = '${_numberFormat.format(totalWeight)} kg';
+          } else {
+            value = _currencyFormat.format(totalAmount);
+          }
+
+          return _buildSummaryRowContent(label, icon, color, value);
+        },
+      ),
+    );
+  }
+
+  Widget _buildSummaryRowContent(
+      String label, IconData icon, Color color, String value) {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -571,169 +680,226 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
   Widget _buildInvoiceDetailsSection(BuildContext context) {
     return Card(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header - compact
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'THÔNG TIN PHIẾU XUẤT CHỢ',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _isWeightLocked
-                            ? Colors.green[100]
-                            : Colors.red[100],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _isWeightLocked
-                                ? Icons.check_circle
-                                : Icons.warning,
-                            size: 14,
-                            color: _isWeightLocked
-                                ? Colors.green[700]
-                                : Colors.red[700],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _isWeightLocked ? 'Đã chốt' : 'Chưa chốt',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header - compact
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'THÔNG TIN PHIẾU XUẤT CHỢ',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _isWeightLocked
+                              ? Colors.green[100]
+                              : Colors.red[100],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isWeightLocked
+                                  ? Icons.check_circle
+                                  : Icons.warning,
+                              size: 14,
                               color: _isWeightLocked
                                   ? Colors.green[700]
                                   : Colors.red[700],
                             ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _isWeightLocked ? 'Đã chốt' : 'Chưa chốt',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: _isWeightLocked
+                                    ? Colors.green[700]
+                                    : Colors.red[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Add Button
+                      SizedBox(
+                        height: 36,
+                        child: FilledButton.icon(
+                          onPressed: _canAddInvoice()
+                              ? () => _addInvoice(context)
+                              : null,
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('THÊM',
+                              style: TextStyle(fontSize: 12)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                           ),
-                        ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+
+              // ROW 1: Mã khách hàng | Tên khách hàng | Công nợ
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: _buildGridTextField(
+                        controller: TextEditingController(
+                          text: _selectedPartner?.id ?? '',
+                        ),
+                        label: 'Mã KH',
+                        enabled: false,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Add Button
-                    SizedBox(
-                      height: 36,
-                      child: FilledButton.icon(
-                        onPressed: _canAddInvoice()
-                            ? () => _addInvoice(context)
-                            : null,
-                        icon: const Icon(Icons.add, size: 16),
-                        label:
-                            const Text('THÊM', style: TextStyle(fontSize: 12)),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                        ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 2,
+                      child: _buildPartnerSelector(context),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 1,
+                      child: _buildPartnerDebtField(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 5),
+
+              // ROW 2: Loại heo | Số lô | Số lượng heo tồn kho
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: _buildPigTypeWithInventory(),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 1,
+                      child: _buildGridTextField(
+                        controller: _batchNumberController,
+                        label: 'Số lô',
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 1,
+                      child: _buildInventoryDisplayField(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 5),
+
+              // ROW 3: Số lượng (với nút +/-) | Trọng lượng | Trừ hao | TL Thực
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: _buildQuantityFieldWithButtons(),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 1,
+                      child: _buildGridLockedField(
+                        label: 'Trọng lượng (kg)',
+                        value: _numberFormat.format(_grossWeight),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 1,
+                      child: _buildDeductionField(),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 1,
+                      child: _buildGridLockedField(
+                        label: 'TL Thực (kg)',
+                        value: _numberFormat.format(_netWeight),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
+              ),
+              const SizedBox(height: 5),
 
-            // Row 1: Khách hàng | Số lô | Loại heo (+ tồn kho) | Số lượng
-            Row(
-              children: [
-                Expanded(child: _buildPartnerSelector(context)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildGridTextField(
-                    controller: _batchNumberController,
-                    label: 'Số lô',
-                  ),
+              // ROW 4: Đơn giá | Thành tiền | Chiết khấu | Thực thu
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: _buildGridTextField(
+                        controller: _priceController,
+                        label: 'Đơn giá (đ)',
+                        isNumber: true,
+                        onChanged: (_) => setState(() => _updateAutoDiscount()),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 1,
+                      child: _buildGridLockedField(
+                        label: 'Thành tiền',
+                        value: _currencyFormat.format(_subtotal),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 1,
+                      child: _buildGridTextField(
+                        controller: _discountController,
+                        label: 'Chiết khấu (đ)',
+                        isNumber: true,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 1,
+                      child: _buildGridLockedField(
+                        label: 'THỰC THU',
+                        value: _currencyFormat.format(_totalAmount),
+                        highlight: true,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(child: _buildPigTypeWithInventory()),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildGridTextField(
-                    controller: _quantityController,
-                    label: 'Số lượng',
-                    isNumber: true,
-                    onChanged: (_) => setState(() {}),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
+              ),
+              const SizedBox(height: 5),
 
-            // Row 2: Trừ hao | TL Thực | Đơn giá | Thành tiền
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDeductionField(),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildGridLockedField(
-                    label: 'TL Thực (kg)',
-                    value: _numberFormat.format(_netWeight),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildGridTextField(
-                    controller: _priceController,
-                    label: 'Đơn giá (đ)',
-                    isNumber: true,
-                    onChanged: (_) => setState(() => _updateAutoDiscount()),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildGridLockedField(
-                    label: 'Thành tiền',
-                    value: _currencyFormat.format(_subtotal),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Row 3: Chiết khấu | Thực thu | Ghi chú (2 cột)
-            Row(
-              children: [
-                Expanded(
-                  child: _buildGridTextField(
-                    controller: _discountController,
-                    label: 'Chiết khấu (đ)',
-                    isNumber: true,
-                    onChanged: (_) => setState(() {}),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildGridLockedField(
-                    label: 'THỰC THU',
-                    value: _currencyFormat.format(_totalAmount),
-                    highlight: true,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: _buildGridTextField(
-                    controller: _noteController,
-                    label: 'Ghi chú',
-                  ),
-                ),
-              ],
-            ),
-          ],
+              // ROW 5: Ghi chú (full width)
+              _buildGridTextField(
+                controller: _noteController,
+                label: 'Ghi chú',
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -744,20 +910,23 @@ class _MarketExportViewState extends State<_MarketExportView> {
     required TextEditingController controller,
     required String label,
     bool isNumber = false,
+    bool enabled = true,
     void Function(String)? onChanged,
   }) {
     return TextField(
       controller: controller,
+      enabled: enabled,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      style: const TextStyle(fontSize: 14),
+      style: const TextStyle(fontSize: 13),
       onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(fontSize: 12),
+        labelStyle: const TextStyle(fontSize: 10),
         border: const OutlineInputBorder(),
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        filled: !enabled,
+        fillColor: enabled ? null : Colors.grey[200],
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       ),
     );
   }
@@ -769,7 +938,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
     bool highlight = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: highlight ? Colors.blue[50] : Colors.grey[100],
         border: Border.all(
@@ -777,8 +946,10 @@ class _MarketExportViewState extends State<_MarketExportView> {
         ),
         borderRadius: BorderRadius.circular(4),
       ),
+      alignment: Alignment.centerLeft,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
@@ -787,15 +958,19 @@ class _MarketExportViewState extends State<_MarketExportView> {
               fontSize: 10,
               color: highlight ? Colors.blue[700] : Colors.grey[600],
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
           Text(
             value,
             style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
               color: highlight ? Colors.blue[800] : Colors.black87,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -854,11 +1029,11 @@ class _MarketExportViewState extends State<_MarketExportView> {
                   value: selected,
                   decoration: const InputDecoration(
                     labelText: 'Loại heo',
-                    labelStyle: TextStyle(fontSize: 12),
+                    labelStyle: TextStyle(fontSize: 10),
                     border: OutlineInputBorder(),
                     isDense: true,
                     contentPadding:
-                        EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                   ),
                   style: const TextStyle(fontSize: 13, color: Colors.black),
                   items: types.map((type) {
@@ -866,7 +1041,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                     return DropdownMenuItem(
                       value: type,
                       child: Text('${type.name} (Tồn: $inv)',
-                          style: const TextStyle(fontSize: 12)),
+                          style: const TextStyle(fontSize: 13)),
                     );
                   }).toList(),
                   onChanged: (v) {
@@ -885,7 +1060,6 @@ class _MarketExportViewState extends State<_MarketExportView> {
     );
   }
 
-  // Helper: Build deduction field with up/down arrows
   Widget _buildDeductionField() {
     return Row(
       children: [
@@ -893,49 +1067,243 @@ class _MarketExportViewState extends State<_MarketExportView> {
           child: TextField(
             controller: _deductionController,
             keyboardType: TextInputType.number,
-            style: const TextStyle(fontSize: 14),
+            style: const TextStyle(fontSize: 13),
             onChanged: (_) => setState(() => _updateAutoDiscount()),
             decoration: const InputDecoration(
               labelText: 'Trừ hao (kg)',
-              labelStyle: TextStyle(fontSize: 12),
+              labelStyle: TextStyle(fontSize: 10),
               border: OutlineInputBorder(),
               isDense: true,
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             ),
           ),
         ),
-        const SizedBox(width: 4),
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            InkWell(
-              onTap: () => _adjustDeduction(1),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(4)),
+        const SizedBox(width: 2),
+        SizedBox(
+          width: 22,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InkWell(
+                onTap: () => _adjustDeduction(1),
+                child: Container(
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(3)),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.keyboard_arrow_up, size: 12),
+                  ),
                 ),
-                child: const Icon(Icons.keyboard_arrow_up, size: 16),
               ),
-            ),
-            InkWell(
-              onTap: () => _adjustDeduction(-1),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius:
-                      const BorderRadius.vertical(bottom: Radius.circular(4)),
+              InkWell(
+                onTap: () => _adjustDeduction(-1),
+                child: Container(
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius:
+                        const BorderRadius.vertical(bottom: Radius.circular(3)),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.keyboard_arrow_down, size: 12),
+                  ),
                 ),
-                child: const Icon(Icons.keyboard_arrow_down, size: 16),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildQuantityFieldWithButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _quantityController,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontSize: 13),
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Số lượng',
+              labelStyle: TextStyle(fontSize: 10),
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            ),
+          ),
+        ),
+        const SizedBox(width: 2),
+        SizedBox(
+          width: 22,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InkWell(
+                onTap: () {
+                  final current = int.tryParse(_quantityController.text) ?? 1;
+                  setState(() {
+                    _quantityController.text = '${current + 1}';
+                  });
+                },
+                child: Container(
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(3)),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.keyboard_arrow_up, size: 12),
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: () {
+                  final current = int.tryParse(_quantityController.text) ?? 1;
+                  if (current > 1) {
+                    setState(() {
+                      _quantityController.text = '${current - 1}';
+                    });
+                  }
+                },
+                child: Container(
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius:
+                        const BorderRadius.vertical(bottom: Radius.circular(3)),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.keyboard_arrow_down, size: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Helper: Build partner debt display field
+  Widget _buildPartnerDebtField() {
+    if (_selectedPartner == null) {
+      return _buildGridLockedField(
+        label: 'Công nợ',
+        value: '0 đ',
+      );
+    }
+
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _calculatePartnerDebt(_selectedPartner!.id),
+      builder: (context, snapshot) {
+        final debtInfo = snapshot.data ?? {};
+        final remaining = debtInfo['remaining'] ?? 0.0;
+
+        return _buildGridLockedField(
+          label: 'Công nợ',
+          value: _currencyFormat.format(remaining),
+          highlight: remaining > 0,
+        );
+      },
+    );
+  }
+
+  // Helper: Build inventory display field
+  Widget _buildInventoryDisplayField() {
+    final pigType = _pigTypeController.text.trim();
+
+    if (pigType.isEmpty) {
+      return _buildInventoryContainer(0, true);
+    }
+
+    return RepaintBoundary(
+      child: StreamBuilder<List<InvoiceEntity>>(
+        stream: _invoiceRepo.watchInvoices(type: 0),
+        builder: (context, importSnap) {
+          if (!importSnap.hasData) {
+            return _buildInventoryContainer(0, true);
+          }
+
+          return StreamBuilder<List<InvoiceEntity>>(
+            stream: _invoiceRepo.watchInvoices(type: 2),
+            builder: (context, exportSnap) {
+              if (!exportSnap.hasData) {
+                return _buildInventoryContainer(0, true);
+              }
+
+              int imported = 0;
+              int exported = 0;
+
+              for (final inv in importSnap.data!) {
+                for (final item in inv.details) {
+                  if ((item.pigType ?? '').trim() == pigType) {
+                    imported += item.quantity;
+                  }
+                }
+              }
+
+              for (final inv in exportSnap.data!) {
+                for (final item in inv.details) {
+                  if ((item.pigType ?? '').trim() == pigType) {
+                    exported += item.quantity;
+                  }
+                }
+              }
+
+              final availableQty = imported - exported;
+              final requestedQty = int.tryParse(_quantityController.text) ?? 0;
+              final isValid = requestedQty <= availableQty;
+
+              return _buildInventoryContainer(availableQty, isValid);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildInventoryContainer(int qty, bool isValid) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: isValid ? Colors.green[50] : Colors.red[50],
+        border: Border.all(
+          color: isValid ? Colors.green : Colors.red,
+        ),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      alignment: Alignment.centerLeft,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Tồn kho',
+            style: TextStyle(
+              fontSize: 10,
+              color: isValid ? Colors.green[700] : Colors.red[700],
+            ),
+            maxLines: 1,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$qty con',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: isValid ? Colors.green[700] : Colors.red[700],
+            ),
+            maxLines: 1,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1404,12 +1772,18 @@ class _MarketExportViewState extends State<_MarketExportView> {
         return DropdownButtonFormField<PartnerEntity>(
           isExpanded: true,
           decoration: const InputDecoration(
-              labelText: 'Khách hàng',
-              border: OutlineInputBorder(),
-              isDense: true),
+            labelText: 'Khách hàng',
+            labelStyle: TextStyle(fontSize: 10),
+            border: OutlineInputBorder(),
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          ),
           value: safeValue,
+          style: const TextStyle(fontSize: 13, color: Colors.black),
           items: partners
-              .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
+              .map((p) => DropdownMenuItem(
+                  value: p,
+                  child: Text(p.name, style: const TextStyle(fontSize: 13))))
               .toList(),
           onChanged: (value) {
             setState(() => _selectedPartner = value);
