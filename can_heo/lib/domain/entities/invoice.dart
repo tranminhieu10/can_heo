@@ -49,12 +49,21 @@ class InvoiceEntity extends Equatable {
   final String id;
   final String? partnerId;
   final String? partnerName;
-  final int type; // 1 = Nhập kho, 2 = Xuất chợ...
+  final int type; // 0 = Nhập kho, 2 = Xuất chợ...
   final DateTime createdDate;
 
-  final double totalWeight; // tổng kg
+  final double totalWeight; // tổng kg (TL cân)
   final int totalQuantity; // tổng số con
-  final double finalAmount; // thành tiền
+  
+  // Thông tin giá & tính tiền
+  final double pricePerKg; // Đơn giá (đ/kg)
+  final double deduction; // Trừ hao (kg)
+  final double discount; // Chiết khấu (đ)
+  final double finalAmount; // Thực thu = (totalWeight - deduction) * pricePerKg - discount
+  
+  // Số tiền đã thanh toán
+  final double paidAmount;
+  
   final String? note; // Ghi chú phiếu (số lô, nguồn nhập...)
 
   final List<WeighingItemEntity> details;
@@ -67,10 +76,19 @@ class InvoiceEntity extends Equatable {
     required this.createdDate,
     required this.totalWeight,
     required this.totalQuantity,
+    this.pricePerKg = 0,
+    this.deduction = 0,
+    this.discount = 0,
     required this.finalAmount,
+    this.paidAmount = 0,
     this.note,
     this.details = const [],
   });
+
+  // Computed properties
+  double get netWeight => (totalWeight - deduction).clamp(0, double.infinity);
+  double get subtotal => netWeight * pricePerKg;
+  double get remainingAmount => (finalAmount - paidAmount).clamp(0, double.infinity);
 
   InvoiceEntity copyWith({
     String? id,
@@ -80,7 +98,11 @@ class InvoiceEntity extends Equatable {
     DateTime? createdDate,
     double? totalWeight,
     int? totalQuantity,
+    double? pricePerKg,
+    double? deduction,
+    double? discount,
     double? finalAmount,
+    double? paidAmount,
     String? note,
     List<WeighingItemEntity>? details,
   }) {
@@ -92,7 +114,11 @@ class InvoiceEntity extends Equatable {
       createdDate: createdDate ?? this.createdDate,
       totalWeight: totalWeight ?? this.totalWeight,
       totalQuantity: totalQuantity ?? this.totalQuantity,
+      pricePerKg: pricePerKg ?? this.pricePerKg,
+      deduction: deduction ?? this.deduction,
+      discount: discount ?? this.discount,
       finalAmount: finalAmount ?? this.finalAmount,
+      paidAmount: paidAmount ?? this.paidAmount,
       note: note ?? this.note,
       details: details ?? this.details,
     );
@@ -107,7 +133,11 @@ class InvoiceEntity extends Equatable {
     createdDate,
     totalWeight,
     totalQuantity,
+    pricePerKg,
+    deduction,
+    discount,
     finalAmount,
+    paidAmount,
     note,
     details,
   ];

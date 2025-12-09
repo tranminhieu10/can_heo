@@ -14,7 +14,8 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
   final _uuid = const Uuid();
 
   double _lastPricePerKg = 0;
-  double _lastTruckCost = 0;
+  double _lastDeduction = 0;
+  double _lastDiscount = 0;
   
   // Quản lý stream từ đầu cân
   StreamSubscription<double>? _scaleSubscription;
@@ -56,7 +57,8 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
     );
 
     _lastPricePerKg = 0;
-    _lastTruckCost = 0;
+    _lastDeduction = 0;
+    _lastDiscount = 0;
 
     // 2. Bắt đầu lắng nghe Stream từ ScaleService (nếu chưa nghe)
     _startListeningToScale();
@@ -171,14 +173,20 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
     if (event.pricePerKg != null) {
       _lastPricePerKg = (event.pricePerKg!.clamp(0, double.infinity)).toDouble();
     }
-    if (event.truckCost != null) {
-      _lastTruckCost = (event.truckCost!.clamp(0, double.infinity)).toDouble();
+    if (event.deduction != null) {
+      _lastDeduction = (event.deduction!.clamp(0, double.infinity)).toDouble();
+    }
+    if (event.discount != null) {
+      _lastDiscount = (event.discount!.clamp(0, double.infinity)).toDouble();
     }
 
     final updatedInvoice = invoice.copyWith(
       partnerId: event.partnerId ?? invoice.partnerId,
       partnerName: event.partnerName ?? invoice.partnerName,
       note: event.note ?? invoice.note,
+      pricePerKg: _lastPricePerKg,
+      deduction: _lastDeduction,
+      discount: _lastDiscount,
       finalAmount: _calculateFinalAmount(invoice.totalWeight),
     );
 
@@ -238,6 +246,7 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
   }
 
   double _calculateFinalAmount(double totalWeight) {
-    return (totalWeight * _lastPricePerKg) + _lastTruckCost;
+    final netWeight = (totalWeight - _lastDeduction).clamp(0, double.infinity);
+    return (netWeight * _lastPricePerKg) - _lastDiscount;
   }
 }

@@ -66,7 +66,13 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
           createdDate: row.invoice.createdDate,
           totalWeight: row.invoice.totalWeight,
           totalQuantity: row.invoice.totalQuantity,
+          pricePerKg: row.invoice.pricePerKg,
+          deduction: row.invoice.pricePerKg > 0 
+              ? row.invoice.truckCost / row.invoice.pricePerKg 
+              : 0, // truckCost stores deduction as monetary value
+          discount: row.invoice.discount,
           finalAmount: row.invoice.finalAmount,
+          paidAmount: row.invoice.paidAmount,
           note: row.invoice.note,
           details: details,
         ));
@@ -118,7 +124,13 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
       createdDate: invoiceRow.createdDate,
       totalWeight: invoiceRow.totalWeight,
       totalQuantity: invoiceRow.totalQuantity,
+      pricePerKg: invoiceRow.pricePerKg,
+      deduction: invoiceRow.pricePerKg > 0 
+          ? invoiceRow.truckCost / invoiceRow.pricePerKg 
+          : 0,
+      discount: invoiceRow.discount,
       finalAmount: invoiceRow.finalAmount,
+      paidAmount: invoiceRow.paidAmount,
       note: invoiceRow.note,
       details: details,
     );
@@ -134,8 +146,12 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
         createdDate: Value(invoice.createdDate),
         totalWeight: Value(invoice.totalWeight),
         totalQuantity: Value(invoice.totalQuantity),
-        note: Value(invoice.note),
+        pricePerKg: Value(invoice.pricePerKg),
+        truckCost: Value(invoice.deduction * invoice.pricePerKg), // Store deduction as monetary value
+        discount: Value(invoice.discount),
         finalAmount: Value(invoice.finalAmount),
+        paidAmount: Value(invoice.paidAmount),
+        note: Value(invoice.note),
       ),
     );
   }

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 // Import các màn hình con
 import '../market_export/market_export_screen.dart';
+import '../import_barn/import_barn_screen.dart';
 import '../history/invoice_history_screen.dart';
 import '../partners/partners_screen.dart';
 import '../pig_types/pig_types_screen.dart';
+import '../finance/finance_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -49,23 +51,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               // Index 2
               NavigationRailDestination(
-                icon: Icon(Icons.input_outlined),
-                selectedIcon: Icon(Icons.input),
-                label: Text('Nhập Kho'),
-              ),
-              // Index 3
-              NavigationRailDestination(
                 icon: Icon(Icons.people_outline),
                 selectedIcon: Icon(Icons.people),
                 label: Text('Đối tác'),
               ),
-              // Index 4: Loại heo management
+              // Index 3
+              NavigationRailDestination(
+                icon: Icon(Icons.account_balance_wallet_outlined),
+                selectedIcon: Icon(Icons.account_balance_wallet),
+                label: Text('Tài chính'),
+              ),
+              // Index 4
+              NavigationRailDestination(
+                icon: Icon(Icons.input_outlined),
+                selectedIcon: Icon(Icons.input),
+                label: Text('Nhập Kho'),
+              ),
+              // Index 5: Loại heo management
               NavigationRailDestination(
                 icon: Icon(Icons.pets_outlined),
                 selectedIcon: Icon(Icons.pets),
                 label: Text('Loại heo'),
               ),
-              // Index 4: THÊM NÚT LỊCH SỬ VÀO ĐÂY
+              // Index 6: Lịch sử
               NavigationRailDestination(
                 icon: Icon(Icons.history_outlined),
                 selectedIcon: Icon(Icons.history),
@@ -95,16 +103,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 1:
         return const MarketExportScreen(); // Màn hình Xuất Chợ
       case 2:
-        return const Center(child: Text("Màn hình NHẬP KHO (Sẽ làm tiếp theo)"));
-
+        return const PartnersScreen(); // Màn hình Đối tác
       case 3:
-         return const PartnersScreen();
+        return const FinanceScreen(); // Màn hình Tài chính
       case 4:
-        // Gọi màn hình quản lý Loại heo
-        return const PigTypesScreen();
+        return const ImportBarnScreen(); // Màn hình Nhập Kho
       case 5:
-        // Gọi màn hình Lịch sử với type = 2 (Xuất Chợ)
-        return const InvoiceHistoryScreen(invoiceType: 2);
+        return const PigTypesScreen(); // Màn hình Loại heo
+      case 6:
+        return const InvoiceHistoryScreen(invoiceType: 2); // Màn hình Lịch sử
       default:
         return const SizedBox();
     }
