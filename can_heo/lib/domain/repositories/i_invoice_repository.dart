@@ -14,9 +14,25 @@ abstract class IInvoiceRepository {
   // Tạo phiếu mới
   Future<void> createInvoice(InvoiceEntity invoice);
 
+  // Cập nhật phiếu
+  Future<void> updateInvoice(InvoiceEntity invoice);
+
   // Thêm 1 mã cân
   Future<void> addWeighingItem(String invoiceId, WeighingItemEntity item);
 
-  // Xóa 1 phiếu
-  Future<void> deleteInvoice(String id);
-}
+  // Cập nhật 1 mã cân
+  Future<void> updateWeighingItem(WeighingItemEntity item);
+
+    // Xóa 1 phiếu
+
+    Future<void> deleteInvoice(String id);
+
+  
+
+    // Xem tồn kho của 1 loại heo
+
+    Stream<int> watchPigTypeInventory(String pigType);
+
+  }
+
+  

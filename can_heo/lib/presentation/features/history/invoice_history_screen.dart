@@ -276,6 +276,26 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
 
   Future<void> _confirmAndDelete(
       BuildContext context, InvoiceEntity invoice) async {
+    // If it's an import invoice (type 0), check if deletion would cause negative inventory
+    if (invoice.type == 0) {
+      final canDelete = await _canDeleteImportInvoice(invoice);
+      if (!canDelete) {
+        if (context.mounted) {
+          String pigTypes = invoice.details.map((d) => d.pigType ?? 'N/A').toSet().join(', ');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '❌ Không thể xóa phiếu! Loại heo "$pigTypes" sẽ bị âm tồn kho nếu xóa phiếu này.',
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+    }
+    
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -300,9 +320,63 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
 
     if (result == true) {
       await sl<IInvoiceRepository>().deleteInvoice(invoice.id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã xóa phiếu')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã xóa phiếu')),
+        );
+      }
+    }
+  }
+
+  /// Check if deleting an import invoice would cause negative inventory
+  Future<bool> _canDeleteImportInvoice(InvoiceEntity invoice) async {
+    try {
+      final repo = sl<IInvoiceRepository>();
+      final importInvoices = await repo.watchInvoices(type: 0).first;
+      final exportInvoices = await repo.watchInvoices(type: 2).first;
+
+      // Get pig types and quantities from this invoice
+      Map<String, int> invoicePigTypes = {};
+      for (final item in invoice.details) {
+        final pigType = (item.pigType ?? '').trim();
+        if (pigType.isNotEmpty) {
+          invoicePigTypes[pigType] = (invoicePigTypes[pigType] ?? 0) + item.quantity;
+        }
+      }
+
+      // Calculate current inventory for each pig type
+      for (final pigType in invoicePigTypes.keys) {
+        int imported = 0;
+        int exported = 0;
+
+        for (final inv in importInvoices) {
+          // Skip the invoice we're trying to delete
+          if (inv.id == invoice.id) continue;
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType) {
+              imported += item.quantity;
+            }
+          }
+        }
+
+        for (final inv in exportInvoices) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType) {
+              exported += item.quantity;
+            }
+          }
+        }
+
+        // If deleting this invoice would make inventory negative
+        final remainingInventory = imported - exported;
+        if (remainingInventory < 0) {
+          return false;
+        }
+      }
+
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 }

@@ -51,9 +51,10 @@ class WeighingInvoiceUpdated extends WeighingEvent {
   final String? partnerId;
   final String? partnerName;
   final double? pricePerKg;
-  final double? deduction; // Trừ hao (kg)
-  final double? discount; // Chiết khấu (đ)
+  final double? deduction; // Trừ hao (kg) hoặc TL Trại (nhập kho)
+  final double? discount; // Chiết khấu (đ) hoặc Cước xe (nhập kho)
   final String? note;
+  final double? finalAmount; // Số tiền thanh toán (nhập kho)
 
   const WeighingInvoiceUpdated({
     this.partnerId,
@@ -62,10 +63,11 @@ class WeighingInvoiceUpdated extends WeighingEvent {
     this.deduction,
     this.discount,
     this.note,
+    this.finalAmount,
   });
 
   @override
-  List<Object?> get props => [partnerId, partnerName, pricePerKg, deduction, discount, note];
+  List<Object?> get props => [partnerId, partnerName, pricePerKg, deduction, discount, note, finalAmount];
 }
 
 /// Lưu phiếu xuống DB

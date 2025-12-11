@@ -180,6 +180,10 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
       _lastDiscount = (event.discount!.clamp(0, double.infinity)).toDouble();
     }
 
+    // If finalAmount is explicitly provided (e.g., from import screen), use it
+    // Otherwise calculate it (for export screen)
+    final calculatedFinalAmount = event.finalAmount ?? _calculateFinalAmount(invoice.totalWeight);
+
     final updatedInvoice = invoice.copyWith(
       partnerId: event.partnerId ?? invoice.partnerId,
       partnerName: event.partnerName ?? invoice.partnerName,
@@ -187,7 +191,7 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
       pricePerKg: _lastPricePerKg,
       deduction: _lastDeduction,
       discount: _lastDiscount,
-      finalAmount: _calculateFinalAmount(invoice.totalWeight),
+      finalAmount: calculatedFinalAmount,
     );
 
     emit(

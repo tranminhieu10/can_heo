@@ -1,4 +1,6 @@
 import 'package:drift/drift.dart';
+import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/invoice.dart';
 import '../../domain/repositories/i_invoice_repository.dart';
@@ -67,9 +69,7 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
           totalWeight: row.invoice.totalWeight,
           totalQuantity: row.invoice.totalQuantity,
           pricePerKg: row.invoice.pricePerKg,
-          deduction: row.invoice.pricePerKg > 0 
-              ? row.invoice.truckCost / row.invoice.pricePerKg 
-              : 0, // truckCost stores deduction as monetary value
+          deduction: row.invoice.truckCost, // Read deduction directly
           discount: row.invoice.discount,
           finalAmount: row.invoice.finalAmount,
           paidAmount: row.invoice.paidAmount,
@@ -125,9 +125,7 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
       totalWeight: invoiceRow.totalWeight,
       totalQuantity: invoiceRow.totalQuantity,
       pricePerKg: invoiceRow.pricePerKg,
-      deduction: invoiceRow.pricePerKg > 0 
-          ? invoiceRow.truckCost / invoiceRow.pricePerKg 
-          : 0,
+      deduction: invoiceRow.truckCost, // Read deduction directly
       discount: invoiceRow.discount,
       finalAmount: invoiceRow.finalAmount,
       paidAmount: invoiceRow.paidAmount,
@@ -147,7 +145,7 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
         totalWeight: Value(invoice.totalWeight),
         totalQuantity: Value(invoice.totalQuantity),
         pricePerKg: Value(invoice.pricePerKg),
-        truckCost: Value(invoice.deduction * invoice.pricePerKg), // Store deduction as monetary value
+        truckCost: Value(invoice.deduction), // Store deduction (farmWeight for import) directly
         discount: Value(invoice.discount),
         finalAmount: Value(invoice.finalAmount),
         paidAmount: Value(invoice.paidAmount),
@@ -190,5 +188,76 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
   @override
   Future<void> deleteInvoice(String id) async {
     await (_db.delete(_db.invoices)..where((tbl) => tbl.id.equals(id))).go();
+  }
+
+  @override
+  Future<void> updateInvoice(InvoiceEntity invoice) async {
+    debugPrint('=== REPOSITORY: updateInvoice ===');
+    debugPrint('Updating invoice ID: ${invoice.id}');
+    debugPrint('totalWeight: ${invoice.totalWeight}');
+    debugPrint('pricePerKg: ${invoice.pricePerKg}');
+    debugPrint('deduction: ${invoice.deduction}');
+    debugPrint('discount: ${invoice.discount}');
+    debugPrint('finalAmount: ${invoice.finalAmount}');
+    
+    final rowsAffected = await (_db.update(_db.invoices)..where((t) => t.id.equals(invoice.id))).write(
+      InvoicesCompanion(
+        partnerId: Value(invoice.partnerId),
+        totalWeight: Value(invoice.totalWeight),
+        totalQuantity: Value(invoice.totalQuantity),
+        pricePerKg: Value(invoice.pricePerKg),
+        truckCost: Value(invoice.deduction), // Store deduction (farmWeight) directly
+        discount: Value(invoice.discount),
+        finalAmount: Value(invoice.finalAmount),
+        paidAmount: Value(invoice.paidAmount),
+        note: Value(invoice.note),
+      ),
+    );
+    debugPrint('Rows affected: $rowsAffected');
+  }
+
+  @override
+  Future<void> updateWeighingItem(WeighingItemEntity item) async {
+    debugPrint('=== REPOSITORY: updateWeighingItem ===');
+    debugPrint('Updating item ID: ${item.id}');
+    debugPrint('pigType: ${item.pigType}');
+    debugPrint('weight: ${item.weight}');
+    
+    final rowsAffected = await (_db.update(_db.weighingDetails)..where((t) => t.id.equals(item.id))).write(
+      WeighingDetailsCompanion(
+        weight: Value(item.weight),
+        quantity: Value(item.quantity),
+        batchNumber: Value(item.batchNumber),
+        pigType: Value(item.pigType),
+      ),
+    );
+    debugPrint('WeighingItem rows affected: $rowsAffected');
+  }
+
+  @override
+  Stream<int> watchPigTypeInventory(String pigType) {
+    if (pigType.isEmpty) return Stream.value(0);
+
+    final query = _db.select(_db.weighingDetails).join([
+      innerJoin(
+          _db.invoices, _db.invoices.id.equalsExp(_db.weighingDetails.invoiceId))
+    ])
+      ..where(_db.weighingDetails.pigType.equals(pigType));
+
+    return query.watch().map((rows) {
+      int imported = 0;
+      int exported = 0;
+
+      for (final row in rows) {
+        final invoice = row.readTable(_db.invoices);
+        final detail = row.readTable(_db.weighingDetails);
+        if (invoice.type == 0) {
+          imported += detail.quantity;
+        } else if (invoice.type == 2) {
+          exported += detail.quantity;
+        }
+      }
+      return imported - exported;
+    });
   }
 }

@@ -1078,7 +1078,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
             ),
           ),
         ),
-        const SizedBox(width: 2),
+        const SizedBox(width: 2), 
         SizedBox(
           width: 22,
           child: Column(
@@ -1355,7 +1355,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 (t) => t.name == _pigTypeController.text,
                 orElse: () => types.first,
               );
-        return DropdownButtonFormField<PigTypeEntity?>(
+        return DropdownButtonFormField<PigTypeEntity>(
           value: selected,
           decoration: const InputDecoration(
             labelText: 'Loại heo',
@@ -1363,7 +1363,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
             isDense: true,
           ),
           items: types
-              .map((t) => DropdownMenuItem(value: t, child: Text(t.name)))
+              .map((t) => DropdownMenuItem<PigTypeEntity>(value: t, child: Text(t.name)))
               .toList(),
           onChanged: (v) {
             if (v != null) {
@@ -1582,7 +1582,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 ),
               ),
               // Data table
-              Expanded(
+              SizedBox(
+                height: 260,
                 child: SingleChildScrollView(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -2003,7 +2004,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
             // Content - Empty placeholder or actual data
             if (!hasPartner)
-              Expanded(
+              SizedBox(
+                height: 140,
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -2020,7 +2022,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 ),
               )
             else
-              Expanded(
+              SizedBox(
+                height: 240,
                 child: _buildPartnerDebtContent(partnerId!),
               ),
           ],

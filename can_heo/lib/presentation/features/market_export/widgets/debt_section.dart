@@ -166,7 +166,7 @@ class DebtSection extends StatelessWidget {
         final remaining = debtInfo['remaining'] ?? 0.0;
 
         return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Left: Transaction histories (thanh toán + trả nợ)
             Expanded(
@@ -383,6 +383,7 @@ class DebtSection extends StatelessWidget {
 
   Widget _buildDebtSummaryBox(String label, double value, Color color) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
@@ -437,61 +438,70 @@ class DebtSection extends StatelessWidget {
                               const TextStyle(color: Colors.grey, fontSize: 11),
                         ),
                       )
-                    : SingleChildScrollView(
-                        child: DataTable(
-                          columnSpacing: 12,
-                          dataRowMinHeight: 32,
-                          dataRowMaxHeight: 36,
-                          headingRowHeight: 34,
-                          columns: const [
-                            DataColumn(
-                                label: Text('STT',
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold))),
-                            DataColumn(
-                                label: Text('Hình thức',
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold))),
-                            DataColumn(
-                                label: Text('Số tiền',
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold))),
-                            DataColumn(
-                                label: Text('Ngày',
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold))),
-                          ],
-                          rows: List.generate(transactions.take(10).length,
-                              (idx) {
-                            final tx = transactions[idx];
-                            final paymentMethod = tx.paymentMethod == 0
-                                ? 'Tiền mặt'
-                                : 'Chuyển khoản';
-                            return DataRow(cells: [
-                              DataCell(Text('${idx + 1}',
-                                  style: const TextStyle(fontSize: 11))),
-                              DataCell(Text(paymentMethod,
-                                  style: const TextStyle(fontSize: 11))),
-                              DataCell(Text(
-                                currencyFormat.format(tx.amount),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
-                                  color: type == 0 ? Colors.green : Colors.blue,
-                                ),
-                              )),
-                              DataCell(Text(
-                                DateFormat('dd/MM').format(tx.transactionDate),
-                                style: const TextStyle(
-                                    fontSize: 10, color: Colors.grey),
-                              )),
-                            ]);
-                          }),
-                        ),
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          return SingleChildScrollView(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minWidth: constraints.maxWidth,
+                              ),
+                              child: DataTable(
+                                columnSpacing: 8,
+                                dataRowMinHeight: 32,
+                                dataRowMaxHeight: 36,
+                                headingRowHeight: 34,
+                                columns: const [
+                                  DataColumn(
+                                      label: Text('STT',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold))),
+                                  DataColumn(
+                                      label: Text('Hình thức',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold))),
+                                  DataColumn(
+                                      label: Text('Số tiền',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold))),
+                                  DataColumn(
+                                      label: Text('Ngày',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold))),
+                                ],
+                                rows: List.generate(transactions.take(10).length,
+                                    (idx) {
+                                  final tx = transactions[idx];
+                                  final paymentMethod = tx.paymentMethod == 0
+                                      ? 'Tiền mặt'
+                                      : 'Chuyển khoản';
+                                  return DataRow(cells: [
+                                    DataCell(Text('${idx + 1}',
+                                        style: const TextStyle(fontSize: 10))),
+                                    DataCell(Text(paymentMethod,
+                                        style: const TextStyle(fontSize: 10))),
+                                    DataCell(Text(
+                                      currencyFormat.format(tx.amount),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                        color: type == 0 ? Colors.green : Colors.blue,
+                                      ),
+                                    )),
+                                    DataCell(Text(
+                                      DateFormat('dd/MM').format(tx.transactionDate),
+                                      style: const TextStyle(
+                                          fontSize: 9, color: Colors.grey),
+                                    )),
+                                  ]);
+                                }),
+                              ),
+                            ),
+                          );
+                        },
                       ),
               ),
             ),
