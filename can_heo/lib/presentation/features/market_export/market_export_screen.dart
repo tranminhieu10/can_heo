@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 
 import '../../../core/services/scale_service.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/partner.dart';
 import '../../../domain/entities/pig_type.dart';
 import '../../../domain/repositories/i_pigtype_repository.dart';
@@ -105,8 +106,10 @@ class _MarketExportViewState extends State<_MarketExportView> {
   int _selectedPaymentMethod = 0; // 0 = Tiền mặt, 1 = Chuyển khoản, 2 = Nợ
   int _selectedDebtPaymentMethod = 0; // 0 = Tiền mặt, 1 = Chuyển khoản
 
-  // Resizable divider positions
-  double _leftPanelFlex = 1.0; // Scale section flex factor
+  // Resizable panel ratio (0.0 to 1.0, default 0.5 = 50%)
+  double _panelRatio = 0.5;
+  static const double _minPanelRatio = 0.25;
+  static const double _maxPanelRatio = 0.75;
 
   @override
   void initState() {
@@ -196,79 +199,97 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 _buildSaveButton(context),
               ],
             ),
-            body: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                children: [
-                  // ========== PHẦN 1: Scale + Summary | Invoice Form (Resizable - Fixed Height) ==========
-                  SizedBox(
-                    height: 360, // Fixed height to prevent overflow
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Left side: Scale + Summary
-                        Expanded(
-                          flex: _leftPanelFlex.round(),
-                          child: _buildScaleSection(context),
-                        ),
-                        // Resizable divider
-                        MouseRegion(
-                          cursor: SystemMouseCursors.resizeColumn,
-                          child: GestureDetector(
-                            onHorizontalDragUpdate: (details) {
-                              setState(() {
-                                final containerWidth =
-                                    MediaQuery.of(context).size.width - 16;
-                                final deltaFlex =
-                                    details.delta.dx / containerWidth * 4;
-                                _leftPanelFlex = (_leftPanelFlex + deltaFlex)
-                                    .clamp(0.3, 2.5);
-                              });
-                            },
-                            child: Container(
-                              width: 8,
-                              color: Colors.grey[300],
-                              child: Center(
-                                child: Container(
-                                  width: 2,
-                                  color: Colors.grey[400],
+            body: LayoutBuilder(
+              builder: (context, constraints) {
+                // Initialize responsive values
+                Responsive.init(context);
+                
+                // Adaptive heights based on screen size
+                final topSectionHeight = Responsive.screenType == ScreenType.desktop27 
+                    ? 400.0 
+                    : Responsive.screenType == ScreenType.desktop24 
+                        ? 380.0 
+                        : Responsive.screenType == ScreenType.laptop15 
+                            ? 360.0 
+                            : 340.0;
+                final debtBarHeight = Responsive.screenType == ScreenType.desktop27 ? 48.0 : 44.0;
+                final padding = Responsive.spacing;
+
+                return Padding(
+                  padding: EdgeInsets.all(padding),
+                  child: Column(
+                    children: [
+                      // ========== PHẦN 1: Scale + Summary | Invoice Form (Resizable - Fixed Height) ==========
+                      SizedBox(
+                        height: topSectionHeight,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final totalWidth = constraints.maxWidth;
+                            const dividerWidth = 12.0;
+                            final availableWidth = totalWidth - dividerWidth;
+                            final leftWidth = availableWidth * _panelRatio;
+                            final rightWidth = availableWidth * (1 - _panelRatio);
+
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Left side: Scale + Summary
+                                SizedBox(
+                                  width: leftWidth,
+                                  child: _buildScaleSection(context),
                                 ),
-                              ),
-                            ),
-                          ),
+                                // Draggable Divider
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onHorizontalDragUpdate: (details) {
+                                    setState(() {
+                                      final newRatio = _panelRatio +
+                                          (details.delta.dx / availableWidth);
+                                      _panelRatio = newRatio.clamp(
+                                          _minPanelRatio, _maxPanelRatio);
+                                    });
+                                  },
+                                  child: MouseRegion(
+                                    cursor: SystemMouseCursors.resizeColumn,
+                                    child: Container(
+                                      width: dividerWidth,
+                                      color: Colors.transparent,
+                                      child: Center(
+                                        child: Container(
+                                          width: 4,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade400,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // Right side: Invoice Details Form
+                                SizedBox(
+                                  width: rightWidth,
+                                  child: _buildInvoiceDetailsSection(context),
+                                ),
+                              ],
+                            );
+                          },
                         ),
-                        // Right side: Invoice Details Form
-                        Expanded(
-                          flex: (3.0 - _leftPanelFlex).round(),
-                          child: _buildInvoiceDetailsSection(context),
-                        ),
-                      ],
-                    ),
+                      ),
+                      // ========== PHẦN 2: Phiếu xuất đã lưu ==========
+                      Expanded(
+                        child: _buildSavedInvoicesGrid(context),
+                      ),
+                      // ========== PHẦN 3: Debt section (always visible) ==========
+                      SizedBox(
+                        height: debtBarHeight,
+                        child: _buildDebtSection(context),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  // ========== PHẦN 2: Phiếu xuất đã lưu ==========
-                  Expanded(
-                    child: _buildSavedInvoicesGrid(context),
-                  ),
-                  const SizedBox(height: 8),
-                  // ========== PHẦN 3: Debt section (always visible) ==========
-                  SizedBox(
-                    height: 280, // Fixed height for debt section
-                    child: _buildDebtSection(context),
-                  ),
-                  // Footer
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text(
-                      "Phím tắt: [F1] Chốt cân | [F2] Tare | [F4] Lưu phiếu",
-                      style: TextStyle(
-                          color: Colors.grey,
-                          fontStyle: FontStyle.italic,
-                          fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ),
@@ -436,130 +457,237 @@ class _MarketExportViewState extends State<_MarketExportView> {
           color: _isWeightLocked ? Colors.green[50] : Colors.blue[50],
           elevation: 2,
           child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // ROW 1: Scale display
-                  Container(
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: _isWeightLocked ? Colors.green : Colors.blue,
-                        width: 2,
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ROW 1: Scale display - compact
+                Container(
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _isWeightLocked ? Colors.green : Colors.blue,
+                      width: 2,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _isWeightLocked ? 'ĐÃ CHỐT: ' : 'SỐ CÂN: ',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: _isWeightLocked
+                              ? Colors.green[700]
+                              : Colors.grey[600],
+                        ),
                       ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _isWeightLocked ? 'ĐÃ CHỐT CÂN' : 'SỐ CÂN (kg)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: _isWeightLocked
-                                ? Colors.green[700]
-                                : Colors.grey,
-                          ),
+                      Text(
+                        _isWeightLocked
+                            ? _numberFormat.format(_lockedWeight)
+                            : (connected
+                                ? _numberFormat.format(weight)
+                                : 'Mất kết nối'),
+                        style: TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: _isWeightLocked
+                              ? Colors.green[800]
+                              : (connected ? Colors.blue[800] : Colors.red),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _isWeightLocked
-                              ? _numberFormat.format(_lockedWeight)
-                              : (connected
-                                  ? _numberFormat.format(weight)
-                                  : 'Mất kết nối'),
-                          style: TextStyle(
-                            fontSize: 42,
-                            fontWeight: FontWeight.bold,
-                            color: _isWeightLocked
-                                ? Colors.green[800]
-                                : (connected ? Colors.blue[800] : Colors.red),
-                          ),
+                      ),
+                      Text(
+                        ' kg',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _isWeightLocked
+                              ? Colors.green[700]
+                              : Colors.blue[700],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                ),
+                const SizedBox(height: 6),
 
-                  // ROW 2: TARE and Lock buttons
-                  SizedBox(
-                    height: 50,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: connected
-                                ? () => sl<IScaleService>().tare()
-                                : null,
-                            style: OutlinedButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                            ),
-                            child: const Text('TARE',
-                                style: TextStyle(fontSize: 14)),
+                // ROW 2: Manual input + TARE and Lock buttons - compact
+                SizedBox(
+                  height: 36,
+                  child: Row(
+                    children: [
+                      // Ô nhập số cân thủ công
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: _scaleInputController,
+                          focusNode: _scaleInputFocus,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d*')),
+                          ],
+                          decoration: InputDecoration(
+                            hintText: 'Nhập TL thủ công...',
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 6),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6)),
                           ),
+                          style: const TextStyle(fontSize: 12),
+                          onSubmitted: (_) => _lockWeightManual(),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: (connected && weight > 0) ||
-                                    _scaleInputController.text.isNotEmpty
-                                ? () {
-                                    if (_scaleInputController.text.isNotEmpty) {
-                                      _lockWeightManual();
-                                    } else {
-                                      _lockWeight(context);
-                                    }
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: connected
+                              ? () => sl<IScaleService>().tare()
+                              : null,
+                          style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.zero),
+                          child: const Text('TARE',
+                              style: TextStyle(fontSize: 11)),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton(
+                          onPressed: (connected && weight > 0) ||
+                                  _scaleInputController.text.isNotEmpty
+                              ? () {
+                                  if (_isWeightLocked) {
+                                    setState(() {
+                                      _isWeightLocked = false;
+                                      _lockedWeight = 0;
+                                    });
+                                  } else if (_scaleInputController
+                                      .text.isNotEmpty) {
+                                    _lockWeightManual();
+                                  } else {
+                                    _lockWeight(context);
                                   }
-                                : null,
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              backgroundColor:
-                                  _isWeightLocked ? Colors.green : null,
-                            ),
-                            child: Text(
-                              _isWeightLocked ? 'HỦY CHỐT' : 'CHỐT CÂN',
-                              style: const TextStyle(fontSize: 14),
-                            ),
+                                }
+                              : null,
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            backgroundColor:
+                                _isWeightLocked ? Colors.green : null,
+                          ),
+                          child: Text(
+                            _isWeightLocked ? 'HỦY CHỐT' : 'CHỐT CÂN (F1)',
+                            style: const TextStyle(fontSize: 11),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                ),
+                const SizedBox(height: 6),
 
-                  // ROW 3: Total pigs sold
-                  _buildScaleSummaryRow(
-                    'TỔNG SỐ HEO BÁN',
-                    Icons.pets,
-                    Colors.orange,
+                // ROW 3: Summary - 3 items in a row
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                          child: _buildCompactSummary(
+                              'SỐ HEO BÁN', Icons.pets, Colors.orange)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                          child: _buildCompactSummary(
+                              'KHỐI LƯỢNG', Icons.scale, Colors.blue)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                          child: _buildCompactSummary(
+                              'TỔNG TIỀN', Icons.attach_money, Colors.green)),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-
-                  // ROW 4: Total weight
-                  _buildScaleSummaryRow(
-                    'TỔNG KHỐI LƯỢNG',
-                    Icons.scale,
-                    Colors.blue,
-                  ),
-                  const SizedBox(height: 8),
-
-                  // ROW 5: Total amount
-                  _buildScaleSummaryRow(
-                    'TỔNG TIỀN',
-                    Icons.attach_money,
-                    Colors.green,
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCompactSummary(String label, IconData icon, Color color) {
+    return RepaintBoundary(
+      child: StreamBuilder<List<InvoiceEntity>>(
+        stream: _invoiceRepo.watchInvoices(type: 2),
+        builder: (context, snapshot) {
+          String value = '0';
+          if (snapshot.hasData) {
+            final invoices = snapshot.data!;
+            final today = DateTime.now();
+            final todayInvoices = invoices.where((inv) {
+              return inv.createdDate.year == today.year &&
+                  inv.createdDate.month == today.month &&
+                  inv.createdDate.day == today.day;
+            }).toList();
+
+            double totalWeight = 0;
+            int totalQuantity = 0;
+            double totalAmount = 0;
+
+            for (final inv in todayInvoices) {
+              totalWeight += inv.totalWeight;
+              totalQuantity += inv.totalQuantity;
+              totalAmount += inv.finalAmount;
+            }
+
+            if (label.contains('HEO')) {
+              value = '$totalQuantity con';
+            } else if (label.contains('KHỐI')) {
+              value = '${_numberFormat.format(totalWeight)} kg';
+            } else {
+              value = _currencyFormat.format(totalAmount);
+            }
+          }
+
+          return Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: color.withOpacity(0.3)),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: color, size: 20),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  style: TextStyle(
+                      fontSize: 10, color: color, fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: color),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -680,227 +808,692 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
   Widget _buildInvoiceDetailsSection(BuildContext context) {
     return Card(
+      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header - compact
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
                     'THÔNG TIN PHIẾU XUẤT CHỢ',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
-                  Row(
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color:
+                        _isWeightLocked ? Colors.green[100] : Colors.red[100],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _isWeightLocked
-                              ? Colors.green[100]
-                              : Colors.red[100],
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _isWeightLocked
-                                  ? Icons.check_circle
-                                  : Icons.warning,
-                              size: 14,
-                              color: _isWeightLocked
-                                  ? Colors.green[700]
-                                  : Colors.red[700],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _isWeightLocked ? 'Đã chốt' : 'Chưa chốt',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: _isWeightLocked
-                                    ? Colors.green[700]
-                                    : Colors.red[700],
-                              ),
-                            ),
-                          ],
-                        ),
+                      Icon(
+                        _isWeightLocked ? Icons.check_circle : Icons.warning,
+                        size: 12,
+                        color: _isWeightLocked
+                            ? Colors.green[700]
+                            : Colors.red[700],
                       ),
-                      const SizedBox(width: 8),
-                      // Add Button
-                      SizedBox(
-                        height: 36,
-                        child: FilledButton.icon(
-                          onPressed: _canAddInvoice()
-                              ? () => _addInvoice(context)
-                              : null,
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('THÊM',
-                              style: TextStyle(fontSize: 12)),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                          ),
+                      const SizedBox(width: 2),
+                      Text(
+                        _isWeightLocked ? 'Đã chốt' : 'Chưa chốt',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _isWeightLocked
+                              ? Colors.green[700]
+                              : Colors.red[700],
                         ),
                       ),
                     ],
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            // Form rows - 5 rows as specified
+            Expanded(
+              child: Column(
+                children: [
+                  // Row 1: Mã KH, Tên KH, Công nợ
+                  Expanded(child: _buildFormRow1()),
+                  const SizedBox(height: 2),
+                  // Row 2: Loại heo, Số lô, Tồn kho
+                  Expanded(child: _buildFormRow2()),
+                  const SizedBox(height: 2),
+                  // Row 3: Số lượng, Trọng lượng, Trừ hao, TL Thực
+                  Expanded(child: _buildFormRow3()),
+                  const SizedBox(height: 2),
+                  // Row 4: Đơn giá, Thành tiền, Chiết khấu, Thực thu
+                  Expanded(child: _buildFormRow4()),
+                  const SizedBox(height: 2),
+                  // Row 5: Ghi chú
+                  Expanded(child: _buildFormRow5()),
                 ],
               ),
-              const SizedBox(height: 6),
+            ),
+            const SizedBox(height: 4),
+            // Action buttons
+            _buildActionButtons(),
+          ],
+        ),
+      ),
+    );
+  }
 
-              // ROW 1: Mã khách hàng | Tên khách hàng | Công nợ
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: _buildGridTextField(
-                        controller: TextEditingController(
-                          text: _selectedPartner?.id ?? '',
-                        ),
-                        label: 'Mã KH',
-                        enabled: false,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 2,
-                      child: _buildPartnerSelector(context),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 1,
-                      child: _buildPartnerDebtField(),
-                    ),
-                  ],
+  Widget _buildFormRow1() {
+    // Row 1: Mã KH, Tên KH, Công nợ
+    return BlocBuilder<PartnerBloc, PartnerState>(
+      builder: (context, state) {
+        final partners = state.partners;
+        final safeValue =
+            (partners.contains(_selectedPartner)) ? _selectedPartner : null;
+
+        return Row(
+          children: [
+            Expanded(
+              child: _buildCompactField(
+                'Mã KH',
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  alignment: Alignment.centerLeft,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Text(
+                    _selectedPartner?.id ?? '---',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
-              const SizedBox(height: 5),
-
-              // ROW 2: Loại heo | Số lô | Số lượng heo tồn kho
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: _buildPigTypeWithInventory(),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 1,
-                      child: _buildGridTextField(
-                        controller: _batchNumberController,
-                        label: 'Số lô',
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 1,
-                      child: _buildInventoryDisplayField(),
-                    ),
-                  ],
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 2,
+              child: _buildCompactField(
+                'Tên KH',
+                DropdownButtonFormField<PartnerEntity>(
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  ),
+                  value: safeValue,
+                  style: const TextStyle(fontSize: 14, color: Colors.black),
+                  items: partners
+                      .map((p) => DropdownMenuItem(
+                          value: p,
+                          child: Text(p.name,
+                              style: const TextStyle(fontSize: 14))))
+                      .toList(),
+                  onChanged: (value) =>
+                      setState(() => _selectedPartner = value),
                 ),
               ),
-              const SizedBox(height: 5),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildPartnerDebtFieldCompact(),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
-              // ROW 3: Số lượng (với nút +/-) | Trọng lượng | Trừ hao | TL Thực
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: _buildQuantityFieldWithButtons(),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 1,
-                      child: _buildGridLockedField(
-                        label: 'Trọng lượng (kg)',
-                        value: _numberFormat.format(_grossWeight),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 1,
-                      child: _buildDeductionField(),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 1,
-                      child: _buildGridLockedField(
-                        label: 'TL Thực (kg)',
-                        value: _numberFormat.format(_netWeight),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 5),
-
-              // ROW 4: Đơn giá | Thành tiền | Chiết khấu | Thực thu
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: _buildGridTextField(
-                        controller: _priceController,
-                        label: 'Đơn giá (đ)',
-                        isNumber: true,
-                        onChanged: (_) => setState(() => _updateAutoDiscount()),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 1,
-                      child: _buildGridLockedField(
-                        label: 'Thành tiền',
-                        value: _currencyFormat.format(_subtotal),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 1,
-                      child: _buildGridTextField(
-                        controller: _discountController,
-                        label: 'Chiết khấu (đ)',
-                        isNumber: true,
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 1,
-                      child: _buildGridLockedField(
-                        label: 'THỰC THU',
-                        value: _currencyFormat.format(_totalAmount),
-                        highlight: true,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 5),
-
-              // ROW 5: Ghi chú (full width)
-              _buildGridTextField(
-                controller: _noteController,
-                label: 'Ghi chú',
-              ),
-            ],
+  Widget _buildFormRow2() {
+    // Row 2: Loại heo, Số lô, Tồn kho
+    return Row(
+      children: [
+        Expanded(
+          child: _buildPigTypeDropdownCompact(),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildCompactTextField(
+            'Số lô',
+            _batchNumberController,
+            hintText: 'Số lô',
           ),
         ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildInventoryDisplayFieldCompact(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormRow3() {
+    // Row 3: Số lượng, Trọng lượng, Trừ hao, TL Thực
+    return Row(
+      children: [
+        Expanded(
+          child: _buildQuantityFieldWithButtonsCompact(),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildCompactField(
+            'Trọng lượng (kg)',
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              alignment: Alignment.centerLeft,
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.blue.shade300),
+              ),
+              child: Text(
+                _numberFormat.format(_grossWeight),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.blue.shade700,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildDeductionFieldCompact(),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildCompactField(
+            'TL Thực (kg)',
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              alignment: Alignment.centerLeft,
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.green.shade300),
+              ),
+              child: Text(
+                _numberFormat.format(_netWeight),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.green.shade700,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormRow4() {
+    // Row 4: Đơn giá, Thành tiền, Chiết khấu, Thực thu
+    return Row(
+      children: [
+        Expanded(
+          child: _buildCompactTextField(
+            'Đơn giá',
+            _priceController,
+            hintText: 'đ/kg',
+            isDecimal: true,
+            onChanged: (_) => _updateAutoDiscount(),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildCompactField(
+            'Thành tiền',
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              alignment: Alignment.centerLeft,
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.orange.shade300),
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _currencyFormat.format(_subtotal),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.orange.shade700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildCompactTextField(
+            'Chiết khấu',
+            _discountController,
+            hintText: '0',
+            isDecimal: true,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildCompactField(
+            'THỰC THU',
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              alignment: Alignment.centerLeft,
+              decoration: BoxDecoration(
+                color: Colors.blue.shade100,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.blue.shade500, width: 2),
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _currencyFormat.format(_totalAmount),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.blue.shade800,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormRow5() {
+    // Row 5: Ghi chú
+    return _buildCompactTextField(
+      'Ghi chú',
+      _noteController,
+      hintText: 'Nhập ghi chú...',
+    );
+  }
+
+  Widget _buildCompactField(String label, Widget child) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 2),
+        Expanded(child: child),
+      ],
+    );
+  }
+
+  Widget _buildCompactTextField(
+    String label,
+    TextEditingController controller, {
+    String? hintText,
+    bool isNumber = false,
+    bool isDecimal = false,
+    void Function(String)? onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 2),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            keyboardType: isDecimal
+                ? const TextInputType.numberWithOptions(decimal: true)
+                : isNumber
+                    ? TextInputType.number
+                    : TextInputType.text,
+            inputFormatters: isDecimal
+                ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))]
+                : isNumber
+                    ? [FilteringTextInputFormatter.digitsOnly]
+                    : null,
+            onChanged: onChanged ?? (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: hintText,
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+            ),
+            style: const TextStyle(fontSize: 14),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return SizedBox(
+      height: 36,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          IconButton(
+            onPressed: _resetForm,
+            icon: const Icon(Icons.refresh, size: 20),
+            tooltip: 'Làm mới',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPartnerDebtFieldCompact() {
+    if (_selectedPartner == null) {
+      return _buildCompactField(
+        'Công nợ',
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          alignment: Alignment.centerLeft,
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: const Text('0 đ', style: TextStyle(fontSize: 14)),
+        ),
+      );
+    }
+
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _calculatePartnerDebt(_selectedPartner!.id),
+      builder: (context, snapshot) {
+        final debtInfo = snapshot.data ?? {};
+        final remaining = debtInfo['remaining'] ?? 0.0;
+
+        return _buildCompactField(
+          'Công nợ',
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            alignment: Alignment.centerLeft,
+            decoration: BoxDecoration(
+              color: remaining > 0 ? Colors.red.shade50 : Colors.green.shade50,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color:
+                    remaining > 0 ? Colors.red.shade300 : Colors.green.shade300,
+              ),
+            ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _currencyFormat.format(remaining),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: remaining > 0
+                      ? Colors.red.shade700
+                      : Colors.green.shade700,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPigTypeDropdownCompact() {
+    return StreamBuilder<List<PigTypeEntity>>(
+      stream: sl<IPigTypeRepository>().watchPigTypes(),
+      builder: (context, snap) {
+        final types = snap.data ?? [];
+        final PigTypeEntity? selected = types.isEmpty
+            ? null
+            : types.firstWhere((t) => t.name == _pigTypeController.text,
+                orElse: () => types.first);
+
+        return _buildCompactField(
+          'Loại heo',
+          DropdownButtonFormField<PigTypeEntity?>(
+            value: selected,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            ),
+            style: const TextStyle(fontSize: 14, color: Colors.black),
+            items: types
+                .map((type) => DropdownMenuItem(
+                    value: type,
+                    child:
+                        Text(type.name, style: const TextStyle(fontSize: 14))))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) setState(() => _pigTypeController.text = v.name);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInventoryDisplayFieldCompact() {
+    final pigType = _pigTypeController.text.trim();
+    if (pigType.isEmpty) {
+      return _buildInventoryContainerCompact(0, true);
+    }
+
+    return RepaintBoundary(
+      child: StreamBuilder<List<InvoiceEntity>>(
+        stream: _invoiceRepo.watchInvoices(type: 0),
+        builder: (context, importSnap) {
+          if (!importSnap.hasData) {
+            return _buildInventoryContainerCompact(0, true);
+          }
+
+          return StreamBuilder<List<InvoiceEntity>>(
+            stream: _invoiceRepo.watchInvoices(type: 2),
+            builder: (context, exportSnap) {
+              if (!exportSnap.hasData) {
+                return _buildInventoryContainerCompact(0, true);
+              }
+
+              int imported = 0;
+              int exported = 0;
+
+              for (final inv in importSnap.data!) {
+                for (final item in inv.details) {
+                  if ((item.pigType ?? '').trim() == pigType) {
+                    imported += item.quantity;
+                  }
+                }
+              }
+
+              for (final inv in exportSnap.data!) {
+                for (final item in inv.details) {
+                  if ((item.pigType ?? '').trim() == pigType) {
+                    exported += item.quantity;
+                  }
+                }
+              }
+
+              final availableQty = imported - exported;
+              final requestedQty = int.tryParse(_quantityController.text) ?? 0;
+              final isValid = requestedQty <= availableQty;
+
+              return _buildInventoryContainerCompact(availableQty, isValid);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildInventoryContainerCompact(int qty, bool isValid) {
+    return _buildCompactField(
+      'Tồn kho',
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          color: isValid ? Colors.green[50] : Colors.red[50],
+          border: Border.all(color: isValid ? Colors.green : Colors.red),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          '$qty con',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: isValid ? Colors.green[700] : Colors.red[700],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuantityFieldWithButtonsCompact() {
+    return _buildCompactField(
+      'Số lượng',
+      Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _quantityController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(fontSize: 14),
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                isDense: true,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              ),
+            ),
+          ),
+          const SizedBox(width: 2),
+          SizedBox(
+            width: 22,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: () {
+                    final current = int.tryParse(_quantityController.text) ?? 1;
+                    setState(() => _quantityController.text = '${current + 1}');
+                  },
+                  child: Container(
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(3)),
+                    ),
+                    child: const Center(
+                        child: Icon(Icons.keyboard_arrow_up, size: 12)),
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    final current = int.tryParse(_quantityController.text) ?? 1;
+                    if (current > 1)
+                      setState(
+                          () => _quantityController.text = '${current - 1}');
+                  },
+                  child: Container(
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(3)),
+                    ),
+                    child: const Center(
+                        child: Icon(Icons.keyboard_arrow_down, size: 12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeductionFieldCompact() {
+    return _buildCompactField(
+      'Trừ hao (kg)',
+      Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _deductionController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(fontSize: 14),
+              onChanged: (_) => setState(() => _updateAutoDiscount()),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                isDense: true,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              ),
+            ),
+          ),
+          const SizedBox(width: 2),
+          SizedBox(
+            width: 22,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: () => _adjustDeduction(1),
+                  child: Container(
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(3)),
+                    ),
+                    child: const Center(
+                        child: Icon(Icons.keyboard_arrow_up, size: 12)),
+                  ),
+                ),
+                InkWell(
+                  onTap: () => _adjustDeduction(-1),
+                  child: Container(
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(3)),
+                    ),
+                    child: const Center(
+                        child: Icon(Icons.keyboard_arrow_down, size: 12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1078,7 +1671,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
             ),
           ),
         ),
-        const SizedBox(width: 2), 
+        const SizedBox(width: 2),
         SizedBox(
           width: 22,
           child: Column(
@@ -1363,7 +1956,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
             isDense: true,
           ),
           items: types
-              .map((t) => DropdownMenuItem<PigTypeEntity>(value: t, child: Text(t.name)))
+              .map((t) => DropdownMenuItem<PigTypeEntity>(
+                  value: t, child: Text(t.name)))
               .toList(),
           onChanged: (v) {
             if (v != null) {
@@ -1818,7 +2412,15 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   bool _canSaveInvoice() {
-    return _canAddInvoice() && _isWeightLocked && _netWeight > 0;
+    // Kiểm tra có weight sẵn sàng (đã chốt hoặc đang nhập trong ô)
+    double pendingWeight = 0;
+    if (_scaleInputController.text.isNotEmpty) {
+      pendingWeight =
+          double.tryParse(_scaleInputController.text.replaceAll(',', '.')) ?? 0;
+    }
+
+    final hasWeight = (_isWeightLocked && _netWeight > 0) || pendingWeight > 0;
+    return _canAddInvoice() && hasWeight;
   }
 
   void _addInvoice(BuildContext context) async {
@@ -1922,11 +2524,26 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   void _saveInvoice(BuildContext context) async {
+    // Tự động chốt cân nếu có số trong ô nhập thủ công
+    if (!_isWeightLocked && _scaleInputController.text.isNotEmpty) {
+      final manualWeight =
+          double.tryParse(_scaleInputController.text.replaceAll(',', '.')) ?? 0;
+      if (manualWeight > 0) {
+        setState(() {
+          _lockedWeight = manualWeight;
+          _isWeightLocked = true;
+          _scaleInputController.clear();
+          _updateAutoDiscount();
+        });
+      }
+    }
+
     if (!_canSaveInvoice()) {
       if (!_isWeightLocked) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('⚠️ Vui lòng chốt cân trước khi lưu!'),
+            content:
+                Text('⚠️ Vui lòng nhập số cân hoặc chốt cân trước khi lưu!'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -1940,93 +2557,364 @@ class _MarketExportViewState extends State<_MarketExportView> {
   // ==================== DEBT SECTION ====================
 
   Widget _buildDebtSection(BuildContext context) {
-    // Always show debt section - empty when no partner selected, show data when partner is selected
     final hasPartner = _selectedPartner != null;
     final partnerId = _selectedPartner?.id;
     final partnerName = _selectedPartner?.name ?? 'Chưa chọn khách hàng';
 
-    return Card(
-      elevation: 3,
-      color: Colors.orange[50],
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                const Icon(Icons.account_balance_wallet,
-                    color: Colors.orange, size: 20),
-                const SizedBox(width: 8),
-                const Text(
-                  'CÔNG NỢ',
+    return FutureBuilder<Map<String, dynamic>>(
+      future: hasPartner ? _calculatePartnerDebt(partnerId!) : Future.value({}),
+      builder: (context, snapshot) {
+        final debtInfo = snapshot.data ?? {};
+        final totalDebt = debtInfo['totalDebt'] ?? 0.0;
+        final totalPaid = debtInfo['totalPaid'] ?? 0.0;
+        final remaining = debtInfo['remaining'] ?? 0.0;
+
+        // Only action bar - no history table
+        return Container(
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            border: Border(
+                top: BorderSide(color: Colors.orange.shade300, width: 2)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            children: [
+              // CÔNG NỢ label
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade600,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  '💰 CÔNG NỢ',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: Colors.orange),
+                      fontSize: 10,
+                      color: Colors.white),
                 ),
-                const SizedBox(width: 16),
-                Text(
-                  'Khách: $partnerName',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: hasPartner ? Colors.black : Colors.grey,
-                  ),
+              ),
+              const SizedBox(width: 8),
+              // Khách hàng
+              Text(
+                partnerName,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                  color: hasPartner ? Colors.black : Colors.grey,
                 ),
-                const Spacer(),
-                if (hasPartner && partnerId != null) ...[
-                  SizedBox(
-                    height: 32,
-                    child: FilledButton.icon(
-                      onPressed: () => _savePayment(context),
-                      icon: const Icon(Icons.check, size: 14),
-                      label: const Text('Xác nhận',
-                          style: TextStyle(fontSize: 11)),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                      ),
+              ),
+              const SizedBox(width: 8),
+              // Hình thức thanh toán
+              if (hasPartner) ...[
+                _buildPaymentChip('T.Mặt', 0, Colors.green),
+                const SizedBox(width: 2),
+                _buildPaymentChip('C.Khoản', 1, Colors.blue),
+                const SizedBox(width: 2),
+                _buildPaymentChip('Nợ', 2, Colors.red),
+                const SizedBox(width: 2),
+                _buildPaymentChip('Trả nợ', 3, Colors.purple),
+                const SizedBox(width: 8),
+                // Số tiền input
+                SizedBox(
+                  width: 100,
+                  height: 28,
+                  child: TextField(
+                    controller: _selectedPaymentMethod == 3
+                        ? _paymentAmountController
+                        : _invoicePaymentAmountController,
+                    keyboardType: TextInputType.number,
+                    enabled: _selectedPaymentMethod != 2,
+                    style: const TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.bold),
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(4)),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 4),
+                      suffixText: 'đ',
+                      suffixStyle: const TextStyle(fontSize: 9),
+                      filled: _selectedPaymentMethod == 2,
+                      fillColor: Colors.grey[200],
+                      hintText:
+                          _selectedPaymentMethod == 3 ? 'Trả nợ' : 'Số tiền',
+                      hintStyle: const TextStyle(fontSize: 8),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: () => _showPartnerDebtDetail(context, partnerId),
-                    icon: const Icon(Icons.visibility, size: 16),
-                    label:
-                        const Text('Chi tiết', style: TextStyle(fontSize: 12)),
-                  ),
-                ],
-              ],
-            ),
-            const Divider(height: 16),
-
-            // Content - Empty placeholder or actual data
-            if (!hasPartner)
-              SizedBox(
-                height: 140,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.person_search,
-                          size: 48, color: Colors.grey[400]),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Vui lòng chọn khách hàng để xem công nợ',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                      ),
-                    ],
+                ),
+                const SizedBox(width: 4),
+                // Xác nhận button
+                SizedBox(
+                  height: 28,
+                  child: FilledButton(
+                    onPressed: () => _savePayment(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child:
+                        const Text('Xác nhận', style: TextStyle(fontSize: 9)),
                   ),
                 ),
-              )
-            else
-              SizedBox(
-                height: 240,
-                child: _buildPartnerDebtContent(partnerId!),
-              ),
+              ],
+              const Spacer(),
+              // Totals
+              _buildDebtSummaryChip('Tổng nợ', totalDebt, Colors.orange),
+              const SizedBox(width: 4),
+              _buildDebtSummaryChip('Đã trả', totalPaid, Colors.green),
+              const SizedBox(width: 4),
+              _buildDebtSummaryChip('Còn nợ', remaining,
+                  remaining > 0 ? Colors.red : Colors.green),
+              const SizedBox(width: 4),
+              // Nút xem lịch sử
+              if (hasPartner)
+                IconButton(
+                  onPressed: () => _showPaymentHistoryDialog(
+                      context, partnerId!, partnerName),
+                  icon: const Icon(Icons.history, size: 18),
+                  tooltip: 'Xem lịch sử thanh toán',
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 28, minHeight: 28),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.grey.shade200,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showPaymentHistoryDialog(
+      BuildContext context, String partnerId, String partnerName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.history, color: Colors.orange),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text('Lịch sử thanh toán - $partnerName',
+                    style: const TextStyle(fontSize: 16))),
           ],
+        ),
+        content: SizedBox(
+          width: 500,
+          height: 400,
+          child: _buildPaymentHistoryTable(partnerId),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDebtSummaryChip(String label, double value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$label: ',
+              style: TextStyle(
+                  fontSize: 9, color: color, fontWeight: FontWeight.w500)),
+          Text(
+            _currencyFormat.format(value),
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 10, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentHistoryTable(String partnerId) {
+    return StreamBuilder<List<Transaction>>(
+      stream: _db.transactionsDao.watchTransactionsByPartner(partnerId),
+      builder: (context, snapshot) {
+        final transactions = snapshot.data ?? [];
+        // Sắp xếp mới nhất trước
+        final filtered = transactions.toList()
+          ..sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
+
+        if (filtered.isEmpty) {
+          return Container(
+            color: Colors.grey.shade50,
+            child: const Center(
+              child: Text('Chưa có giao dịch',
+                  style: TextStyle(color: Colors.grey, fontSize: 11)),
+            ),
+          );
+        }
+
+        return Container(
+          color: Colors.white,
+          child: Column(
+            children: [
+              // Header
+              Container(
+                height: 24,
+                color: Colors.grey.shade200,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: const Row(
+                  children: [
+                    SizedBox(
+                        width: 80,
+                        child: Text('Ngày',
+                            style: TextStyle(
+                                fontSize: 10, fontWeight: FontWeight.bold))),
+                    SizedBox(
+                        width: 80,
+                        child: Text('Loại',
+                            style: TextStyle(
+                                fontSize: 10, fontWeight: FontWeight.bold))),
+                    Expanded(
+                        child: Text('Số tiền',
+                            style: TextStyle(
+                                fontSize: 10, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.right)),
+                    SizedBox(
+                        width: 100,
+                        child: Text('Ghi chú',
+                            style: TextStyle(
+                                fontSize: 10, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center)),
+                  ],
+                ),
+              ),
+              // Body
+              Expanded(
+                child: ListView.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final t = filtered[index];
+                    final isDebt = t.paymentMethod == 2;
+                    final isDebtPayment = t.paymentMethod == 3;
+                    final typeLabel = switch (t.paymentMethod) {
+                      0 => 'T.Mặt',
+                      1 => 'C.Khoản',
+                      2 => 'Nợ',
+                      3 => 'Trả nợ',
+                      _ => '?',
+                    };
+                    final typeColor = switch (t.paymentMethod) {
+                      0 => Colors.green,
+                      1 => Colors.blue,
+                      2 => Colors.red,
+                      3 => Colors.purple,
+                      _ => Colors.grey,
+                    };
+
+                    return Container(
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color:
+                            index.isEven ? Colors.white : Colors.grey.shade50,
+                        border: Border(
+                            bottom: BorderSide(color: Colors.grey.shade200)),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 80,
+                            child: Text(
+                              DateFormat('dd/MM HH:mm')
+                                  .format(t.transactionDate),
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 80,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: typeColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                typeLabel,
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: typeColor),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '${isDebt ? '+' : '-'}${_currencyFormat.format(t.amount)}đ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isDebt ? Colors.red : Colors.green,
+                              ),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                          SizedBox(
+                            width: 100,
+                            child: Text(
+                              t.note ?? '',
+                              style: const TextStyle(
+                                  fontSize: 9, color: Colors.grey),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPaymentChip(String label, int value, Color color) {
+    final isSelected = _selectedPaymentMethod == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedPaymentMethod = value;
+          if (value == 2) _invoicePaymentAmountController.text = '0';
+          if (value == 3) _invoicePaymentAmountController.text = '0';
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.3) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isSelected ? color : Colors.grey.shade300),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? color : Colors.grey.shade600,
+          ),
         ),
       ),
     );
@@ -2041,230 +2929,120 @@ class _MarketExportViewState extends State<_MarketExportView> {
         final totalPaid = debtInfo['totalPaid'] ?? 0.0;
         final remaining = debtInfo['remaining'] ?? 0.0;
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        return Column(
           children: [
-            // Left: Transaction histories (thanh toán + trả nợ) - chiếm 50% bên trái
+            // Top row: Lịch sử thanh toán | Hình thức thanh toán
             Expanded(
-              flex: 1,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Lịch sử thanh toán
+                  // Left: Lịch sử thanh toán
                   Expanded(
-                      child: _buildTransactionHistory(partnerId,
-                          type: 0, title: 'Lịch sử thanh toán')),
-                  const SizedBox(width: 8),
-                  // Lịch sử trả nợ
-                  Expanded(
-                      child: _buildTransactionHistory(partnerId,
-                          type: 1, title: 'Lịch sử trả nợ')),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Right: Payment forms + Summary boxes - 50% bên phải
-            Expanded(
-              flex: 1,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Payment forms
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Payment method for new invoices
-                          const Text('Hình thức thanh toán (phiếu mới)',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 11)),
-                          const SizedBox(height: 4),
-                          Wrap(
-                            spacing: 4,
-                            runSpacing: 4,
-                            children: [
-                              ChoiceChip(
-                                label: const Text('Tiền mặt',
-                                    style: TextStyle(fontSize: 10)),
-                                selected: _selectedPaymentMethod == 0,
-                                onSelected: (selected) {
-                                  if (selected)
-                                    setState(() => _selectedPaymentMethod = 0);
-                                },
-                                selectedColor: Colors.green[200],
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                              ),
-                              ChoiceChip(
-                                label: const Text('Chuyển khoản',
-                                    style: TextStyle(fontSize: 10)),
-                                selected: _selectedPaymentMethod == 1,
-                                onSelected: (selected) {
-                                  if (selected)
-                                    setState(() => _selectedPaymentMethod = 1);
-                                },
-                                selectedColor: Colors.blue[200],
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                              ),
-                              ChoiceChip(
-                                label: const Text('Nợ',
-                                    style: TextStyle(fontSize: 10)),
-                                selected: _selectedPaymentMethod == 2,
-                                onSelected: (selected) {
-                                  if (selected) {
-                                    setState(() {
-                                      _selectedPaymentMethod = 2;
-                                      _invoicePaymentAmountController.text =
-                                          '0';
-                                    });
-                                  }
-                                },
-                                selectedColor: Colors.red[200],
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          // Invoice payment amount - now below chips
-                          SizedBox(
-                            width: 200,
-                            child: TextField(
-                              controller: _invoicePaymentAmountController,
-                              keyboardType: TextInputType.number,
-                              enabled: _selectedPaymentMethod != 2,
-                              style: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.bold),
-                              decoration: InputDecoration(
-                                border: const OutlineInputBorder(),
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
-                                suffixText: 'đ',
-                                suffixStyle: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.bold),
-                                filled: _selectedPaymentMethod == 2,
-                                fillColor: Colors.grey[200],
-                                hintText: 'Số tiền TT phiếu',
-                                hintStyle: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          // Debt repayment method
-                          const Text('Hình thức trả nợ',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 11)),
-                          const SizedBox(height: 4),
-                          Wrap(
-                            spacing: 4,
-                            runSpacing: 4,
-                            children: [
-                              ChoiceChip(
-                                label: const Text('Tiền mặt',
-                                    style: TextStyle(fontSize: 10)),
-                                selected: _selectedDebtPaymentMethod == 0,
-                                onSelected: (selected) {
-                                  if (selected)
-                                    setState(
-                                        () => _selectedDebtPaymentMethod = 0);
-                                },
-                                selectedColor: Colors.green[200],
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                              ),
-                              ChoiceChip(
-                                label: const Text('Chuyển khoản',
-                                    style: TextStyle(fontSize: 10)),
-                                selected: _selectedDebtPaymentMethod == 1,
-                                onSelected: (selected) {
-                                  if (selected)
-                                    setState(
-                                        () => _selectedDebtPaymentMethod = 1);
-                                },
-                                selectedColor: Colors.blue[200],
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          // Debt payment amount
-                          SizedBox(
-                            width: 200,
-                            child: TextField(
-                              controller: _paymentAmountController,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.bold),
-                              decoration: const InputDecoration(
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
-                                suffixText: 'đ',
-                                suffixStyle: TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.bold),
-                                hintText: 'Số tiền trả nợ',
-                                hintStyle: TextStyle(fontSize: 12),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    flex: 2,
+                    child: _buildTransactionHistory(partnerId,
+                        title: 'Lịch sử thanh toán'),
                   ),
                   const SizedBox(width: 12),
-                  // Summary boxes
-                  SizedBox(
-                    width: 140,
+                  // Right: Payment form
+                  Expanded(
+                    flex: 3,
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildDebtSummaryBox(
-                            'Tổng nợ', totalDebt, Colors.orange),
+                        const Text('Hình thức thanh toán',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 11)),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: [
+                            ChoiceChip(
+                              label: const Text('Tiền mặt',
+                                  style: TextStyle(fontSize: 10)),
+                              selected: _selectedPaymentMethod == 0,
+                              onSelected: (selected) {
+                                if (selected)
+                                  setState(() => _selectedPaymentMethod = 0);
+                              },
+                              selectedColor: Colors.green[200],
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                            ),
+                            ChoiceChip(
+                              label: const Text('Chuyển khoản',
+                                  style: TextStyle(fontSize: 10)),
+                              selected: _selectedPaymentMethod == 1,
+                              onSelected: (selected) {
+                                if (selected)
+                                  setState(() => _selectedPaymentMethod = 1);
+                              },
+                              selectedColor: Colors.blue[200],
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                            ),
+                            ChoiceChip(
+                              label: const Text('Nợ',
+                                  style: TextStyle(fontSize: 10)),
+                              selected: _selectedPaymentMethod == 2,
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() {
+                                    _selectedPaymentMethod = 2;
+                                    _invoicePaymentAmountController.text = '0';
+                                  });
+                                }
+                              },
+                              selectedColor: Colors.red[200],
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                            ),
+                            ChoiceChip(
+                              label: const Text('Trả nợ',
+                                  style: TextStyle(fontSize: 10)),
+                              selected: _selectedPaymentMethod == 3,
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() {
+                                    _selectedPaymentMethod = 3;
+                                    _invoicePaymentAmountController.text = '0';
+                                  });
+                                }
+                              },
+                              selectedColor: Colors.purple[200],
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 6),
-                        _buildDebtSummaryBox('Đã trả', totalPaid, Colors.green),
-                        const SizedBox(height: 6),
-                        // Remaining - highlight
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: remaining > 0
-                                ? Colors.red[100]
-                                : Colors.green[100],
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                                color:
-                                    remaining > 0 ? Colors.red : Colors.green),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                'CÒN NỢ',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: remaining > 0
-                                      ? Colors.red[700]
-                                      : Colors.green[700],
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _currencyFormat.format(remaining),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: remaining > 0
-                                      ? Colors.red[800]
-                                      : Colors.green[800],
-                                ),
-                              ),
-                            ],
+                        // Payment amount input
+                        SizedBox(
+                          width: 160,
+                          height: 36,
+                          child: TextField(
+                            controller: _selectedPaymentMethod == 3
+                                ? _paymentAmountController
+                                : _invoicePaymentAmountController,
+                            keyboardType: TextInputType.number,
+                            enabled: _selectedPaymentMethod != 2,
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.bold),
+                            decoration: InputDecoration(
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 6),
+                              suffixText: 'đ',
+                              suffixStyle: const TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.bold),
+                              filled: _selectedPaymentMethod == 2,
+                              fillColor: Colors.grey[200],
+                              hintText: _selectedPaymentMethod == 3
+                                  ? 'Số tiền trả nợ'
+                                  : 'Số tiền TT',
+                              hintStyle: const TextStyle(fontSize: 10),
+                            ),
                           ),
                         ),
                       ],
@@ -2273,9 +3051,110 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 ],
               ),
             ),
+            const SizedBox(height: 6),
+            // Bottom row: Summary boxes in one row
+            Row(
+              children: [
+                Expanded(
+                    child: _buildDebtSummaryBoxHorizontal(
+                        'Tổng nợ', totalDebt, Colors.orange)),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _buildDebtSummaryBoxHorizontal(
+                        'Đã trả', totalPaid, Colors.green)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color:
+                          remaining > 0 ? Colors.red[100] : Colors.green[100],
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                          color: remaining > 0 ? Colors.red : Colors.green),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'CÒN NỢ',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: remaining > 0
+                                ? Colors.red[700]
+                                : Colors.green[700],
+                          ),
+                        ),
+                        Text(
+                          _currencyFormat.format(remaining),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: remaining > 0
+                                ? Colors.red[800]
+                                : Colors.green[800],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildDebtSummaryBoxHorizontal(
+      String label, double value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 10, color: color, fontWeight: FontWeight.w600)),
+          Text(
+            _currencyFormat.format(value),
+            style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.bold, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDebtSummaryBoxCompact(String label, double value, Color color) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Column(
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 9, color: color, fontWeight: FontWeight.w600)),
+          Text(
+            _currencyFormat.format(value),
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.bold, color: color),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2306,88 +3185,95 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildTransactionHistory(String partnerId,
-      {int type = 0, String title = 'Lịch sử thanh toán'}) {
-    // type 0 = thanh toán, type 1 = trả nợ
+      {String title = 'Lịch sử thanh toán'}) {
+    // Show all transactions (type 0 = Thu/Thanh toán)
     return StreamBuilder<List<Transaction>>(
       stream: _db.transactionsDao.watchTransactionsByPartner(partnerId),
       builder: (context, snapshot) {
-        final allTransactions = snapshot.data ?? [];
-        // Filter by transaction type
         final transactions =
-            allTransactions.where((tx) => tx.type == type).toList();
+            (snapshot.data ?? []).where((tx) => tx.type == 0).toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
                 style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-            const SizedBox(height: 6),
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+            const SizedBox(height: 4),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(4),
                 ),
                 child: transactions.isEmpty
-                    ? Center(
-                        child: Text(
-                          type == 0 ? 'Chưa có thanh toán' : 'Chưa có trả nợ',
-                          style:
-                              const TextStyle(color: Colors.grey, fontSize: 11),
-                        ),
+                    ? const Center(
+                        child: Text('Chưa có giao dịch',
+                            style: TextStyle(color: Colors.grey, fontSize: 10)),
                       )
                     : SingleChildScrollView(
                         child: DataTable(
-                          columnSpacing: 12,
-                          dataRowMinHeight: 32,
-                          dataRowMaxHeight: 36,
-                          headingRowHeight: 34,
+                          columnSpacing: 8,
+                          dataRowMinHeight: 24,
+                          dataRowMaxHeight: 28,
+                          headingRowHeight: 26,
                           columns: const [
                             DataColumn(
-                                label: Text('STT',
+                                label: Text('Loại',
                                     style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold))),
-                            DataColumn(
-                                label: Text('Hình thức',
-                                    style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.bold))),
                             DataColumn(
                                 label: Text('Số tiền',
                                     style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.bold))),
                             DataColumn(
                                 label: Text('Ngày',
                                     style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.bold))),
                           ],
-                          rows: List.generate(transactions.take(10).length,
-                              (idx) {
+                          rows:
+                              List.generate(transactions.take(8).length, (idx) {
                             final tx = transactions[idx];
-                            final paymentMethod = tx.paymentMethod == 0
-                                ? 'Tiền mặt'
-                                : 'Chuyển khoản';
+                            // paymentMethod: 0=Tiền mặt, 1=Chuyển khoản, 2=Nợ, 3=Trả nợ
+                            String methodLabel;
+                            Color methodColor;
+                            switch (tx.paymentMethod) {
+                              case 0:
+                                methodLabel = 'TM';
+                                methodColor = Colors.green;
+                                break;
+                              case 1:
+                                methodLabel = 'CK';
+                                methodColor = Colors.blue;
+                                break;
+                              case 3:
+                                methodLabel = 'Trả nợ';
+                                methodColor = Colors.purple;
+                                break;
+                              default:
+                                methodLabel = 'Khác';
+                                methodColor = Colors.grey;
+                            }
                             return DataRow(cells: [
-                              DataCell(Text('${idx + 1}',
-                                  style: const TextStyle(fontSize: 11))),
-                              DataCell(Text(paymentMethod,
-                                  style: const TextStyle(fontSize: 11))),
+                              DataCell(Text(methodLabel,
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: methodColor,
+                                      fontWeight: FontWeight.w600))),
                               DataCell(Text(
                                 _currencyFormat.format(tx.amount),
                                 style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
-                                  color: type == 0 ? Colors.green : Colors.blue,
-                                ),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                    color: methodColor),
                               )),
                               DataCell(Text(
                                 DateFormat('dd/MM').format(tx.transactionDate),
                                 style: const TextStyle(
-                                    fontSize: 10, color: Colors.grey),
+                                    fontSize: 9, color: Colors.grey),
                               )),
                             ]);
                           }),
@@ -2613,7 +3499,10 @@ class _MarketExportViewState extends State<_MarketExportView> {
     final partnerId = _lastSavedInvoice?.partnerId ?? _selectedPartner?.id;
     if (partnerId == null) return;
 
-    final amount = double.tryParse(_paymentAmountController.text) ?? 0;
+    // Get amount based on payment method
+    final amount = _selectedPaymentMethod == 3
+        ? (double.tryParse(_paymentAmountController.text) ?? 0)
+        : (double.tryParse(_invoicePaymentAmountController.text) ?? 0);
 
     // If "Nợ" is selected for payment method, we don't create a transaction
     if (_selectedPaymentMethod == 2) {
@@ -2635,43 +3524,41 @@ class _MarketExportViewState extends State<_MarketExportView> {
     }
 
     try {
-      // Determine transaction type: 0 = Thanh toán, 1 = Trả nợ
-      // If payment method is 0/1 -> create payment transaction
-      // Create a transaction record
+      // All payment methods save to transaction history with type = 0 (Thu)
+      // paymentMethod: 0 = Tiền mặt, 1 = Chuyển khoản, 3 = Trả nợ
+      String note;
+      switch (_selectedPaymentMethod) {
+        case 0:
+          note = 'Thanh toán tiền mặt';
+          break;
+        case 1:
+          note = 'Thanh toán chuyển khoản';
+          break;
+        case 3:
+          note = 'Trả nợ';
+          break;
+        default:
+          note = 'Thanh toán';
+      }
+
       await _db.transactionsDao.createTransaction(
         TransactionsCompanion(
           id: Value(DateTime.now().millisecondsSinceEpoch.toString()),
           partnerId: Value(partnerId),
           invoiceId: const Value(null),
           amount: Value(amount),
-          type: const Value(0), // 0 = Thanh toán
+          type: const Value(0), // 0 = Thu (all go to Lịch sử thanh toán)
           paymentMethod: Value(_selectedPaymentMethod),
           transactionDate: Value(DateTime.now()),
-          note: Value('Thanh toán phiếu xuất chợ'),
+          note: Value(note),
         ),
       );
-
-      // Also create debt repayment record if debt payment method is selected
-      if (_selectedDebtPaymentMethod == 0 || _selectedDebtPaymentMethod == 1) {
-        await _db.transactionsDao.createTransaction(
-          TransactionsCompanion(
-            id: Value('${DateTime.now().millisecondsSinceEpoch}_debt'),
-            partnerId: Value(partnerId),
-            invoiceId: const Value(null),
-            amount: Value(amount),
-            type: const Value(1), // 1 = Trả nợ
-            paymentMethod: Value(_selectedDebtPaymentMethod),
-            transactionDate: Value(DateTime.now()),
-            note: Value(
-                'Trả nợ - ${_selectedDebtPaymentMethod == 0 ? "Tiền mặt" : "Chuyển khoản"}'),
-          ),
-        );
-      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Đã ghi nhận: ${_currencyFormat.format(amount)}'),
+            content: Text(
+                '✅ Đã ghi nhận: ${_currencyFormat.format(amount)} - $note'),
             backgroundColor: Colors.green,
           ),
         );

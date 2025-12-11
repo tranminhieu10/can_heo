@@ -23,13 +23,19 @@ part 'database.g.dart';
 
 @DriftDatabase(
   tables: [Partners, Invoices, WeighingDetails, Transactions, PigTypes],
-  daos: [PartnersDao, InvoicesDao, WeighingDetailsDao, TransactionsDao, PigTypesDao],
+  daos: [
+    PartnersDao,
+    InvoicesDao,
+    WeighingDetailsDao,
+    TransactionsDao,
+    PigTypesDao
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 4; // added PigTypes table
+  int get schemaVersion => 5; // added paymentMethod to transactions
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -69,11 +75,23 @@ class AppDatabase extends _$AppDatabase {
               await m.createTable(pigTypes);
             } catch (_) {}
           }
+
+          // Từ version 4 -> 5: Thêm cột paymentMethod cho Transactions
+          if (from < 5) {
+            try {
+              await m.addColumn(transactions, transactions.paymentMethod);
+            } catch (_) {}
+          }
         },
 
         beforeOpen: (OpeningDetails details) async {
-          if (details.wasCreated) {
-            await customStatement('PRAGMA foreign_keys = ON');
+          await customStatement('PRAGMA foreign_keys = ON');
+          // Đảm bảo cột payment_method tồn tại
+          try {
+            await customStatement(
+                'ALTER TABLE transactions ADD COLUMN payment_method INTEGER NOT NULL DEFAULT 0');
+          } catch (_) {
+            // Cột đã tồn tại, bỏ qua
           }
         },
       );

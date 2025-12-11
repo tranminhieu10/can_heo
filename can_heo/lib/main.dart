@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'core/utils/responsive.dart';
 import 'injection_container.dart' as di;
 import 'presentation/features/dashboard/dashboard_screen.dart';
 
@@ -14,7 +15,28 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ThemeData(
+    return MaterialApp(
+      title: 'Cân Heo',
+      debugShowCheckedModeBanner: false,
+      theme: _buildTheme(),
+      builder: (context, child) {
+        // Initialize responsive utility
+        Responsive.init(context);
+        
+        // Apply text scaling based on screen size
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(Responsive.textScaleFactor),
+          ),
+          child: child ?? const SizedBox(),
+        );
+      },
+      home: const DashboardScreen(),
+    );
+  }
+
+  ThemeData _buildTheme() {
+    return ThemeData(
       useMaterial3: true,
       colorSchemeSeed: Colors.green,
       scaffoldBackgroundColor: const Color(0xFFF3F4F6),
@@ -28,13 +50,6 @@ class MyApp extends StatelessWidget {
         border: OutlineInputBorder(),
         isDense: true,
       ),
-    );
-
-    return MaterialApp(
-      title: 'Cân Heo',
-      debugShowCheckedModeBanner: false,
-      theme: theme,
-      home: const DashboardScreen(),
     );
   }
 }

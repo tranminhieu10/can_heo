@@ -37,37 +37,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Thêm padding để menu thoáng hơn
             groupAlignment: -0.9, 
             destinations: const [
-              // Index 0
+              // Index 0: Tổng quan
               NavigationRailDestination(
                 icon: Icon(Icons.dashboard_outlined),
                 selectedIcon: Icon(Icons.dashboard),
                 label: Text('Tổng quan'),
               ),
-              // Index 1
+              // Index 1: Xuất chợ
               NavigationRailDestination(
                 icon: Icon(Icons.output_outlined),
                 selectedIcon: Icon(Icons.output),
                 label: Text('Xuất Chợ'),
               ),
-              // Index 2
-              NavigationRailDestination(
-                icon: Icon(Icons.people_outline),
-                selectedIcon: Icon(Icons.people),
-                label: Text('Đối tác'),
-              ),
-              // Index 3
-              NavigationRailDestination(
-                icon: Icon(Icons.account_balance_wallet_outlined),
-                selectedIcon: Icon(Icons.account_balance_wallet),
-                label: Text('Tài chính'),
-              ),
-              // Index 4
+              // Index 2: Nhập kho
               NavigationRailDestination(
                 icon: Icon(Icons.input_outlined),
                 selectedIcon: Icon(Icons.input),
                 label: Text('Nhập Kho'),
               ),
-              // Index 5: Loại heo management
+              // Index 3: Tài chính
+              NavigationRailDestination(
+                icon: Icon(Icons.account_balance_wallet_outlined),
+                selectedIcon: Icon(Icons.account_balance_wallet),
+                label: Text('Tài chính'),
+              ),
+              // Index 4: Đối tác
+              NavigationRailDestination(
+                icon: Icon(Icons.people_outline),
+                selectedIcon: Icon(Icons.people),
+                label: Text('Đối tác'),
+              ),
+              // Index 5: Loại heo
               NavigationRailDestination(
                 icon: Icon(Icons.pets_outlined),
                 selectedIcon: Icon(Icons.pets),
@@ -103,11 +103,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 1:
         return const MarketExportScreen(); // Màn hình Xuất Chợ
       case 2:
-        return const PartnersScreen(); // Màn hình Đối tác
+        return const ImportBarnScreen(); // Màn hình Nhập Kho
       case 3:
         return const FinanceScreen(); // Màn hình Tài chính
       case 4:
-        return const ImportBarnScreen(); // Màn hình Nhập Kho
+        return const PartnersScreen(); // Màn hình Đối tác
       case 5:
         return const PigTypesScreen(); // Màn hình Loại heo
       case 6:
