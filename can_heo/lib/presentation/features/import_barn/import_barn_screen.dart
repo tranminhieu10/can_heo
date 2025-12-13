@@ -183,7 +183,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
             body: Builder(
               builder: (ctx) {
                 Responsive.init(ctx);
-                
+
                 // Adaptive heights based on screen type
                 final topSectionHeight = switch (Responsive.screenType) {
                   ScreenType.tablet => 320.0,
@@ -192,7 +192,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                   ScreenType.desktop24 => 380.0,
                   ScreenType.desktop27 => 400.0,
                 };
-                
+
                 return Padding(
                   padding: EdgeInsets.all(Responsive.spacing),
                   child: Column(
@@ -201,79 +201,70 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                       SizedBox(
                         height: topSectionHeight,
                         child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final totalWidth = constraints.maxWidth;
-                        final dividerWidth = 12.0;
-                        final availableWidth = totalWidth - dividerWidth;
-                        final leftWidth = availableWidth * _panelRatio;
-                        final rightWidth = availableWidth * (1 - _panelRatio);
+                          builder: (context, constraints) {
+                            final totalWidth = constraints.maxWidth;
+                            final dividerWidth = 12.0;
+                            final availableWidth = totalWidth - dividerWidth;
+                            final leftWidth = availableWidth * _panelRatio;
+                            final rightWidth =
+                                availableWidth * (1 - _panelRatio);
 
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Left: Scale Section
-                            SizedBox(
-                              width: leftWidth,
-                              child: _buildScaleSection(context),
-                            ),
-                            // Draggable Divider
-                            GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onHorizontalDragUpdate: (details) {
-                                setState(() {
-                                  final newRatio = _panelRatio +
-                                      (details.delta.dx / availableWidth);
-                                  _panelRatio = newRatio.clamp(
-                                      _minPanelRatio, _maxPanelRatio);
-                                });
-                              },
-                              child: MouseRegion(
-                                cursor: SystemMouseCursors.resizeColumn,
-                                child: Container(
-                                  width: dividerWidth,
-                                  color: Colors.transparent,
-                                  child: Center(
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Left: Scale Section
+                                SizedBox(
+                                  width: leftWidth,
+                                  child: _buildScaleSection(context),
+                                ),
+                                // Draggable Divider
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onHorizontalDragUpdate: (details) {
+                                    setState(() {
+                                      final newRatio = _panelRatio +
+                                          (details.delta.dx / availableWidth);
+                                      _panelRatio = newRatio.clamp(
+                                          _minPanelRatio, _maxPanelRatio);
+                                    });
+                                  },
+                                  child: MouseRegion(
+                                    cursor: SystemMouseCursors.resizeColumn,
                                     child: Container(
-                                      width: 4,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade400,
-                                        borderRadius: BorderRadius.circular(2),
+                                      width: dividerWidth,
+                                      color: Colors.transparent,
+                                      child: Center(
+                                        child: Container(
+                                          width: 4,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade400,
+                                            borderRadius:
+                                                BorderRadius.circular(2),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
-                            // Right: Invoice Form
-                            SizedBox(
-                              width: rightWidth,
-                              child: _buildInvoiceDetailsSection(context),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
+                                // Right: Invoice Form
+                                SizedBox(
+                                  width: rightWidth,
+                                  child: _buildInvoiceDetailsSection(context),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Row 2: Saved Invoices Grid (full width)
+                      Expanded(
+                        child: _buildSavedInvoicesGrid(context),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  // Row 2: Saved Invoices Grid (full width)
-                  Expanded(
-                    child: _buildSavedInvoicesGrid(context),
-                  ),
-                  // Footer
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      "Phím tắt: [F2] Tare | [F4] Lưu phiếu",
-                      style: TextStyle(
-                          color: Colors.grey,
-                          fontStyle: FontStyle.italic,
-                          fontSize: Responsive.bodyFontSize * 0.9),
-                    ),
-                  ),
-                ],
-              ),
-            );
+                );
               },
             ),
           ),
@@ -1473,12 +1464,41 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
       return;
     }
 
+    // Tìm các phiếu chiết khấu/trả nợ liên quan đến phiếu này
+    final allInvoices = await _invoiceRepo.watchInvoices(type: 0).first;
+    final relatedInvoices = allInvoices.where((inv) {
+      final note = inv.note ?? '';
+      if (note.contains('[TRẢ NỢ]') || note.contains('[CHIẾT KHẤU]')) {
+        // Check if this invoice is related to the one we're deleting
+        return note.contains('Phiếu gốc: ${invoice.id}');
+      }
+      return false;
+    }).toList();
+
+    // Build confirmation message
+    String confirmMessage = 'Bạn có chắc muốn xóa phiếu này?';
+    if (relatedInvoices.isNotEmpty) {
+      final debtCount = relatedInvoices
+          .where((inv) => inv.note?.contains('[TRẢ NỢ]') ?? false)
+          .length;
+      final discountCount = relatedInvoices
+          .where((inv) => inv.note?.contains('[CHIẾT KHẤU]') ?? false)
+          .length;
+
+      List<String> relatedInfo = [];
+      if (debtCount > 0) relatedInfo.add('$debtCount phiếu trả nợ');
+      if (discountCount > 0) relatedInfo.add('$discountCount phiếu chiết khấu');
+
+      confirmMessage =
+          'Phiếu này có ${relatedInfo.join(' và ')} liên quan.\nXóa phiếu sẽ xóa luôn các phiếu liên quan.\n\nBạn có chắc muốn xóa?';
+    }
+
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Xóa phiếu'),
-        content: const Text('Bạn có chắc muốn xóa phiếu này?'),
+        content: Text(confirmMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -1493,10 +1513,21 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     );
 
     if (confirmed == true && context.mounted) {
+      // Xóa các phiếu chiết khấu/trả nợ liên quan trước
+      for (final relatedInv in relatedInvoices) {
+        await _invoiceRepo.deleteInvoice(relatedInv.id);
+      }
+
+      // Xóa phiếu gốc
       await _invoiceRepo.deleteInvoice(invoice.id);
+
       if (context.mounted) {
+        String message = 'Đã xóa phiếu';
+        if (relatedInvoices.isNotEmpty) {
+          message += ' và ${relatedInvoices.length} phiếu liên quan';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã xóa phiếu')),
+          SnackBar(content: Text(message)),
         );
       }
     }
@@ -1512,6 +1543,86 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         if (invoices.isEmpty)
           return const Center(child: Text('Chưa có phiếu nhập nào'));
 
+        // Tách phiếu nhập kho (gốc) và phiếu chiết khấu/trả nợ
+        final importInvoices = invoices.where((inv) {
+          final isDebtPayment = inv.note?.contains('[TRẢ NỢ]') ?? false;
+          final isDiscount = inv.note?.contains('[CHIẾT KHẤU]') ?? false;
+          return !isDebtPayment && !isDiscount;
+        }).toList();
+
+        // Tạo map: phiếu gốc ID -> danh sách phiếu liên quan (chiết khấu/trả nợ)
+        final Map<String, List<InvoiceEntity>> relatedPayments = {};
+        for (final inv in invoices) {
+          final note = inv.note ?? '';
+          if (note.contains('[TRẢ NỢ]') || note.contains('[CHIẾT KHẤU]')) {
+            // Extract original invoice ID from note - ID nằm sau "Phiếu gốc: " đến cuối hoặc đến ký tự đặc biệt
+            final match = RegExp(r'Phiếu gốc:\s*(.+)$').firstMatch(note);
+            if (match != null) {
+              final originalId = match.group(1)!.trim();
+              relatedPayments.putIfAbsent(originalId, () => []);
+              relatedPayments[originalId]!.add(inv);
+            }
+          }
+        }
+
+        // Tạo map: invoice ID -> STT (theo nhóm phiếu gốc)
+        final Map<String, int> invoiceSttMap = {};
+        int sttCounter = 0;
+        for (final inv in importInvoices) {
+          sttCounter++;
+          invoiceSttMap[inv.id] = sttCounter;
+          // Gán cùng STT cho các phiếu liên quan
+          final related = relatedPayments[inv.id] ?? [];
+          for (final r in related) {
+            invoiceSttMap[r.id] = sttCounter;
+          }
+        }
+
+        // Tính tổng chiết khấu/trả nợ cho mỗi phiếu gốc
+        final Map<String, double> totalRelatedPayments = {};
+        for (final entry in relatedPayments.entries) {
+          double total = 0;
+          for (final r in entry.value) {
+            total += r.finalAmount.abs();
+          }
+          totalRelatedPayments[entry.key] = total;
+        }
+
+        // Tính công nợ cộng dồn theo NCC (nhà cung cấp)
+        // Sắp xếp phiếu gốc theo thời gian từ cũ đến mới để tính cộng dồn
+        final sortedImportInvoices = List<InvoiceEntity>.from(importInvoices)
+          ..sort((a, b) => a.createdDate.compareTo(b.createdDate));
+
+        // Map: partnerName -> danh sách phiếu gốc theo thứ tự thời gian (cũ -> mới)
+        // Sử dụng partnerName thay vì partnerId để nhóm đúng theo NCC
+        final Map<String, List<InvoiceEntity>> invoicesByPartner = {};
+        for (final inv in sortedImportInvoices) {
+          final partnerKey = inv.partnerName ?? inv.partnerId ?? 'unknown';
+          invoicesByPartner.putIfAbsent(partnerKey, () => []);
+          invoicesByPartner[partnerKey]!.add(inv);
+        }
+
+        // Tính công nợ cộng dồn cho mỗi phiếu theo NCC
+        // Phiếu mới nhất sẽ có công nợ = tổng công nợ các phiếu cũ + công nợ phiếu hiện tại
+        final Map<String, double> cumulativeDebtByInvoice = {};
+        for (final partnerKey in invoicesByPartner.keys) {
+          final partnerInvoices = invoicesByPartner[partnerKey]!;
+          double runningDebt = 0;
+          for (final inv in partnerInvoices) {
+            // Tính công nợ riêng của phiếu này
+            final transportFee = inv.discount;
+            final subtotal = inv.totalWeight * inv.pricePerKg;
+            final totalImport = subtotal + transportFee;
+            final paidAmount = inv.finalAmount;
+            final relatedTotal = totalRelatedPayments[inv.id] ?? 0;
+            final invoiceDebt = totalImport - paidAmount - relatedTotal;
+
+            // Cộng dồn công nợ
+            runningDebt += invoiceDebt;
+            cumulativeDebtByInvoice[inv.id] = runningDebt;
+          }
+        }
+
         return Card(
           elevation: 2,
           child: Column(
@@ -1525,7 +1636,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                 child: Row(
                   children: [
                     Text(
-                      'PHIẾU NHẬP ĐÃ LƯU (${invoices.length})',
+                      'PHIẾU NHẬP ĐÃ LƯU (${importInvoices.length})',
                       style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -1552,6 +1663,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                       dataTextStyle: const TextStyle(fontSize: 12),
                       columns: const [
                         DataColumn(label: Text('STT')),
+                        DataColumn(label: Text('Mã phiếu')),
                         DataColumn(label: Text('Thời gian')),
                         DataColumn(label: Text('Tên NCC')),
                         DataColumn(label: Text('Tên Trại')),
@@ -1574,7 +1686,11 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                         final inv = invoices[idx];
                         final dateFormat = DateFormat('dd/MM HH:mm');
 
-                        // Check if this is a debt payment or discount invoice (type indicator in note)
+                        // Get STT from map (grouped by original invoice)
+                        final stt = invoiceSttMap[inv.id] ?? (idx + 1);
+
+                        // Check if this is a debt payment or discount invoice
+
                         final isDebtPayment =
                             inv.note?.contains('[TRẢ NỢ]') ?? false;
                         final isDiscount =
@@ -1595,19 +1711,20 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                         double paidAmount;
                         double remainingDebt;
 
-                        if (isDiscount) {
-                          // Chiết khấu: thành tiền = âm, tổng nhập = 0, thanh toán = 0, công nợ = âm
-                          subtotal = inv.finalAmount; // Thành tiền âm
-                          totalImport = 0; // Tổng nhập = 0
-                          paidAmount = 0; // Thanh toán = 0
-                          remainingDebt = inv.finalAmount; // Công nợ = âm
+                        if (isDiscount || isDebtPayment) {
+                          // Chiết khấu/Trả nợ: không hiển thị công nợ riêng
+                          subtotal = 0;
+                          totalImport = 0;
+                          paidAmount = inv.finalAmount.abs();
+                          remainingDebt =
+                              0; // Không hiển thị công nợ cho dòng này
                         } else {
-                          // For import: subtotal = marketWeight * pricePerKg (not netWeight)
+                          // Nhập kho: công nợ = công nợ cộng dồn theo NCC
                           subtotal = marketWeight * inv.pricePerKg;
                           totalImport = subtotal + transportFee;
-                          // finalAmount stores the paid amount
                           paidAmount = inv.finalAmount;
-                          remainingDebt = totalImport - paidAmount;
+                          // Sử dụng công nợ cộng dồn theo NCC thay vì công nợ riêng
+                          remainingDebt = cumulativeDebtByInvoice[inv.id] ?? 0;
                         }
 
                         // Extract farm name from note
@@ -1620,7 +1737,6 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                             }
                           } else if (inv.note!.contains('[TRẢ NỢ]') ||
                               inv.note!.contains('[CHIẾT KHẤU]')) {
-                            // Extract farm name from debt payment/discount note
                             final match = RegExp(r'Trại: ([^|\[]+)')
                                 .firstMatch(inv.note!);
                             if (match != null) {
@@ -1655,7 +1771,15 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                               }
                             },
                             cells: [
-                              DataCell(Center(child: Text('${idx + 1}'))),
+                              DataCell(Center(child: Text('$stt'))),
+                              // Mã phiếu
+                              DataCell(Text(
+                                inv.invoiceCode ?? '-',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 11,
+                                ),
+                              )),
                               DataCell(
                                   Text(dateFormat.format(inv.createdDate))),
                               DataCell(SizedBox(
@@ -1723,19 +1847,22 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                                   style: TextStyle(color: Colors.green[700]),
                                 ),
                               )),
+                              // Công nợ: để trống nếu là chiết khấu/trả nợ
                               DataCell(Align(
                                 alignment: Alignment.centerRight,
-                                child: Text(
-                                  _currencyFormat.format(remainingDebt),
-                                  style: TextStyle(
-                                    color: remainingDebt > 0
-                                        ? Colors.red
-                                        : Colors.green,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                child: (isDiscount || isDebtPayment)
+                                    ? const Text('-')
+                                    : Text(
+                                        _currencyFormat.format(remainingDebt),
+                                        style: TextStyle(
+                                          color: remainingDebt > 0
+                                              ? Colors.red
+                                              : Colors.green,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                               )),
-                              // Status column
+                              // Status column - màu theo loại phiếu
                               DataCell(
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -1744,7 +1871,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                                     color: isDiscount
                                         ? Colors.orange.shade100
                                         : (isDebtPayment
-                                            ? Colors.purple.shade100
+                                            ? Colors.green.shade100
                                             : Colors.blue.shade100),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
@@ -1754,9 +1881,9 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                       color: isDiscount
-                                          ? Colors.orange.shade800
+                                          ? Colors.orange.shade700
                                           : (isDebtPayment
-                                              ? Colors.purple
+                                              ? Colors.green.shade700
                                               : Colors.blue),
                                     ),
                                   ),
@@ -1812,18 +1939,29 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     double totalDebt = 0;
     double totalPaid = 0;
     double totalDiscount = 0;
+
     for (final inv in invoices) {
+      final isDebtPayment = inv.note?.contains('[TRẢ NỢ]') ?? false;
       final isDiscount = inv.note?.contains('[CHIẾT KHẤU]') ?? false;
-      final transportFee = inv.discount;
-      final subtotal = inv.subtotal;
-      final totalImport = subtotal + transportFee;
-      final paidAmount = inv.finalAmount;
-      // Tổng công nợ: tổng của tất cả các phiếu
+
       if (isDiscount) {
-        totalDebt += paidAmount; // paidAmount của phiếu chiết khấu là âm
-        totalDiscount += paidAmount.abs(); // tổng chiết khấu là trị tuyệt đối
+        // Chiết khấu: cộng vào tổng đã trả và tổng chiết khấu, trừ vào công nợ
+        totalPaid += inv.finalAmount.abs();
+        totalDiscount += inv.finalAmount.abs();
+        totalDebt -= inv.finalAmount.abs();
+      } else if (isDebtPayment) {
+        // Trả nợ: cộng vào tổng đã trả, trừ vào công nợ
+        totalPaid += inv.finalAmount.abs();
+        totalDebt -= inv.finalAmount.abs();
       } else {
-        totalDebt += (totalImport - paidAmount);
+        // Nhập kho: tính bình thường
+        final transportFee = inv.discount;
+        final subtotal = inv.totalWeight * inv.pricePerKg;
+        final totalImport = subtotal + transportFee;
+        final paidAmount = inv.finalAmount;
+        final remaining = totalImport - paidAmount;
+
+        totalDebt += remaining;
         totalPaid += paidAmount;
       }
     }
@@ -2047,9 +2185,9 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     }
 
     final debtPayment = double.tryParse(_debtPaymentController.text) ?? 0;
-    final discountPerKg = double.tryParse(_discountController.text) ?? 0;
+    final discountAmount = double.tryParse(_discountController.text) ?? 0;
 
-    if (debtPayment <= 0 && discountPerKg <= 0) {
+    if (debtPayment <= 0 && discountAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('⚠️ Vui lòng nhập số tiền trả nợ hoặc chiết khấu!'),
@@ -2087,8 +2225,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
           pricePerKg: 0,
           deduction: 0,
           discount: 0,
-          finalAmount:
-              debtPayment, // Store payment amount in finalAmount (will show in Thành tiền)
+          finalAmount: debtPayment, // Số tiền trả nợ hiển thị ở Thanh toán
           paidAmount: 0,
           note: debtNote,
           details: [],
@@ -2097,25 +2234,13 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         await _invoiceRepo.createInvoice(debtInvoice);
       }
 
-      // Create discount invoice if discountPerKg > 0
-      // Chiết khấu: nhà CC giảm giá cho kho
-      // Hiển thị đầy đủ thông tin phiếu gốc, thành tiền = âm (công nợ trừ đi)
-      if (discountPerKg > 0) {
+      // Create discount invoice if discountAmount > 0
+      // Chiết khấu: nhập thẳng số tiền, hiển thị ở Thanh toán, trừ vào công nợ
+      if (discountAmount > 0) {
         final discountInvoiceId =
             'discount_${DateTime.now().millisecondsSinceEpoch}';
         final discountNote =
             '[CHIẾT KHẤU] Trại: $farmName | Phiếu gốc: ${_selectedInvoice!.id}';
-
-        // Chiết khấu = chiết khấu/kg × số cân gốc (âm để công nợ trừ đi)
-        final discountAmount = discountPerKg * _selectedInvoice!.totalWeight;
-
-        // Lấy thông tin loại heo từ phiếu gốc
-        final pigType = _selectedInvoice!.details.isNotEmpty
-            ? (_selectedInvoice!.details.first.pigType ?? '')
-            : '';
-        final batchNumber = _selectedInvoice!.details.isNotEmpty
-            ? (_selectedInvoice!.details.first.batchNumber ?? '')
-            : '';
 
         final discountInvoice = InvoiceEntity(
           id: discountInvoiceId,
@@ -2123,32 +2248,19 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
           partnerName: _selectedInvoice!.partnerName,
           type: 0, // Import type
           createdDate: DateTime.now(),
-          totalWeight: _selectedInvoice!.totalWeight, // Hiện số cân gốc
-          totalQuantity: _selectedInvoice!.totalQuantity, // Hiện số lượng gốc
-          pricePerKg: discountPerKg, // Đơn giá = giá chiết khấu/kg
-          deduction: _selectedInvoice!.deduction, // Cân trại gốc
-          discount: 0, // Cước xe = 0
-          finalAmount: -discountAmount, // Thành tiền âm → công nợ âm
+          totalWeight: 0,
+          totalQuantity: 0,
+          pricePerKg: 0,
+          deduction: 0,
+          discount: 0,
+          finalAmount:
+              discountAmount, // Số tiền chiết khấu hiển thị ở Thanh toán
           paidAmount: 0,
           note: discountNote,
           details: [],
         );
 
         await _invoiceRepo.createInvoice(discountInvoice);
-
-        // Tạo weighing detail để hiện loại heo
-        if (pigType.isNotEmpty) {
-          final discountItem = WeighingItemEntity(
-            id: 'item_${DateTime.now().millisecondsSinceEpoch}',
-            sequence: 1,
-            weight: _selectedInvoice!.totalWeight,
-            quantity: _selectedInvoice!.totalQuantity,
-            time: DateTime.now(),
-            batchNumber: batchNumber.isNotEmpty ? batchNumber : null,
-            pigType: pigType,
-          );
-          await _invoiceRepo.addWeighingItem(discountInvoiceId, discountItem);
-        }
       }
 
       if (mounted) {
@@ -2156,11 +2268,9 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         if (debtPayment > 0) {
           message += 'Trả nợ ${_currencyFormat.format(debtPayment)}';
         }
-        if (discountPerKg > 0) {
+        if (discountAmount > 0) {
           if (debtPayment > 0) message += ', ';
-          final discountAmount = discountPerKg * _selectedInvoice!.totalWeight;
-          message +=
-              'Chiết khấu ${_currencyFormat.format(discountAmount)} (${_currencyFormat.format(discountPerKg)}/kg × ${_selectedInvoice!.totalWeight}kg)';
+          message += 'Chiết khấu ${_currencyFormat.format(discountAmount)}';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(

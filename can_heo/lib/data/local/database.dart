@@ -35,7 +35,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 5; // added paymentMethod to transactions
+  int get schemaVersion => 6; // added invoiceCode to invoices
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -82,6 +82,13 @@ class AppDatabase extends _$AppDatabase {
               await m.addColumn(transactions, transactions.paymentMethod);
             } catch (_) {}
           }
+          
+          // Từ version 5 -> 6: Thêm cột invoiceCode cho Invoices
+          if (from < 6) {
+            try {
+              await m.addColumn(invoices, invoices.invoiceCode);
+            } catch (_) {}
+          }
         },
 
         beforeOpen: (OpeningDetails details) async {
@@ -90,6 +97,13 @@ class AppDatabase extends _$AppDatabase {
           try {
             await customStatement(
                 'ALTER TABLE transactions ADD COLUMN payment_method INTEGER NOT NULL DEFAULT 0');
+          } catch (_) {
+            // Cột đã tồn tại, bỏ qua
+          }
+          // Đảm bảo cột invoice_code tồn tại
+          try {
+            await customStatement(
+                'ALTER TABLE invoices ADD COLUMN invoice_code TEXT');
           } catch (_) {
             // Cột đã tồn tại, bỏ qua
           }

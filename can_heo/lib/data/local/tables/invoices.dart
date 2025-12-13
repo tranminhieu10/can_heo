@@ -5,6 +5,9 @@ import 'partners.dart';
 class Invoices extends Table {
   TextColumn get id => text()();
   
+  // Mã phiếu theo ngày (VD: 20251212-01)
+  TextColumn get invoiceCode => text().nullable()();
+  
   // Liên kết với bảng Partner
   TextColumn get partnerId => text().nullable().references(Partners, #id)();
   

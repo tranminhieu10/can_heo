@@ -1,5 +1,4 @@
 import 'package:drift/drift.dart';
-import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/invoice.dart';
@@ -62,6 +61,7 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
 
         results.add(InvoiceEntity(
           id: row.invoice.id,
+          invoiceCode: row.invoice.invoiceCode,
           partnerId: row.partner?.id,
           partnerName: row.partner?.name ?? 'Khách lẻ',
           type: row.invoice.type,
@@ -118,6 +118,7 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
 
     return InvoiceEntity(
       id: invoiceRow.id,
+      invoiceCode: invoiceRow.invoiceCode,
       partnerId: invoiceRow.partnerId,
       partnerName: partnerName,
       type: invoiceRow.type,
@@ -139,6 +140,7 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
     await _db.invoicesDao.createInvoice(
       InvoicesCompanion(
         id: Value(invoice.id),
+        invoiceCode: Value(invoice.invoiceCode),
         partnerId: Value(invoice.partnerId),
         type: Value(invoice.type),
         createdDate: Value(invoice.createdDate),
@@ -259,5 +261,33 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
       }
       return imported - exported;
     });
+  }
+
+  @override
+  Future<String> generateInvoiceCode(int type) async {
+    final now = DateTime.now();
+    final dateStr = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    final prefix = type == 0 ? 'NK' : 'XC'; // NK = Nhập Kho, XC = Xuất Chợ
+    
+    // Đếm số phiếu cùng loại trong ngày (chỉ đếm phiếu gốc, không đếm chiết khấu/trả nợ)
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    
+    final query = _db.select(_db.invoices)
+      ..where((tbl) => tbl.type.equals(type) & 
+                       tbl.createdDate.isBiggerOrEqualValue(startOfDay) &
+                       tbl.createdDate.isSmallerThanValue(endOfDay));
+    
+    final todayInvoices = await query.get();
+    
+    // Chỉ đếm phiếu có invoiceCode (phiếu gốc), không đếm phiếu chiết khấu/trả nợ
+    final originalInvoices = todayInvoices.where((inv) {
+      final note = inv.note ?? '';
+      return !note.contains('[TRẢ NỢ]') && !note.contains('[CHIẾT KHẤU]');
+    }).toList();
+    
+    final count = originalInvoices.length + 1;
+    
+    return '$dateStr-$prefix${count.toString().padLeft(2, '0')}';
   }
 }

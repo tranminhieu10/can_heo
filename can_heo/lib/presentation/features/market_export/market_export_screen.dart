@@ -1227,7 +1227,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
       future: _calculatePartnerDebt(_selectedPartner!.id),
       builder: (context, snapshot) {
         final debtInfo = snapshot.data ?? {};
-        final remaining = debtInfo['remaining'] ?? 0.0;
+        final remaining = (debtInfo['remaining'] as num?)?.toDouble() ?? 0.0;
 
         return _buildCompactField(
           'Công nợ',
@@ -1796,7 +1796,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
       future: _calculatePartnerDebt(_selectedPartner!.id),
       builder: (context, snapshot) {
         final debtInfo = snapshot.data ?? {};
-        final remaining = debtInfo['remaining'] ?? 0.0;
+        final remaining = (debtInfo['remaining'] as num?)?.toDouble() ?? 0.0;
 
         return _buildGridLockedField(
           label: 'Công nợ',
@@ -2565,9 +2565,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
       future: hasPartner ? _calculatePartnerDebt(partnerId!) : Future.value({}),
       builder: (context, snapshot) {
         final debtInfo = snapshot.data ?? {};
-        final totalDebt = debtInfo['totalDebt'] ?? 0.0;
-        final totalPaid = debtInfo['totalPaid'] ?? 0.0;
-        final remaining = debtInfo['remaining'] ?? 0.0;
+        final totalDebt = (debtInfo['totalDebt'] as num?)?.toDouble() ?? 0.0;
+        final totalPaid = (debtInfo['totalPaid'] as num?)?.toDouble() ?? 0.0;
+        final remaining = (debtInfo['remaining'] as num?)?.toDouble() ?? 0.0;
 
         // Only action bar - no history table
         return Container(
@@ -2925,9 +2925,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
       future: _calculatePartnerDebt(partnerId),
       builder: (context, snapshot) {
         final debtInfo = snapshot.data ?? {};
-        final totalDebt = debtInfo['totalDebt'] ?? 0.0;
-        final totalPaid = debtInfo['totalPaid'] ?? 0.0;
-        final remaining = debtInfo['remaining'] ?? 0.0;
+        final totalDebt = (debtInfo['totalDebt'] as num?)?.toDouble() ?? 0.0;
+        final totalPaid = (debtInfo['totalPaid'] as num?)?.toDouble() ?? 0.0;
+        final remaining = (debtInfo['remaining'] as num?)?.toDouble() ?? 0.0;
 
         return Column(
           children: [

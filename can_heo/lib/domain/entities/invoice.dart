@@ -47,6 +47,7 @@ class WeighingItemEntity extends Equatable {
 /// Phiếu cân (header) + danh sách chi tiết (có thể trống)
 class InvoiceEntity extends Equatable {
   final String id;
+  final String? invoiceCode; // Mã phiếu theo ngày (VD: 20251212-01)
   final String? partnerId;
   final String? partnerName;
   final int type; // 0 = Nhập kho, 2 = Xuất chợ...
@@ -70,6 +71,7 @@ class InvoiceEntity extends Equatable {
 
   const InvoiceEntity({
     required this.id,
+    this.invoiceCode,
     this.partnerId,
     this.partnerName,
     required this.type,
@@ -92,6 +94,7 @@ class InvoiceEntity extends Equatable {
 
   InvoiceEntity copyWith({
     String? id,
+    String? invoiceCode,
     String? partnerId,
     String? partnerName,
     int? type,
@@ -108,6 +111,7 @@ class InvoiceEntity extends Equatable {
   }) {
     return InvoiceEntity(
       id: id ?? this.id,
+      invoiceCode: invoiceCode ?? this.invoiceCode,
       partnerId: partnerId ?? this.partnerId,
       partnerName: partnerName ?? this.partnerName,
       type: type ?? this.type,
@@ -127,6 +131,7 @@ class InvoiceEntity extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    invoiceCode,
     partnerId,
     partnerName,
     type,

@@ -443,6 +443,12 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
       'id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _invoiceCodeMeta =
+      const VerificationMeta('invoiceCode');
+  @override
+  late final GeneratedColumn<String> invoiceCode = GeneratedColumn<String>(
+      'invoice_code', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _partnerIdMeta =
       const VerificationMeta('partnerId');
   @override
@@ -527,6 +533,7 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
   @override
   List<GeneratedColumn> get $columns => [
         id,
+        invoiceCode,
         partnerId,
         type,
         createdDate,
@@ -553,6 +560,12 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('invoice_code')) {
+      context.handle(
+          _invoiceCodeMeta,
+          invoiceCode.isAcceptableOrUnknown(
+              data['invoice_code']!, _invoiceCodeMeta));
     }
     if (data.containsKey('partner_id')) {
       context.handle(_partnerIdMeta,
@@ -625,6 +638,8 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     return Invoice(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      invoiceCode: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}invoice_code']),
       partnerId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}partner_id']),
       type: attachedDatabase.typeMapping
@@ -658,6 +673,7 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
 
 class Invoice extends DataClass implements Insertable<Invoice> {
   final String id;
+  final String? invoiceCode;
   final String? partnerId;
   final int type;
   final DateTime createdDate;
@@ -671,6 +687,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   final String? note;
   const Invoice(
       {required this.id,
+      this.invoiceCode,
       this.partnerId,
       required this.type,
       required this.createdDate,
@@ -686,6 +703,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    if (!nullToAbsent || invoiceCode != null) {
+      map['invoice_code'] = Variable<String>(invoiceCode);
+    }
     if (!nullToAbsent || partnerId != null) {
       map['partner_id'] = Variable<String>(partnerId);
     }
@@ -707,6 +727,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   InvoicesCompanion toCompanion(bool nullToAbsent) {
     return InvoicesCompanion(
       id: Value(id),
+      invoiceCode: invoiceCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(invoiceCode),
       partnerId: partnerId == null && nullToAbsent
           ? const Value.absent()
           : Value(partnerId),
@@ -728,6 +751,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Invoice(
       id: serializer.fromJson<String>(json['id']),
+      invoiceCode: serializer.fromJson<String?>(json['invoiceCode']),
       partnerId: serializer.fromJson<String?>(json['partnerId']),
       type: serializer.fromJson<int>(json['type']),
       createdDate: serializer.fromJson<DateTime>(json['createdDate']),
@@ -746,6 +770,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'invoiceCode': serializer.toJson<String?>(invoiceCode),
       'partnerId': serializer.toJson<String?>(partnerId),
       'type': serializer.toJson<int>(type),
       'createdDate': serializer.toJson<DateTime>(createdDate),
@@ -762,6 +787,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
 
   Invoice copyWith(
           {String? id,
+          Value<String?> invoiceCode = const Value.absent(),
           Value<String?> partnerId = const Value.absent(),
           int? type,
           DateTime? createdDate,
@@ -775,6 +801,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           Value<String?> note = const Value.absent()}) =>
       Invoice(
         id: id ?? this.id,
+        invoiceCode: invoiceCode.present ? invoiceCode.value : this.invoiceCode,
         partnerId: partnerId.present ? partnerId.value : this.partnerId,
         type: type ?? this.type,
         createdDate: createdDate ?? this.createdDate,
@@ -790,6 +817,8 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   Invoice copyWithCompanion(InvoicesCompanion data) {
     return Invoice(
       id: data.id.present ? data.id.value : this.id,
+      invoiceCode:
+          data.invoiceCode.present ? data.invoiceCode.value : this.invoiceCode,
       partnerId: data.partnerId.present ? data.partnerId.value : this.partnerId,
       type: data.type.present ? data.type.value : this.type,
       createdDate:
@@ -815,6 +844,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   String toString() {
     return (StringBuffer('Invoice(')
           ..write('id: $id, ')
+          ..write('invoiceCode: $invoiceCode, ')
           ..write('partnerId: $partnerId, ')
           ..write('type: $type, ')
           ..write('createdDate: $createdDate, ')
@@ -833,6 +863,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   @override
   int get hashCode => Object.hash(
       id,
+      invoiceCode,
       partnerId,
       type,
       createdDate,
@@ -849,6 +880,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       identical(this, other) ||
       (other is Invoice &&
           other.id == this.id &&
+          other.invoiceCode == this.invoiceCode &&
           other.partnerId == this.partnerId &&
           other.type == this.type &&
           other.createdDate == this.createdDate &&
@@ -864,6 +896,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
 
 class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String> id;
+  final Value<String?> invoiceCode;
   final Value<String?> partnerId;
   final Value<int> type;
   final Value<DateTime> createdDate;
@@ -878,6 +911,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<int> rowid;
   const InvoicesCompanion({
     this.id = const Value.absent(),
+    this.invoiceCode = const Value.absent(),
     this.partnerId = const Value.absent(),
     this.type = const Value.absent(),
     this.createdDate = const Value.absent(),
@@ -893,6 +927,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   });
   InvoicesCompanion.insert({
     required String id,
+    this.invoiceCode = const Value.absent(),
     this.partnerId = const Value.absent(),
     required int type,
     required DateTime createdDate,
@@ -910,6 +945,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
         createdDate = Value(createdDate);
   static Insertable<Invoice> custom({
     Expression<String>? id,
+    Expression<String>? invoiceCode,
     Expression<String>? partnerId,
     Expression<int>? type,
     Expression<DateTime>? createdDate,
@@ -925,6 +961,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (invoiceCode != null) 'invoice_code': invoiceCode,
       if (partnerId != null) 'partner_id': partnerId,
       if (type != null) 'type': type,
       if (createdDate != null) 'created_date': createdDate,
@@ -942,6 +979,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
 
   InvoicesCompanion copyWith(
       {Value<String>? id,
+      Value<String?>? invoiceCode,
       Value<String?>? partnerId,
       Value<int>? type,
       Value<DateTime>? createdDate,
@@ -956,6 +994,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       Value<int>? rowid}) {
     return InvoicesCompanion(
       id: id ?? this.id,
+      invoiceCode: invoiceCode ?? this.invoiceCode,
       partnerId: partnerId ?? this.partnerId,
       type: type ?? this.type,
       createdDate: createdDate ?? this.createdDate,
@@ -976,6 +1015,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (invoiceCode.present) {
+      map['invoice_code'] = Variable<String>(invoiceCode.value);
     }
     if (partnerId.present) {
       map['partner_id'] = Variable<String>(partnerId.value);
@@ -1020,6 +1062,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   String toString() {
     return (StringBuffer('InvoicesCompanion(')
           ..write('id: $id, ')
+          ..write('invoiceCode: $invoiceCode, ')
           ..write('partnerId: $partnerId, ')
           ..write('type: $type, ')
           ..write('createdDate: $createdDate, ')
@@ -2631,6 +2674,7 @@ typedef $$PartnersTableProcessedTableManager = ProcessedTableManager<
     PrefetchHooks Function({bool invoicesRefs, bool transactionsRefs})>;
 typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   required String id,
+  Value<String?> invoiceCode,
   Value<String?> partnerId,
   required int type,
   required DateTime createdDate,
@@ -2646,6 +2690,7 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
 });
 typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<String> id,
+  Value<String?> invoiceCode,
   Value<String?> partnerId,
   Value<int> type,
   Value<DateTime> createdDate,
@@ -2721,6 +2766,9 @@ class $$InvoicesTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get invoiceCode => $composableBuilder(
+      column: $table.invoiceCode, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get type => $composableBuilder(
       column: $table.type, builder: (column) => ColumnFilters(column));
@@ -2827,6 +2875,9 @@ class $$InvoicesTableOrderingComposer
   ColumnOrderings<String> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get invoiceCode => $composableBuilder(
+      column: $table.invoiceCode, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get type => $composableBuilder(
       column: $table.type, builder: (column) => ColumnOrderings(column));
 
@@ -2890,6 +2941,9 @@ class $$InvoicesTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get invoiceCode => $composableBuilder(
+      column: $table.invoiceCode, builder: (column) => column);
 
   GeneratedColumn<int> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
@@ -3009,6 +3063,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
               $$InvoicesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<String> id = const Value.absent(),
+            Value<String?> invoiceCode = const Value.absent(),
             Value<String?> partnerId = const Value.absent(),
             Value<int> type = const Value.absent(),
             Value<DateTime> createdDate = const Value.absent(),
@@ -3024,6 +3079,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
           }) =>
               InvoicesCompanion(
             id: id,
+            invoiceCode: invoiceCode,
             partnerId: partnerId,
             type: type,
             createdDate: createdDate,
@@ -3039,6 +3095,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
           ),
           createCompanionCallback: ({
             required String id,
+            Value<String?> invoiceCode = const Value.absent(),
             Value<String?> partnerId = const Value.absent(),
             required int type,
             required DateTime createdDate,
@@ -3054,6 +3111,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
           }) =>
               InvoicesCompanion.insert(
             id: id,
+            invoiceCode: invoiceCode,
             partnerId: partnerId,
             type: type,
             createdDate: createdDate,

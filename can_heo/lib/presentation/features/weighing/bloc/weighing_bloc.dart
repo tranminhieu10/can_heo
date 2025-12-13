@@ -213,7 +213,11 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
     emit(state.copyWith(status: WeighingStatus.loading, clearError: true));
 
     try {
-      await invoiceRepository.createInvoice(invoice);
+      // Generate invoice code
+      final invoiceCode = await invoiceRepository.generateInvoiceCode(invoice.type);
+      final invoiceWithCode = invoice.copyWith(invoiceCode: invoiceCode);
+      
+      await invoiceRepository.createInvoice(invoiceWithCode);
       for (final item in state.items) {
         await invoiceRepository.addWeighingItem(invoice.id, item);
       }

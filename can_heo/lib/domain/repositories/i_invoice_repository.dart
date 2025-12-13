@@ -23,16 +23,14 @@ abstract class IInvoiceRepository {
   // Cập nhật 1 mã cân
   Future<void> updateWeighingItem(WeighingItemEntity item);
 
-    // Xóa 1 phiếu
+  // Xóa 1 phiếu
+  Future<void> deleteInvoice(String id);
 
-    Future<void> deleteInvoice(String id);
+  // Xem tồn kho của 1 loại heo
+  Stream<int> watchPigTypeInventory(String pigType);
 
-  
-
-    // Xem tồn kho của 1 loại heo
-
-    Stream<int> watchPigTypeInventory(String pigType);
-
-  }
+  // Generate invoice code theo ngày (VD: 20251212-01)
+  Future<String> generateInvoiceCode(int type);
+}
 
   
