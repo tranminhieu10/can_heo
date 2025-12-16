@@ -1036,7 +1036,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildFormRow1() {
-    // Row 1: Mã KH, Tên KH, Công nợ
+    // Row 1: Mã KH, Tên KH, Công nợ - compact
     return BlocBuilder<PartnerBloc, PartnerState>(
       builder: (context, state) {
         final partners = state.partners;
@@ -1045,41 +1045,42 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
         return Row(
           children: [
-            Expanded(
+            SizedBox(
+              width: 50,
               child: _buildCompactField(
-                'Mã KH',
+                'Mã',
                 Text(
                   _selectedPartner?.id ?? '---',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
                   overflow: TextOverflow.ellipsis,
                 ),
                 icon: Icons.badge,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
             Expanded(
               flex: 2,
               child: DropdownButtonFormField<PartnerEntity>(
                 isExpanded: true,
                 decoration: InputDecoration(
-                  labelText: 'Tên KH',
-                  labelStyle: const TextStyle(fontSize: 12),
-                  prefixIcon: const Icon(Icons.person, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  labelText: 'Khách hàng',
+                  labelStyle: const TextStyle(fontSize: 10),
+                  prefixIcon: const Icon(Icons.person, size: 14),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 ),
                 value: safeValue,
-                style: const TextStyle(fontSize: 13, color: Colors.black),
+                style: const TextStyle(fontSize: 11, color: Colors.black),
                 items: partners
                     .map((p) => DropdownMenuItem(
                         value: p,
-                        child: Text(p.name, style: const TextStyle(fontSize: 13))))
+                        child: Text(p.name, style: const TextStyle(fontSize: 11))))
                     .toList(),
                 onChanged: (value) => setState(() => _selectedPartner = value),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
             Expanded(
               child: _buildPartnerDebtFieldCompact(),
             ),
@@ -1090,23 +1091,25 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildFormRow2() {
-    // Row 2: Loại heo, Số lô, Tồn kho
+    // Row 2: Loại heo, Số lô, Tồn kho - compact
     return Row(
       children: [
         Expanded(
           child: _buildPigTypeDropdownCompact(),
         ),
-        const SizedBox(width: 8),
-        Expanded(
+        const SizedBox(width: 4),
+        SizedBox(
+          width: 60,
           child: _buildCompactTextField(
             'Số lô',
             _batchNumberController,
-            hintText: 'Số lô',
+            hintText: 'Lô',
             icon: Icons.inventory_2,
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
+        const SizedBox(width: 4),
+        SizedBox(
+          width: 70,
           child: _buildInventoryDisplayFieldCompact(),
         ),
       ],
@@ -1114,21 +1117,23 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildFormRow3() {
-    // Row 3: Số lượng, Trọng lượng, Trừ hao, TL Thực
+    // Row 3: Số lượng, Trọng lượng, Trừ hao, TL Thực - compact
     return Row(
       children: [
-        Expanded(
+        SizedBox(
+          width: 70,
           child: _buildQuantityFieldWithButtonsCompact(),
         ),
-        const SizedBox(width: 8),
-        Expanded(
+        const SizedBox(width: 4),
+        SizedBox(
+          width: 80,
           child: _buildCompactField(
-            'Trọng lượng (kg)',
+            'TL (kg)',
             Text(
               _numberFormat.format(_grossWeight),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 13,
+                fontSize: 11,
                 color: Colors.blue.shade700,
               ),
             ),
@@ -1136,19 +1141,20 @@ class _MarketExportViewState extends State<_MarketExportView> {
             bgColor: Colors.blue.shade50,
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
+        const SizedBox(width: 4),
+        SizedBox(
+          width: 70,
           child: _buildDeductionFieldCompact(),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
         Expanded(
           child: _buildCompactField(
-            'TL Thực (kg)',
+            'TL Thực',
             Text(
               _numberFormat.format(_netWeight),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 13,
+                fontSize: 11,
                 color: Colors.green.shade700,
               ),
             ),
@@ -1161,10 +1167,11 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildFormRow4() {
-    // Row 4: Đơn giá, Thành tiền, Chiết khấu, Thực thu
+    // Row 4: Đơn giá, Thành tiền, Chiết khấu, Thực thu - compact
     return Row(
       children: [
-        Expanded(
+        SizedBox(
+          width: 80,
           child: _buildCompactTextField(
             'Đơn giá',
             _priceController,
@@ -1174,7 +1181,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
             icon: Icons.price_change,
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
         Expanded(
           child: _buildCompactField(
             'Thành tiền',
@@ -1185,7 +1192,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 _currencyFormat.format(_subtotal),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 13,
+                  fontSize: 11,
                   color: Colors.orange.shade700,
                 ),
               ),
@@ -1194,8 +1201,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
             bgColor: Colors.orange.shade50,
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
+        const SizedBox(width: 4),
+        SizedBox(
+          width: 80,
           child: _buildCompactTextField(
             'Chiết khấu',
             _discountController,
@@ -1204,10 +1212,10 @@ class _MarketExportViewState extends State<_MarketExportView> {
             icon: Icons.discount,
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
         Expanded(
           child: _buildCompactField(
-            'THỰC THU',
+            'Thực thu',
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
@@ -1215,7 +1223,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 _currencyFormat.format(_totalAmount),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 13,
+                  fontSize: 11,
                   color: Colors.blue.shade800,
                 ),
               ),
@@ -1229,11 +1237,11 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildFormRow5() {
-    // Row 5: Ghi chú
+    // Row 5: Ghi chú - compact
     return _buildCompactTextField(
       'Ghi chú',
       _noteController,
-      hintText: 'Nhập ghi chú...',
+      hintText: 'Ghi chú...',
       icon: Icons.note,
     );
   }
@@ -1243,17 +1251,17 @@ class _MarketExportViewState extends State<_MarketExportView> {
     return Container(
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(4),
         border: Border.all(color: Colors.grey.shade300),
       ),
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(fontSize: 12),
-          prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+          labelStyle: const TextStyle(fontSize: 10),
+          prefixIcon: icon != null ? Icon(icon, size: 14) : null,
           isDense: true,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           border: InputBorder.none,
         ),
         child: child,
@@ -1286,13 +1294,13 @@ class _MarketExportViewState extends State<_MarketExportView> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
-        labelStyle: const TextStyle(fontSize: 12),
-        prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+        labelStyle: const TextStyle(fontSize: 10),
+        prefixIcon: icon != null ? Icon(icon, size: 14) : null,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
       ),
-      style: const TextStyle(fontSize: 13),
+      style: const TextStyle(fontSize: 11),
     );
   }
 

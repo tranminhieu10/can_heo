@@ -173,10 +173,19 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                   padding: EdgeInsets.all(Responsive.spacing),
                   child: Column(
                     children: [
-                      // ========== PHẦN 1: Thông tin phiếu - 1/3 height ==========
+                      // ========== PHẦN 1: Thông tin phiếu - chiếm 1/2 bên trái ==========
                       Expanded(
                         flex: 1,
-                        child: _buildInvoiceDetailsSection(context),
+                        child: Row(
+                          children: [
+                            // Nửa trái: Form thông tin phiếu
+                            Expanded(
+                              child: _buildInvoiceDetailsSection(context),
+                            ),
+                            // Nửa phải: để trống hoặc có thể thêm nội dung khác
+                            const Expanded(child: SizedBox()),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 8),
                       // ========== PHẦN 2: Phiếu đã lưu - 2/3 height ==========
@@ -423,57 +432,35 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            // Form - Table layout for alignment
+            const SizedBox(height: 4),
+            // Form - 4 rows layout with equal height fields
             Expanded(
               child: Column(
                 children: [
-                  // Row 1: Labels
-                  Table(
-                    columnWidths: const {
-                      0: FixedColumnWidth(80), // Mã NCC
-                      1: FlexColumnWidth(2), // Nhà cung cấp
-                      2: FlexColumnWidth(1.5), // Loại heo
-                      3: FixedColumnWidth(100), // Tồn kho
-                    },
-                    children: [
-                      TableRow(
-                        children: [
-                          _buildTableLabel('Mã NCC'),
-                          _buildTableLabel('Nhà cung cấp'),
-                          _buildTableLabel('Loại heo'),
-                          _buildTableLabel('Tồn kho'),
-                        ],
-                      ),
-                    ],
-                  ),
-                  // Row 1: Fields
-                  SizedBox(
-                    height: fieldHeight,
+                  // Row 1: Mã + Nhà cung cấp
+                  _buildRowLabels(['Mã', 'Nhà cung cấp'], [50, null]),
+                  Expanded(
                     child: Row(
                       children: [
-                        // Mã NCC
                         SizedBox(
-                          width: 80,
+                          width: 50,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
                             decoration: BoxDecoration(
                               border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                             alignment: Alignment.centerLeft,
                             child: Text(
                               _selectedPartner?.id ?? '---',
                               style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 13),
+                                  fontWeight: FontWeight.bold, fontSize: 11),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),
                         const SizedBox(width: 4),
-                        // Nhà cung cấp
                         Expanded(
-                          flex: 2,
                           child: BlocBuilder<PartnerBloc, PartnerState>(
                             builder: (context, state) {
                               final partners = state.partners;
@@ -485,20 +472,20 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                                 isExpanded: true,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(6)),
+                                      borderRadius: BorderRadius.circular(4)),
                                   isDense: true,
                                   contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 8),
+                                      horizontal: 6, vertical: 4),
                                 ),
                                 value: safeValue,
                                 style: const TextStyle(
-                                    fontSize: 13, color: Colors.black),
+                                    fontSize: 11, color: Colors.black),
                                 items: partners
                                     .map((p) => DropdownMenuItem(
                                           value: p,
                                           child: Text(p.name,
                                               style: const TextStyle(
-                                                  fontSize: 13)),
+                                                  fontSize: 11)),
                                         ))
                                     .toList(),
                                 onChanged: (value) =>
@@ -507,60 +494,42 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        // Loại heo
-                        Expanded(flex: 2, child: _buildPigTypeDropdown()),
-                        const SizedBox(width: 4),
-                        // Tồn kho
-                        SizedBox(
-                            width: 100, child: _buildInventoryDisplayField()),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  // Row 2: Labels
-                  Table(
-                    columnWidths: const {
-                      0: FlexColumnWidth(1), // Lý do
-                      1: FixedColumnWidth(80), // Số lô
-                      2: FixedColumnWidth(100), // Số lượng
-                      3: FlexColumnWidth(1), // TL
-                      4: FlexColumnWidth(2), // Ghi chú
-                    },
-                    children: [
-                      TableRow(
-                        children: [
-                          _buildTableLabel('Lý do xuất'),
-                          _buildTableLabel('Số lô'),
-                          _buildTableLabel('Số lượng'),
-                          _buildTableLabel('TL (kg)'),
-                          _buildTableLabel('Ghi chú'),
-                        ],
-                      ),
-                    ],
-                  ),
-                  // Row 2: Fields
-                  SizedBox(
-                    height: fieldHeight,
+                  const SizedBox(height: 2),
+                  // Row 2: Loại heo + Tồn kho
+                  _buildRowLabels(['Loại heo', 'Tồn kho'], [null, 60]),
+                  Expanded(
                     child: Row(
                       children: [
-                        // Lý do xuất
+                        Expanded(child: _buildPigTypeDropdown()),
+                        const SizedBox(width: 4),
+                        SizedBox(
+                            width: 60, child: _buildInventoryDisplayField()),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  // Row 3: Lý do + Số lô + SL + TL
+                  _buildRowLabels(['Lý do xuất', 'Số lô', 'SL', 'TL (kg)'], [null, 50, 60, 70]),
+                  Expanded(
+                    child: Row(
+                      children: [
                         Expanded(
                             child: _buildSimpleTextField(_farmNameController)),
                         const SizedBox(width: 4),
-                        // Số lô
                         SizedBox(
-                            width: 80,
+                            width: 50,
                             child:
                                 _buildSimpleTextField(_batchNumberController)),
                         const SizedBox(width: 4),
-                        // Số lượng
                         SizedBox(
-                            width: 100,
+                            width: 60,
                             child: _buildQuantityFieldWithButtons()),
                         const SizedBox(width: 4),
-                        // Trọng lượng
-                        Expanded(
+                        SizedBox(
+                          width: 70,
                           child: _buildSimpleTextField(
                             _scaleInputController,
                             isDecimal: true,
@@ -570,22 +539,40 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        // Ghi chú
-                        Expanded(
-                            flex: 2,
-                            child: _buildSimpleTextField(_noteController)),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 2),
+                  // Row 4: Ghi chú
+                  _buildRowLabels(['Ghi chú'], [null]),
+                  Expanded(
+                    child: _buildSimpleTextField(_noteController),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             _buildActionButtons(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRowLabels(List<String> labels, List<double?> widths) {
+    return Row(
+      children: List.generate(labels.length, (i) {
+        final label = labels[i];
+        final width = widths[i];
+        if (width != null) {
+          return SizedBox(
+            width: width,
+            child: _buildTableLabel(label),
+          );
+        } else {
+          return Expanded(child: _buildTableLabel(label));
+        }
+      }).expand((w) => [w, const SizedBox(width: 4)]).toList()..removeLast(),
     );
   }
 

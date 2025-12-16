@@ -155,10 +155,19 @@ class _MarketImportViewState extends State<_MarketImportView> {
                 padding: EdgeInsets.all(padding),
                 child: Column(
                   children: [
-                    // ========== PHẦN 1: Thông tin phiếu - 1/3 height ==========
+                    // ========== PHẦN 1: Thông tin phiếu - chiếm 1/2 bên trái ==========
                     Expanded(
                       flex: 1,
-                      child: _buildInvoiceDetailsSection(context),
+                      child: Row(
+                        children: [
+                          // Nửa trái: Form thông tin phiếu
+                          Expanded(
+                            child: _buildInvoiceDetailsSection(context),
+                          ),
+                          // Nửa phải: để trống
+                          const Expanded(child: SizedBox()),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 8),
                     // ========== PHẦN 2: Phiếu đã lưu - 2/3 height ==========
@@ -430,52 +439,38 @@ class _MarketImportViewState extends State<_MarketImportView> {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
 
-            // Form fields - Table layout for alignment
+            // Form fields - 4 rows layout with equal height
             Expanded(
-              child: Table(
-                columnWidths: const {
-                  0: FlexColumnWidth(2), // Khách hàng
-                  1: FlexColumnWidth(1.5), // Loại heo
-                  2: FixedColumnWidth(100), // TL (kg)
-                  3: FixedColumnWidth(80), // SL
-                  4: FixedColumnWidth(80), // Trừ bì
-                },
+              child: Column(
                 children: [
-                  // Labels row
-                  TableRow(
+                  // Row 1: Khách hàng
+                  _buildRowLabel('Khách hàng', fontSize),
+                  Expanded(
+                    child: _buildPartnerField(context, fontSize: fontSize),
+                  ),
+                  const SizedBox(height: 2),
+                  // Row 2: Loại heo
+                  _buildRowLabel('Loại heo', fontSize),
+                  Expanded(
+                    child: _buildPigTypeField(context, fontSize: fontSize),
+                  ),
+                  const SizedBox(height: 2),
+                  // Row 3: TL + SL + Trừ bì
+                  Row(
                     children: [
-                      _buildTableLabel('Khách hàng', fontSize),
-                      _buildTableLabel('Loại heo', fontSize),
-                      _buildTableLabel('TL (kg)', fontSize),
-                      _buildTableLabel('Số lượng', fontSize),
-                      _buildTableLabel('Trừ bì', fontSize),
+                      Expanded(child: _buildRowLabel('TL (kg)', fontSize)),
+                      const SizedBox(width: 4),
+                      SizedBox(width: 50, child: _buildRowLabel('SL', fontSize)),
+                      const SizedBox(width: 4),
+                      SizedBox(width: 50, child: _buildRowLabel('Trừ bì', fontSize)),
                     ],
                   ),
-                  // Input fields row
-                  TableRow(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: SizedBox(
-                          height: fieldHeight,
-                          child:
-                              _buildPartnerField(context, fontSize: fontSize),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: SizedBox(
-                          height: fieldHeight,
-                          child:
-                              _buildPigTypeField(context, fontSize: fontSize),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: SizedBox(
-                          height: fieldHeight,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
                           child: _buildCompactTextField(
                             controller: _scaleInputController,
                             focusNode: _scaleInputFocus,
@@ -484,22 +479,18 @@ class _MarketImportViewState extends State<_MarketImportView> {
                             onChanged: (_) => setState(() {}),
                           ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: SizedBox(
-                          height: fieldHeight,
+                        const SizedBox(width: 4),
+                        SizedBox(
+                          width: 50,
                           child: _buildCompactTextField(
                             controller: _quantityController,
                             fontSize: fontSize,
                             keyboardType: TextInputType.number,
                           ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: SizedBox(
-                          height: fieldHeight,
+                        const SizedBox(width: 4),
+                        SizedBox(
+                          width: 50,
                           child: _buildCompactTextField(
                             controller: _deductionController,
                             fontSize: fontSize,
@@ -507,22 +498,12 @@ class _MarketImportViewState extends State<_MarketImportView> {
                             onChanged: (_) => setState(() {}),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ],
-              ),
-            ),
-            // Ghi chú row
-            SizedBox(
-              height: fieldHeight,
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 60,
-                    child:
-                        Text('Ghi chú:', style: TextStyle(fontSize: fontSize)),
-                  ),
+                  const SizedBox(height: 2),
+                  // Row 4: Ghi chú
+                  _buildRowLabel('Ghi chú', fontSize),
                   Expanded(
                     child: _buildCompactTextField(
                       controller: _noteController,
@@ -533,6 +514,20 @@ class _MarketImportViewState extends State<_MarketImportView> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRowLabel(String label, double fontSize) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: fontSize - 1,
+          fontWeight: FontWeight.w500,
+          color: Colors.grey[700],
         ),
       ),
     );
