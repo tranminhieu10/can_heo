@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:intl/intl.dart';
 
 import '../../../core/services/scale_service.dart';
+import '../../../core/services/nhb300_scale_service.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/partner.dart';
 import '../../../domain/entities/pig_type.dart';
@@ -111,16 +112,51 @@ class _MarketExportViewState extends State<_MarketExportView> {
   static const double _minPanelRatio = 0.25;
   static const double _maxPanelRatio = 0.75;
 
+  // NHB300 Scale Service
+  final NHB300ScaleService _nhb300Service = NHB300ScaleService();
+  StreamSubscription<double>? _weightSubscription;
+  StreamSubscription<bool>? _connectionSubscription;
+  bool _isNhb300Connected = false;
+  double _nhb300Weight = 0.0;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _scaleInputFocus.requestFocus();
     });
+    _setupNhb300Listeners();
+  }
+
+  void _setupNhb300Listeners() {
+    _connectionSubscription = _nhb300Service.connectionStream.listen((connected) {
+      if (mounted) {
+        setState(() => _isNhb300Connected = connected);
+        if (connected) {
+          _startWeightListening();
+        }
+      }
+    });
+  }
+
+  void _startWeightListening() {
+    _weightSubscription?.cancel();
+    _weightSubscription = _nhb300Service.watchWeight().listen((weight) {
+      if (mounted) {
+        setState(() => _nhb300Weight = weight);
+        // Tự động cập nhật ô nhập cân nếu chưa chốt
+        if (!_isWeightLocked && weight > 0) {
+          _scaleInputController.text = weight.toStringAsFixed(1);
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    _weightSubscription?.cancel();
+    _connectionSubscription?.cancel();
+    _nhb300Service.dispose();
     _scaleInputController.dispose();
     _batchNumberController.dispose();
     _pigTypeController.dispose();
@@ -423,6 +459,17 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   void _lockWeight(BuildContext context) {
+    // Ưu tiên NHB300 nếu đã kết nối
+    if (_isNhb300Connected && _nhb300Weight > 0) {
+      setState(() {
+        _lockedWeight = _nhb300Weight;
+        _isWeightLocked = true;
+        _updateAutoDiscount();
+      });
+      return;
+    }
+    
+    // Fallback về bloc scale
     final state = context.read<WeighingBloc>().state;
     if (state.isScaleConnected && state.scaleWeight > 0) {
       setState(() {
@@ -450,8 +497,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
   Widget _buildScaleSection(BuildContext context) {
     return BlocBuilder<WeighingBloc, WeighingState>(
       builder: (context, state) {
-        final weight = state.scaleWeight;
-        final connected = state.isScaleConnected;
+        // Ưu tiên NHB300 nếu đã kết nối, nếu không thì dùng scale từ bloc
+        final connected = _isNhb300Connected || state.isScaleConnected;
+        final weight = _isNhb300Connected ? _nhb300Weight : state.scaleWeight;
 
         return Card(
           color: _isWeightLocked ? Colors.green[50] : Colors.blue[50],
@@ -462,6 +510,10 @@ class _MarketExportViewState extends State<_MarketExportView> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // NHB300 Connection status bar
+                _buildNhb300ConnectionBar(),
+                const SizedBox(height: 6),
+                
                 // ROW 1: Scale display - compact
                 Container(
                   height: 70,
@@ -776,6 +828,99 @@ class _MarketExportViewState extends State<_MarketExportView> {
     );
   }
 
+  Widget _buildNhb300ConnectionBar() {
+    final ports = NHB300ScaleService.getAvailablePorts();
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: _isNhb300Connected ? Colors.green.shade100 : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: _isNhb300Connected ? Colors.green : Colors.grey,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            _isNhb300Connected ? Icons.usb : Icons.usb_off,
+            size: 16,
+            color: _isNhb300Connected ? Colors.green : Colors.grey,
+          ),
+          const SizedBox(width: 6),
+          if (!_isNhb300Connected) ...[
+            // Dropdown chọn cổng COM
+            Expanded(
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: ports.isNotEmpty ? ports.first : null,
+                  hint: const Text('Chọn cổng', style: TextStyle(fontSize: 11)),
+                  isDense: true,
+                  items: ports.map((p) => DropdownMenuItem(
+                    value: p,
+                    child: Text(p, style: const TextStyle(fontSize: 11)),
+                  )).toList(),
+                  onChanged: (port) async {
+                    if (port != null) {
+                      try {
+                        await _nhb300Service.connect(port);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('✅ Đã kết nối cân tại $port'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('❌ Lỗi: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  },
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh, size: 16),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () => setState(() {}),
+              tooltip: 'Làm mới cổng',
+            ),
+          ] else ...[
+            Expanded(
+              child: Text(
+                'Đã kết nối: ${_nhb300Service.currentPortName}',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () async {
+                await _nhb300Service.disconnect();
+                setState(() {});
+              },
+              icon: const Icon(Icons.link_off, size: 14),
+              label: const Text('Ngắt', style: TextStyle(fontSize: 10)),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   void _lockWeightManual() {
     final raw = _scaleInputController.text.trim();
     if (raw.isEmpty) return;
@@ -903,47 +1048,35 @@ class _MarketExportViewState extends State<_MarketExportView> {
             Expanded(
               child: _buildCompactField(
                 'Mã KH',
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  alignment: Alignment.centerLeft,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Text(
-                    _selectedPartner?.id ?? '---',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 14),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  _selectedPartner?.id ?? '---',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
                 ),
+                icon: Icons.badge,
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               flex: 2,
-              child: _buildCompactField(
-                'Tên KH',
-                DropdownButtonFormField<PartnerEntity>(
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  ),
-                  value: safeValue,
-                  style: const TextStyle(fontSize: 14, color: Colors.black),
-                  items: partners
-                      .map((p) => DropdownMenuItem(
-                          value: p,
-                          child: Text(p.name,
-                              style: const TextStyle(fontSize: 14))))
-                      .toList(),
-                  onChanged: (value) =>
-                      setState(() => _selectedPartner = value),
+              child: DropdownButtonFormField<PartnerEntity>(
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: 'Tên KH',
+                  labelStyle: const TextStyle(fontSize: 12),
+                  prefixIcon: const Icon(Icons.person, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
+                value: safeValue,
+                style: const TextStyle(fontSize: 13, color: Colors.black),
+                items: partners
+                    .map((p) => DropdownMenuItem(
+                        value: p,
+                        child: Text(p.name, style: const TextStyle(fontSize: 13))))
+                    .toList(),
+                onChanged: (value) => setState(() => _selectedPartner = value),
               ),
             ),
             const SizedBox(width: 8),
@@ -969,6 +1102,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
             'Số lô',
             _batchNumberController,
             hintText: 'Số lô',
+            icon: Icons.inventory_2,
           ),
         ),
         const SizedBox(width: 8),
@@ -990,23 +1124,16 @@ class _MarketExportViewState extends State<_MarketExportView> {
         Expanded(
           child: _buildCompactField(
             'Trọng lượng (kg)',
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              alignment: Alignment.centerLeft,
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.blue.shade300),
-              ),
-              child: Text(
-                _numberFormat.format(_grossWeight),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Colors.blue.shade700,
-                ),
+            Text(
+              _numberFormat.format(_grossWeight),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: Colors.blue.shade700,
               ),
             ),
+            icon: Icons.scale,
+            bgColor: Colors.blue.shade50,
           ),
         ),
         const SizedBox(width: 8),
@@ -1017,23 +1144,16 @@ class _MarketExportViewState extends State<_MarketExportView> {
         Expanded(
           child: _buildCompactField(
             'TL Thực (kg)',
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              alignment: Alignment.centerLeft,
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.green.shade300),
-              ),
-              child: Text(
-                _numberFormat.format(_netWeight),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Colors.green.shade700,
-                ),
+            Text(
+              _numberFormat.format(_netWeight),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: Colors.green.shade700,
               ),
             ),
+            icon: Icons.monitor_weight,
+            bgColor: Colors.green.shade50,
           ),
         ),
       ],
@@ -1051,33 +1171,27 @@ class _MarketExportViewState extends State<_MarketExportView> {
             hintText: 'đ/kg',
             isDecimal: true,
             onChanged: (_) => _updateAutoDiscount(),
+            icon: Icons.price_change,
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _buildCompactField(
             'Thành tiền',
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+            FittedBox(
+              fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.orange.shade300),
-              ),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _currencyFormat.format(_subtotal),
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.orange.shade700,
-                  ),
+              child: Text(
+                _currencyFormat.format(_subtotal),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Colors.orange.shade700,
                 ),
               ),
             ),
+            icon: Icons.calculate,
+            bgColor: Colors.orange.shade50,
           ),
         ),
         const SizedBox(width: 8),
@@ -1087,33 +1201,27 @@ class _MarketExportViewState extends State<_MarketExportView> {
             _discountController,
             hintText: '0',
             isDecimal: true,
+            icon: Icons.discount,
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _buildCompactField(
             'THỰC THU',
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+            FittedBox(
+              fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              decoration: BoxDecoration(
-                color: Colors.blue.shade100,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.blue.shade500, width: 2),
-              ),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _currencyFormat.format(_totalAmount),
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.blue.shade800,
-                  ),
+              child: Text(
+                _currencyFormat.format(_totalAmount),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Colors.blue.shade800,
                 ),
               ),
             ),
+            icon: Icons.attach_money,
+            bgColor: Colors.blue.shade100,
           ),
         ),
       ],
@@ -1126,20 +1234,30 @@ class _MarketExportViewState extends State<_MarketExportView> {
       'Ghi chú',
       _noteController,
       hintText: 'Nhập ghi chú...',
+      icon: Icons.note,
     );
   }
 
-  Widget _buildCompactField(String label, Widget child) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+  Widget _buildCompactField(String label, Widget child,
+      {IconData? icon, Color? bgColor}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(fontSize: 12),
+          prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          border: InputBorder.none,
         ),
-        const SizedBox(height: 2),
-        Expanded(child: child),
-      ],
+        child: child,
+      ),
     );
   }
 
@@ -1150,41 +1268,31 @@ class _MarketExportViewState extends State<_MarketExportView> {
     bool isNumber = false,
     bool isDecimal = false,
     void Function(String)? onChanged,
+    IconData? icon,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 2),
-        Expanded(
-          child: TextField(
-            controller: controller,
-            keyboardType: isDecimal
-                ? const TextInputType.numberWithOptions(decimal: true)
-                : isNumber
-                    ? TextInputType.number
-                    : TextInputType.text,
-            inputFormatters: isDecimal
-                ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))]
-                : isNumber
-                    ? [FilteringTextInputFormatter.digitsOnly]
-                    : null,
-            onChanged: onChanged ?? (_) => setState(() {}),
-            decoration: InputDecoration(
-              hintText: hintText,
-              isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-            ),
-            style: const TextStyle(fontSize: 14),
-          ),
-        ),
-      ],
+    return TextField(
+      controller: controller,
+      keyboardType: isDecimal
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : isNumber
+              ? TextInputType.number
+              : TextInputType.text,
+      inputFormatters: isDecimal
+          ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))]
+          : isNumber
+              ? [FilteringTextInputFormatter.digitsOnly]
+              : null,
+      onChanged: onChanged ?? (_) => setState(() {}),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        labelStyle: const TextStyle(fontSize: 12),
+        prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      style: const TextStyle(fontSize: 13),
     );
   }
 
@@ -1210,16 +1318,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
     if (_selectedPartner == null) {
       return _buildCompactField(
         'Công nợ',
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          alignment: Alignment.centerLeft,
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: Colors.grey[300]!),
-          ),
-          child: const Text('0 đ', style: TextStyle(fontSize: 14)),
-        ),
+        const Text('0 đ', style: TextStyle(fontSize: 13)),
+        icon: Icons.account_balance_wallet,
+        bgColor: Colors.grey[100],
       );
     }
 
@@ -1231,32 +1332,22 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
         return _buildCompactField(
           'Công nợ',
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            decoration: BoxDecoration(
-              color: remaining > 0 ? Colors.red.shade50 : Colors.green.shade50,
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(
-                color:
-                    remaining > 0 ? Colors.red.shade300 : Colors.green.shade300,
-              ),
-            ),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _currencyFormat.format(remaining),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: remaining > 0
-                      ? Colors.red.shade700
-                      : Colors.green.shade700,
-                ),
+            child: Text(
+              _currencyFormat.format(remaining),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: remaining > 0
+                    ? Colors.red.shade700
+                    : Colors.green.shade700,
               ),
             ),
           ),
+          icon: Icons.account_balance_wallet,
+          bgColor: remaining > 0 ? Colors.red.shade50 : Colors.green.shade50,
         );
       },
     );
@@ -1272,26 +1363,26 @@ class _MarketExportViewState extends State<_MarketExportView> {
             : types.firstWhere((t) => t.name == _pigTypeController.text,
                 orElse: () => types.first);
 
-        return _buildCompactField(
-          'Loại heo',
-          DropdownButtonFormField<PigTypeEntity?>(
-            value: selected,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              isDense: true,
-              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            ),
-            style: const TextStyle(fontSize: 14, color: Colors.black),
-            items: types
-                .map((type) => DropdownMenuItem(
-                    value: type,
-                    child:
-                        Text(type.name, style: const TextStyle(fontSize: 14))))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _pigTypeController.text = v.name);
-            },
+        return DropdownButtonFormField<PigTypeEntity?>(
+          value: selected,
+          decoration: InputDecoration(
+            labelText: 'Loại heo',
+            labelStyle: const TextStyle(fontSize: 12),
+            prefixIcon: const Icon(Icons.pets, size: 18),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           ),
+          style: const TextStyle(fontSize: 13, color: Colors.black),
+          items: types
+              .map((type) => DropdownMenuItem(
+                  value: type,
+                  child:
+                      Text(type.name, style: const TextStyle(fontSize: 13))))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) setState(() => _pigTypeController.text = v.name);
+          },
         );
       },
     );
@@ -1352,23 +1443,16 @@ class _MarketExportViewState extends State<_MarketExportView> {
   Widget _buildInventoryContainerCompact(int qty, bool isValid) {
     return _buildCompactField(
       'Tồn kho',
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        alignment: Alignment.centerLeft,
-        decoration: BoxDecoration(
-          color: isValid ? Colors.green[50] : Colors.red[50],
-          border: Border.all(color: isValid ? Colors.green : Colors.red),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          '$qty con',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isValid ? Colors.green[700] : Colors.red[700],
-          ),
+      Text(
+        '$qty con',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: isValid ? Colors.green[700] : Colors.red[700],
         ),
       ),
+      icon: Icons.inventory,
+      bgColor: isValid ? Colors.green[50] : Colors.red[50],
     );
   }
 
@@ -1381,17 +1465,16 @@ class _MarketExportViewState extends State<_MarketExportView> {
             child: TextField(
               controller: _quantityController,
               keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: 13),
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
-                border: OutlineInputBorder(),
+                border: InputBorder.none,
                 isDense: true,
                 contentPadding:
-                    EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    EdgeInsets.symmetric(horizontal: 4, vertical: 0),
               ),
             ),
           ),
-          const SizedBox(width: 2),
           SizedBox(
             width: 22,
             child: Column(
@@ -1403,7 +1486,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                     setState(() => _quantityController.text = '${current + 1}');
                   },
                   child: Container(
-                    height: 16,
+                    height: 14,
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius:
@@ -1421,7 +1504,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                           () => _quantityController.text = '${current - 1}');
                   },
                   child: Container(
-                    height: 16,
+                    height: 14,
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: const BorderRadius.vertical(
@@ -1436,6 +1519,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
           ),
         ],
       ),
+      icon: Icons.numbers,
     );
   }
 
@@ -1448,17 +1532,16 @@ class _MarketExportViewState extends State<_MarketExportView> {
             child: TextField(
               controller: _deductionController,
               keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: 13),
               onChanged: (_) => setState(() => _updateAutoDiscount()),
               decoration: const InputDecoration(
-                border: OutlineInputBorder(),
+                border: InputBorder.none,
                 isDense: true,
                 contentPadding:
-                    EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    EdgeInsets.symmetric(horizontal: 4, vertical: 0),
               ),
             ),
           ),
-          const SizedBox(width: 2),
           SizedBox(
             width: 22,
             child: Column(
@@ -1467,7 +1550,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 InkWell(
                   onTap: () => _adjustDeduction(1),
                   child: Container(
-                    height: 16,
+                    height: 14,
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius:
@@ -1480,7 +1563,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 InkWell(
                   onTap: () => _adjustDeduction(-1),
                   child: Container(
-                    height: 16,
+                    height: 14,
                     decoration: BoxDecoration(
                       color: Colors.grey[300],
                       borderRadius: const BorderRadius.vertical(
@@ -1495,6 +1578,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
           ),
         ],
       ),
+      icon: Icons.trending_down,
     );
   }
 

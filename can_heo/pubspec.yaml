@@ -34,6 +34,9 @@ dependencies:
   window_manager: ^0.5.1
   file_picker: ^10.3.7
   excel: ^4.0.6
+  
+  # --- Serial Port (Kết nối cân điện tử) ---
+  flutter_libserialport: ^0.4.0
 
 dev_dependencies:
   flutter_test:

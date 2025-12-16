@@ -1,0 +1,1454 @@
+import 'package:flutter/material.dart';
+import 'package:rxdart/rxdart.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
+
+import '../../../core/utils/responsive.dart';
+import '../../../domain/entities/partner.dart';
+import '../../../domain/entities/pig_type.dart';
+import '../../../domain/entities/invoice.dart';
+import '../../../domain/repositories/i_pigtype_repository.dart';
+import '../../../domain/repositories/i_invoice_repository.dart';
+import '../../../injection_container.dart';
+import '../partners/bloc/partner_bloc.dart';
+import '../partners/bloc/partner_event.dart';
+import '../partners/bloc/partner_state.dart';
+import '../weighing/bloc/weighing_bloc.dart';
+import '../weighing/bloc/weighing_event.dart';
+import '../weighing/bloc/weighing_state.dart';
+import '../pig_types/pig_types_screen.dart';
+
+/// Màn hình Xuất Kho - Xuất heo từ kho ra cho NCC (trả heo, hoàn hàng cho NCC)
+/// Type = 1 (Xuất kho)
+class ExportBarnScreen extends StatelessWidget {
+  const ExportBarnScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<WeighingBloc>(
+          create: (_) => sl<WeighingBloc>()..add(const WeighingStarted(1)),
+        ),
+        BlocProvider<PartnerBloc>(
+          create: (_) => sl<PartnerBloc>()..add(const LoadPartners(true)),
+        ),
+      ],
+      child: const _ExportBarnView(),
+    );
+  }
+}
+
+class _ExportBarnView extends StatefulWidget {
+  const _ExportBarnView();
+
+  @override
+  State<_ExportBarnView> createState() => _ExportBarnViewState();
+}
+
+class _ExportBarnViewState extends State<_ExportBarnView> {
+  // Controllers
+  final TextEditingController _scaleInputController = TextEditingController();
+  final TextEditingController _batchNumberController = TextEditingController();
+  final TextEditingController _pigTypeController = TextEditingController();
+  final TextEditingController _noteController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
+  final TextEditingController _quantityController =
+      TextEditingController(text: '1');
+
+  final TextEditingController _farmNameController = TextEditingController();
+  final TextEditingController _farmWeightController = TextEditingController();
+  final TextEditingController _paymentAmountController =
+      TextEditingController();
+
+  // Selected invoice for operations
+  InvoiceEntity? _selectedInvoice;
+  bool _isEditMode = false;
+
+  // Resizable panel ratio (default 1/3 for form)
+  double _panelRatio = 0.33;
+  static const double _minPanelRatio = 0.2;
+  static const double _maxPanelRatio = 0.5;
+
+  final FocusNode _scaleInputFocus = FocusNode();
+  final NumberFormat _numberFormat = NumberFormat('#,##0.0', 'en_US');
+  final NumberFormat _currencyFormat =
+      NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
+
+  PartnerEntity? _selectedPartner;
+  final _invoiceRepo = sl<IInvoiceRepository>();
+
+  // Scale data - nhập trực tiếp từ người dùng
+  double _totalWeight = 0.0;
+  int _totalQuantity = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scaleInputFocus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scaleInputController.dispose();
+    _batchNumberController.dispose();
+    _pigTypeController.dispose();
+    _noteController.dispose();
+    _priceController.dispose();
+    _quantityController.dispose();
+    _farmNameController.dispose();
+    _farmWeightController.dispose();
+    _paymentAmountController.dispose();
+    _scaleInputFocus.dispose();
+    super.dispose();
+  }
+
+  // Calculations
+  double get _weight => _totalWeight;
+  double get _pricePerKg =>
+      double.tryParse(_priceController.text.replaceAll(',', '')) ?? 0;
+  double get _subtotal => _weight * _pricePerKg;
+
+  @override
+  Widget build(BuildContext context) {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.f4): () =>
+            _saveInvoice(context),
+      },
+      child: Focus(
+        autofocus: true,
+        child: BlocListener<WeighingBloc, WeighingState>(
+          listener: (context, state) {
+            if (state.status == WeighingStatus.success) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('✅ Đã lưu phiếu xuất kho!'),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+              _resetForm();
+            } else if (state.status == WeighingStatus.failure) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.errorMessage ?? 'Lỗi không xác định'),
+                  backgroundColor: Colors.brown,
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            }
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Phiếu Xuất Kho'),
+              backgroundColor: Colors.brown[100],
+              actions: [
+                IconButton(
+                  tooltip: 'Quản lý Loại heo',
+                  icon: const Icon(Icons.pets_outlined),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PigTypesScreen()),
+                  ),
+                ),
+                _buildSaveButton(context),
+              ],
+            ),
+            body: Builder(
+              builder: (ctx) {
+                Responsive.init(ctx);
+
+                final topSectionHeight = switch (Responsive.screenType) {
+                  ScreenType.tablet => 320.0,
+                  ScreenType.laptop13 => 340.0,
+                  ScreenType.laptop15 => 360.0,
+                  ScreenType.desktop24 => 380.0,
+                  ScreenType.desktop27 => 400.0,
+                };
+
+                return Padding(
+                  padding: EdgeInsets.all(Responsive.spacing),
+                  child: Column(
+                    children: [
+                      // ========== PHẦN 1: Thông tin phiếu - 1/3 height ==========
+                      Expanded(
+                        flex: 1,
+                        child: _buildInvoiceDetailsSection(context),
+                      ),
+                      const SizedBox(height: 8),
+                      // ========== PHẦN 2: Phiếu đã lưu - 2/3 height ==========
+                      Expanded(
+                        flex: 2,
+                        child: _buildSavedInvoicesGrid(context),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScaleSection(BuildContext context) {
+    return Card(
+      color: Colors.brown[50],
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Scale display - editable input
+            Container(
+              height: 70,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.brown, width: 2),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'SỐ CÂN: ',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: TextField(
+                      controller: _scaleInputController,
+                      focusNode: _scaleInputFocus,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d*')),
+                      ],
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.brown[800],
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '0',
+                        hintStyle: TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.brown[300],
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onChanged: (value) {
+                        final weight = double.tryParse(value) ?? 0;
+                        setState(() {
+                          _totalWeight = weight;
+                        });
+                      },
+                    ),
+                  ),
+                  Text(
+                    ' kg',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.brown[700],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // Summary
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                      child: _buildCompactSummary(
+                          'SỐ HEO XUẤT', Icons.pets, Colors.brown)),
+                  const SizedBox(width: 4),
+                  Expanded(
+                      child: _buildCompactSummary(
+                          'KHỐI LƯỢNG', Icons.scale, Colors.blue)),
+                  const SizedBox(width: 4),
+                  Expanded(
+                      child: _buildCompactSummary(
+                          'SỐ PHIẾU', Icons.receipt, Colors.green)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactSummary(String label, IconData icon, Color color) {
+    return RepaintBoundary(
+      child: StreamBuilder<List<InvoiceEntity>>(
+        stream: _invoiceRepo.watchInvoices(type: 1), // Type 1 = Xuất kho
+        builder: (context, snapshot) {
+          String value = '0';
+          if (snapshot.hasData) {
+            final invoices = snapshot.data!;
+            final today = DateTime.now();
+            final todayInvoices = invoices.where((inv) {
+              return inv.createdDate.year == today.year &&
+                  inv.createdDate.month == today.month &&
+                  inv.createdDate.day == today.day;
+            }).toList();
+
+            double totalWeight = 0;
+            int totalQuantity = 0;
+            int invoiceCount = todayInvoices.length;
+
+            for (final inv in todayInvoices) {
+              totalWeight += inv.totalWeight;
+              totalQuantity += inv.totalQuantity;
+            }
+
+            if (label.contains('HEO')) {
+              value = '$totalQuantity con';
+            } else if (label.contains('KHỐI')) {
+              value = '${_numberFormat.format(totalWeight)} kg';
+            } else if (label.contains('PHIẾU')) {
+              value = '$invoiceCount phiếu';
+            }
+          }
+
+          return Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: color.withOpacity(0.3)),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: color, size: 20),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  style: TextStyle(
+                      fontSize: 10, color: color, fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: color),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildInvoiceDetailsSection(BuildContext context) {
+    const fieldHeight = 42.0;
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header - style giống nhập chợ
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: _isEditMode
+                    ? Colors.orange.shade600
+                    : Colors.brown.shade600,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _isEditMode ? Icons.edit : Icons.receipt_long,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _isEditMode
+                          ? '✏️ CHỈNH SỬA PHIẾU XUẤT KHO'
+                          : '📝 THÔNG TIN PHIẾU XUẤT KHO',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  if (_isEditMode)
+                    TextButton.icon(
+                      onPressed: _resetForm,
+                      icon:
+                          const Icon(Icons.add, size: 14, color: Colors.white),
+                      label: const Text('Tạo mới',
+                          style: TextStyle(fontSize: 11, color: Colors.white)),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Form - Table layout for alignment
+            Expanded(
+              child: Column(
+                children: [
+                  // Row 1: Labels
+                  Table(
+                    columnWidths: const {
+                      0: FixedColumnWidth(80), // Mã NCC
+                      1: FlexColumnWidth(2), // Nhà cung cấp
+                      2: FlexColumnWidth(1.5), // Loại heo
+                      3: FixedColumnWidth(100), // Tồn kho
+                    },
+                    children: [
+                      TableRow(
+                        children: [
+                          _buildTableLabel('Mã NCC'),
+                          _buildTableLabel('Nhà cung cấp'),
+                          _buildTableLabel('Loại heo'),
+                          _buildTableLabel('Tồn kho'),
+                        ],
+                      ),
+                    ],
+                  ),
+                  // Row 1: Fields
+                  SizedBox(
+                    height: fieldHeight,
+                    child: Row(
+                      children: [
+                        // Mã NCC
+                        SizedBox(
+                          width: 80,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _selectedPartner?.id ?? '---',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        // Nhà cung cấp
+                        Expanded(
+                          flex: 2,
+                          child: BlocBuilder<PartnerBloc, PartnerState>(
+                            builder: (context, state) {
+                              final partners = state.partners;
+                              final safeValue =
+                                  partners.contains(_selectedPartner)
+                                      ? _selectedPartner
+                                      : null;
+                              return DropdownButtonFormField<PartnerEntity>(
+                                isExpanded: true,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(6)),
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 8),
+                                ),
+                                value: safeValue,
+                                style: const TextStyle(
+                                    fontSize: 13, color: Colors.black),
+                                items: partners
+                                    .map((p) => DropdownMenuItem(
+                                          value: p,
+                                          child: Text(p.name,
+                                              style: const TextStyle(
+                                                  fontSize: 13)),
+                                        ))
+                                    .toList(),
+                                onChanged: (value) =>
+                                    setState(() => _selectedPartner = value),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        // Loại heo
+                        Expanded(flex: 2, child: _buildPigTypeDropdown()),
+                        const SizedBox(width: 4),
+                        // Tồn kho
+                        SizedBox(
+                            width: 100, child: _buildInventoryDisplayField()),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  // Row 2: Labels
+                  Table(
+                    columnWidths: const {
+                      0: FlexColumnWidth(1), // Lý do
+                      1: FixedColumnWidth(80), // Số lô
+                      2: FixedColumnWidth(100), // Số lượng
+                      3: FlexColumnWidth(1), // TL
+                      4: FlexColumnWidth(2), // Ghi chú
+                    },
+                    children: [
+                      TableRow(
+                        children: [
+                          _buildTableLabel('Lý do xuất'),
+                          _buildTableLabel('Số lô'),
+                          _buildTableLabel('Số lượng'),
+                          _buildTableLabel('TL (kg)'),
+                          _buildTableLabel('Ghi chú'),
+                        ],
+                      ),
+                    ],
+                  ),
+                  // Row 2: Fields
+                  SizedBox(
+                    height: fieldHeight,
+                    child: Row(
+                      children: [
+                        // Lý do xuất
+                        Expanded(
+                            child: _buildSimpleTextField(_farmNameController)),
+                        const SizedBox(width: 4),
+                        // Số lô
+                        SizedBox(
+                            width: 80,
+                            child:
+                                _buildSimpleTextField(_batchNumberController)),
+                        const SizedBox(width: 4),
+                        // Số lượng
+                        SizedBox(
+                            width: 100,
+                            child: _buildQuantityFieldWithButtons()),
+                        const SizedBox(width: 4),
+                        // Trọng lượng
+                        Expanded(
+                          child: _buildSimpleTextField(
+                            _scaleInputController,
+                            isDecimal: true,
+                            onChanged: (value) {
+                              final weight = double.tryParse(value) ?? 0;
+                              setState(() => _totalWeight = weight);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        // Ghi chú
+                        Expanded(
+                            flex: 2,
+                            child: _buildSimpleTextField(_noteController)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            _buildActionButtons(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTableLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 2),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: Colors.grey[600],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleTextField(
+    TextEditingController controller, {
+    bool isDecimal = false,
+    void Function(String)? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: isDecimal
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : TextInputType.text,
+      inputFormatters: isDecimal
+          ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))]
+          : null,
+      onChanged: onChanged ?? (_) => setState(() {}),
+      decoration: InputDecoration(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      style: const TextStyle(fontSize: 13),
+    );
+  }
+
+  Widget _buildFormRow1() {
+    return BlocBuilder<PartnerBloc, PartnerState>(
+      builder: (context, state) {
+        final partners = state.partners;
+        final safeValue =
+            (partners.contains(_selectedPartner)) ? _selectedPartner : null;
+
+        return Row(
+          children: [
+            Expanded(
+              child: _buildCompactField(
+                'Mã NCC',
+                Text(
+                  _selectedPartner?.id ?? '---',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                icon: Icons.badge_outlined,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: DropdownButtonFormField<PartnerEntity>(
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: 'Tên NCC',
+                  labelStyle: const TextStyle(fontSize: 12),
+                  prefixIcon: const Icon(Icons.business, size: 18),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                value: safeValue,
+                style: const TextStyle(fontSize: 13, color: Colors.black),
+                items: partners
+                    .map((p) => DropdownMenuItem(
+                          value: p,
+                          child: Text(p.name,
+                              style: const TextStyle(fontSize: 13)),
+                        ))
+                    .toList(),
+                onChanged: (value) => setState(() => _selectedPartner = value),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFormRow2() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildCompactTextField(
+            'Lý do xuất',
+            _farmNameController,
+            hintText: 'Trả heo, hoàn hàng...',
+            icon: Icons.info_outline,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildCompactTextField(
+            'Số lô',
+            _batchNumberController,
+            hintText: 'Số lô',
+            icon: Icons.numbers,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormRow3() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildPigTypeDropdown(),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildInventoryDisplayField(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormRow4() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildQuantityFieldWithButtons(),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildCompactTextField(
+            'Trọng lượng (kg)',
+            _scaleInputController,
+            hintText: 'Nhập TL',
+            isDecimal: true,
+            icon: Icons.scale,
+            onChanged: (value) {
+              final weight = double.tryParse(value) ?? 0;
+              setState(() => _totalWeight = weight);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormRow5() {
+    // Chỉ có Ghi chú - bỏ Đơn giá và Thành tiền
+    return _buildCompactTextField(
+      'Ghi chú',
+      _noteController,
+      hintText: 'Ghi chú...',
+      icon: Icons.edit_note,
+    );
+  }
+
+  Widget _buildCompactField(String label, Widget child,
+      {IconData? icon, Color? bgColor}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(fontSize: 12),
+          prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          border: InputBorder.none,
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildCompactTextField(
+    String label,
+    TextEditingController controller, {
+    String? hintText,
+    bool isNumber = false,
+    bool isDecimal = false,
+    IconData? icon,
+    void Function(String)? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: isDecimal
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : isNumber
+              ? TextInputType.number
+              : TextInputType.text,
+      inputFormatters: isDecimal
+          ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))]
+          : isNumber
+              ? [FilteringTextInputFormatter.digitsOnly]
+              : null,
+      onChanged: onChanged ?? (_) => setState(() {}),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        labelStyle: const TextStyle(fontSize: 12),
+        prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+        isDense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      style: const TextStyle(fontSize: 13),
+    );
+  }
+
+  Widget _buildPigTypeDropdown() {
+    return StreamBuilder<List<PigTypeEntity>>(
+      stream: sl<IPigTypeRepository>().watchPigTypes(),
+      builder: (context, snap) {
+        final types = snap.data ?? [];
+        final PigTypeEntity? selected = types.isEmpty
+            ? null
+            : types.firstWhere((t) => t.name == _pigTypeController.text,
+                orElse: () => types.first);
+
+        return DropdownButtonFormField<PigTypeEntity?>(
+          value: selected,
+          decoration: InputDecoration(
+            labelText: 'Loại heo',
+            labelStyle: const TextStyle(fontSize: 12),
+            prefixIcon: const Icon(Icons.pets, size: 18),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          style: const TextStyle(fontSize: 13, color: Colors.black),
+          items: types
+              .map((type) => DropdownMenuItem(
+                  value: type,
+                  child: Text(type.name, style: const TextStyle(fontSize: 13))))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) setState(() => _pigTypeController.text = v.name);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildInventoryDisplayField() {
+    final pigType = _pigTypeController.text.trim();
+    if (pigType.isEmpty) {
+      return _buildInventoryContainer(0);
+    }
+    return StreamBuilder<List<List<InvoiceEntity>>>(
+      stream: Rx.combineLatest2(
+        _invoiceRepo.watchInvoices(type: 0), // Nhập kho
+        _invoiceRepo.watchInvoices(type: 2), // Xuất chợ
+        (List<InvoiceEntity> imports, List<InvoiceEntity> exports) =>
+            [imports, exports],
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            !snapshot.hasData) {
+          return const Center(
+              child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2)));
+        }
+        final importSnap = snapshot.data![0];
+        final exportSnap = snapshot.data![1];
+        int imported = 0;
+        int exported = 0;
+        for (final inv in importSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              imported += item.quantity;
+          }
+        }
+        for (final inv in exportSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              exported += item.quantity;
+          }
+        }
+        final availableQty = imported - exported;
+        return _buildInventoryContainer(availableQty);
+      },
+    );
+  }
+
+  Widget _buildInventoryContainer(int qty) {
+    return _buildCompactField(
+      'Tồn kho',
+      Text(
+        '$qty con',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Colors.green[700],
+        ),
+      ),
+      icon: Icons.inventory_2,
+      bgColor: Colors.green.shade50,
+    );
+  }
+
+  Widget _buildQuantityFieldWithButtons() {
+    return TextField(
+      controller: _quantityController,
+      keyboardType: TextInputType.number,
+      style: const TextStyle(fontSize: 13),
+      onChanged: (_) => setState(() {}),
+      decoration: InputDecoration(
+        labelText: 'Số lượng',
+        labelStyle: const TextStyle(fontSize: 12),
+        prefixIcon: const Icon(Icons.format_list_numbered, size: 18),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        isDense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        suffixIcon: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            InkWell(
+              onTap: () {
+                final current = int.tryParse(_quantityController.text) ?? 1;
+                setState(() => _quantityController.text = '${current + 1}');
+              },
+              child: const Icon(Icons.keyboard_arrow_up, size: 18),
+            ),
+            InkWell(
+              onTap: () {
+                final current = int.tryParse(_quantityController.text) ?? 1;
+                if (current > 1) {
+                  setState(() => _quantityController.text = '${current - 1}');
+                }
+              },
+              child: const Icon(Icons.keyboard_arrow_down, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return SizedBox(
+      height: 36,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          IconButton(
+            onPressed: _resetForm,
+            icon: const Icon(Icons.refresh, size: 20),
+            tooltip: 'Làm mới',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSaveButton(BuildContext context) {
+    final canSave = _canSaveInvoice();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_isEditMode) ...[
+            TextButton.icon(
+              onPressed: _resetForm,
+              icon: const Icon(Icons.close, size: 18),
+              label: const Text('Hủy'),
+              style: TextButton.styleFrom(foregroundColor: Colors.brown),
+            ),
+            const SizedBox(width: 8),
+          ],
+          FilledButton.icon(
+            onPressed: canSave
+                ? () => _isEditMode
+                    ? _updateInvoice(context)
+                    : _saveInvoice(context)
+                : null,
+            icon: Icon(_isEditMode ? Icons.edit : Icons.save),
+            label: Text(_isEditMode ? 'CẬP NHẬT' : 'LƯU (F4)'),
+            style: FilledButton.styleFrom(
+              backgroundColor: canSave
+                  ? (_isEditMode ? Colors.brown : Colors.brown)
+                  : Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _canSaveInvoice() {
+    final weight =
+        double.tryParse(_scaleInputController.text.replaceAll(',', '.')) ?? 0;
+    final hasWeight = weight > 0;
+
+    return _selectedPartner != null &&
+        _pigTypeController.text.isNotEmpty &&
+        hasWeight;
+  }
+
+  void _saveInvoice(BuildContext context) async {
+    final weight =
+        double.tryParse(_scaleInputController.text.replaceAll(',', '.')) ?? 0;
+
+    if (weight <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Vui lòng nhập số cân!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _totalWeight = weight;
+    });
+
+    if (!_canSaveInvoice()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Vui lòng điền đầy đủ thông tin!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Kiểm tra tồn kho
+    final quantity = int.tryParse(_quantityController.text) ?? 1;
+    final pigType = _pigTypeController.text.trim();
+
+    try {
+      final importInvoices = await _invoiceRepo.watchInvoices(type: 0).first;
+      final exportInvoices = await _invoiceRepo.watchInvoices(type: 2).first;
+
+      int imported = 0;
+      int exported = 0;
+
+      for (final inv in importInvoices) {
+        for (final item in inv.details) {
+          if ((item.pigType ?? '').trim() == pigType) {
+            imported += item.quantity;
+          }
+        }
+      }
+
+      for (final inv in exportInvoices) {
+        for (final item in inv.details) {
+          if ((item.pigType ?? '').trim() == pigType) {
+            exported += item.quantity;
+          }
+        }
+      }
+
+      final available = imported - exported;
+
+      if (quantity > available) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '❌ Không đủ tồn kho! Chỉ còn $available con $pigType trong kho.'),
+            backgroundColor: Colors.brown,
+          ),
+        );
+        return;
+      }
+
+      // Thêm invoice item
+      context.read<WeighingBloc>().add(
+            WeighingItemAdded(
+              weight: _totalWeight,
+              quantity: quantity,
+              batchNumber: _batchNumberController.text.isNotEmpty
+                  ? _batchNumberController.text
+                  : null,
+              pigType: pigType,
+            ),
+          );
+
+      final note = _farmNameController.text.isNotEmpty
+          ? 'Lý do: ${_farmNameController.text}${_noteController.text.isNotEmpty ? ' | ${_noteController.text}' : ''}'
+          : _noteController.text;
+
+      // Chỉ lưu thông tin cơ bản - không tính tiền
+      context.read<WeighingBloc>().add(
+            WeighingInvoiceUpdated(
+              partnerId: _selectedPartner!.id,
+              partnerName: _selectedPartner!.name,
+              pricePerKg: 0, // Không tính giá
+              deduction: 0,
+              discount: 0,
+              note: note,
+              finalAmount: 0, // Không tính tiền
+            ),
+          );
+
+      context.read<WeighingBloc>().add(const WeighingSaved());
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Lỗi: $e'),
+            backgroundColor: Colors.brown,
+          ),
+        );
+      }
+    }
+  }
+
+  void _resetForm() {
+    _scaleInputController.clear();
+    _batchNumberController.clear();
+    _noteController.clear();
+    _pigTypeController.clear();
+    _priceController.clear();
+    _quantityController.text = '1';
+    _farmNameController.clear();
+    _farmWeightController.clear();
+    _paymentAmountController.clear();
+    setState(() {
+      _selectedPartner = null;
+      _selectedInvoice = null;
+      _isEditMode = false;
+      _totalWeight = 0;
+      _totalQuantity = 0;
+    });
+    context.read<WeighingBloc>().add(const WeighingStarted(1));
+    _scaleInputFocus.requestFocus();
+  }
+
+  void _loadInvoiceToForm(InvoiceEntity invoice) {
+    String reason = '';
+    String otherNote = '';
+    if (invoice.note != null && invoice.note!.startsWith('Lý do: ')) {
+      final parts = invoice.note!.split(' | ');
+      if (parts.isNotEmpty) {
+        reason = parts[0].replaceFirst('Lý do: ', '');
+        if (parts.length > 1) {
+          otherNote = parts.sublist(1).join(' | ');
+        }
+      }
+    } else {
+      otherNote = invoice.note ?? '';
+    }
+
+    final pigType =
+        invoice.details.isNotEmpty ? (invoice.details.first.pigType ?? '') : '';
+    final batchNumber = invoice.details.isNotEmpty
+        ? (invoice.details.first.batchNumber ?? '')
+        : '';
+
+    final weight = invoice.totalWeight;
+
+    setState(() {
+      _selectedInvoice = invoice;
+      _isEditMode = true;
+
+      final partnerState = context.read<PartnerBloc>().state;
+      _selectedPartner = partnerState.partners.firstWhere(
+        (p) => p.id == invoice.partnerId,
+        orElse: () => partnerState.partners.isNotEmpty
+            ? partnerState.partners.first
+            : PartnerEntity(
+                id: invoice.partnerId ?? '',
+                name: invoice.partnerName ?? '',
+                isSupplier: true,
+                currentDebt: 0),
+      );
+
+      _farmNameController.text = reason;
+      _noteController.text = otherNote;
+      _pigTypeController.text = pigType;
+      _batchNumberController.text = batchNumber;
+      _quantityController.text = '${invoice.totalQuantity}';
+      _priceController.text =
+          invoice.pricePerKg > 0 ? invoice.pricePerKg.toStringAsFixed(0) : '';
+
+      _scaleInputController.text = weight.toStringAsFixed(1);
+      _totalWeight = weight;
+      _totalQuantity = invoice.totalQuantity;
+    });
+  }
+
+  Future<void> _updateInvoice(BuildContext context) async {
+    if (_selectedInvoice == null) return;
+
+    if (!_canSaveInvoice()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Vui lòng điền đầy đủ thông tin!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final quantity = int.tryParse(_quantityController.text) ?? 1;
+      final pigType = _pigTypeController.text.trim();
+
+      final note = _farmNameController.text.isNotEmpty
+          ? 'Lý do: ${_farmNameController.text}${_noteController.text.isNotEmpty ? ' | ${_noteController.text}' : ''}'
+          : _noteController.text;
+
+      final updatedInvoice = _selectedInvoice!.copyWith(
+        partnerId: _selectedPartner!.id,
+        partnerName: _selectedPartner!.name,
+        totalWeight: _totalWeight,
+        totalQuantity: quantity,
+        pricePerKg: _pricePerKg,
+        finalAmount: _subtotal,
+        note: note,
+      );
+
+      await _invoiceRepo.updateInvoice(updatedInvoice);
+
+      if (_selectedInvoice!.details.isNotEmpty) {
+        final updatedItem = _selectedInvoice!.details.first.copyWith(
+          pigType: pigType,
+          batchNumber: _batchNumberController.text.isNotEmpty
+              ? _batchNumberController.text
+              : null,
+          weight: _totalWeight,
+          quantity: quantity,
+        );
+        await _invoiceRepo.updateWeighingItem(updatedItem);
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Đã cập nhật phiếu!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      _resetForm();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Lỗi cập nhật: $e'),
+            backgroundColor: Colors.brown,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteInvoice(
+      BuildContext context, InvoiceEntity invoice) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xóa phiếu'),
+        content: const Text('Bạn có chắc muốn xóa phiếu này?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('HỦY'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('XÓA'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await _invoiceRepo.deleteInvoice(invoice.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã xóa phiếu')),
+        );
+      }
+    }
+  }
+
+  Widget _buildSavedInvoicesGrid(BuildContext context) {
+    return StreamBuilder<List<InvoiceEntity>>(
+      stream: _invoiceRepo.watchInvoices(type: 1), // Type 1 = Xuất kho
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        var invoices = snapshot.data!;
+        if (invoices.isEmpty) {
+          return const Center(child: Text('Chưa có phiếu xuất kho nào'));
+        }
+
+        return Card(
+          elevation: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                color: Colors.brown[50],
+                child: Row(
+                  children: [
+                    Text(
+                      'PHIẾU XUẤT KHO ĐÃ LƯU (${invoices.length})',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: Colors.brown),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    child: DataTable(
+                      showCheckboxColumn: false,
+                      columnSpacing: 12,
+                      horizontalMargin: 10,
+                      headingRowHeight: 40,
+                      dataRowMinHeight: 36,
+                      dataRowMaxHeight: 44,
+                      headingTextStyle: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 12),
+                      dataTextStyle: const TextStyle(fontSize: 12),
+                      columns: const [
+                        DataColumn(label: Text('STT')),
+                        DataColumn(label: Text('Thời gian')),
+                        DataColumn(label: Text('Tên NCC')),
+                        DataColumn(label: Text('Lý do')),
+                        DataColumn(label: Text('Loại heo')),
+                        DataColumn(label: Text('SL')),
+                        DataColumn(label: Text('TL (kg)')),
+                        DataColumn(label: Text('Đơn giá')),
+                        DataColumn(label: Text('Thành tiền')),
+                        DataColumn(label: Text('')),
+                      ],
+                      rows: List.generate(invoices.length, (idx) {
+                        final inv = invoices[idx];
+                        final dateFormat = DateFormat('dd/MM HH:mm');
+
+                        String reason = '';
+                        if (inv.note != null &&
+                            inv.note!.startsWith('Lý do: ')) {
+                          final parts = inv.note!.split(' | ');
+                          if (parts.isNotEmpty) {
+                            reason = parts[0].replaceFirst('Lý do: ', '');
+                          }
+                        }
+
+                        final pigType = inv.details.isNotEmpty
+                            ? (inv.details.first.pigType ?? '-')
+                            : '-';
+
+                        final isSelected = _selectedInvoice?.id == inv.id;
+
+                        return DataRow(
+                          selected: isSelected,
+                          color:
+                              WidgetStateProperty.resolveWith<Color?>((states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return Colors.brown.shade100;
+                            }
+                            return null;
+                          }),
+                          onSelectChanged: (selected) {
+                            if (selected == true) {
+                              _loadInvoiceToForm(inv);
+                            } else {
+                              _resetForm();
+                            }
+                          },
+                          cells: [
+                            DataCell(Center(child: Text('${idx + 1}'))),
+                            DataCell(Text(dateFormat.format(inv.createdDate))),
+                            DataCell(SizedBox(
+                              width: 80,
+                              child: Text(inv.partnerName ?? 'NCC',
+                                  overflow: TextOverflow.ellipsis),
+                            )),
+                            DataCell(SizedBox(
+                              width: 80,
+                              child:
+                                  Text(reason, overflow: TextOverflow.ellipsis),
+                            )),
+                            DataCell(Text(pigType)),
+                            DataCell(Align(
+                                alignment: Alignment.centerRight,
+                                child: Text('${inv.totalQuantity}'))),
+                            DataCell(Align(
+                              alignment: Alignment.centerRight,
+                              child:
+                                  Text(_numberFormat.format(inv.totalWeight)),
+                            )),
+                            DataCell(Align(
+                              alignment: Alignment.centerRight,
+                              child:
+                                  Text(_currencyFormat.format(inv.pricePerKg)),
+                            )),
+                            DataCell(Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                _currencyFormat
+                                    .format(inv.totalWeight * inv.pricePerKg),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            )),
+                            DataCell(Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.visibility,
+                                      size: 18, color: Colors.blue),
+                                  tooltip: 'Xem',
+                                  onPressed: () => _loadInvoiceToForm(inv),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete,
+                                      size: 18, color: Colors.brown),
+                                  tooltip: 'Xóa',
+                                  onPressed: () =>
+                                      _confirmDeleteInvoice(context, inv),
+                                ),
+                              ],
+                            )),
+                          ],
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
