@@ -8,8 +8,10 @@ import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/partner.dart';
 import '../../../domain/entities/pig_type.dart';
 import '../../../domain/entities/invoice.dart';
+import '../../../domain/entities/farm.dart';
 import '../../../domain/repositories/i_pigtype_repository.dart';
 import '../../../domain/repositories/i_invoice_repository.dart';
+import '../../../domain/repositories/i_farm_repository.dart';
 import '../../../injection_container.dart';
 import '../partners/bloc/partner_bloc.dart';
 import '../partners/bloc/partner_event.dart';
@@ -77,7 +79,9 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
       NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
   PartnerEntity? _selectedPartner;
+  FarmEntity? _selectedFarm;
   final _invoiceRepo = sl<IInvoiceRepository>();
+  final _farmRepo = sl<IFarmRepository>();
 
   // Scale data - nhập trực tiếp từ người dùng
   double _totalWeight = 0.0;
@@ -433,33 +437,17 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
               ),
             ),
             const SizedBox(height: 4),
-            // Form - 4 rows layout with equal height fields
+            // Form - 4 rows layout: 3 rows x 3 cols equal + 1 row ghi chú
             Expanded(
               child: Column(
                 children: [
-                  // Row 1: Mã + Nhà cung cấp
-                  _buildRowLabels(['Mã', 'Nhà cung cấp'], [50, null]),
+                  // Row 1: Nhà cung cấp + Trại + Lý do xuất
+                  _buildRowLabels(
+                      ['Nhà cung cấp', 'Trại', 'Lý do xuất'], [null, null, null]),
                   Expanded(
                     child: Row(
                       children: [
-                        SizedBox(
-                          width: 50,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _selectedPartner?.id ?? '---',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 11),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
+                        // Nhà cung cấp
                         Expanded(
                           child: BlocBuilder<PartnerBloc, PartnerState>(
                             builder: (context, state) {
@@ -471,65 +459,75 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                               return DropdownButtonFormField<PartnerEntity>(
                                 isExpanded: true,
                                 decoration: InputDecoration(
+                                  hintText: 'Chọn NCC',
+                                  hintStyle: const TextStyle(fontSize: 13),
                                   border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(4)),
+                                      borderRadius: BorderRadius.circular(6)),
                                   isDense: true,
                                   contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 4),
+                                      horizontal: 8, vertical: 10),
                                 ),
                                 value: safeValue,
                                 style: const TextStyle(
-                                    fontSize: 11, color: Colors.black),
+                                    fontSize: 13, color: Colors.black),
                                 items: partners
                                     .map((p) => DropdownMenuItem(
                                           value: p,
                                           child: Text(p.name,
                                               style: const TextStyle(
-                                                  fontSize: 11)),
+                                                  fontSize: 13)),
                                         ))
                                     .toList(),
-                                onChanged: (value) =>
-                                    setState(() => _selectedPartner = value),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedPartner = value;
+                                    _selectedFarm = null; // Reset farm when partner changes
+                                  });
+                                },
                               );
                             },
                           ),
+                        ),
+                        const SizedBox(width: 4),
+                        // Trại - Dropdown
+                        Expanded(
+                          child: _buildFarmDropdown(),
+                        ),
+                        const SizedBox(width: 4),
+                        // Lý do xuất
+                        Expanded(
+                          child: _buildSimpleTextField(_farmNameController),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 2),
-                  // Row 2: Loại heo + Tồn kho
-                  _buildRowLabels(['Loại heo', 'Tồn kho'], [null, 60]),
+                  // Row 2: Loại heo + Tồn kho + Số lô
+                  _buildRowLabels(
+                      ['Loại heo', 'Tồn kho', 'Số lô'], [null, null, null]),
                   Expanded(
                     child: Row(
                       children: [
                         Expanded(child: _buildPigTypeDropdown()),
                         const SizedBox(width: 4),
-                        SizedBox(
-                            width: 60, child: _buildInventoryDisplayField()),
+                        Expanded(child: _buildInventoryDisplayField()),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: _buildSimpleTextField(_batchNumberController),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 2),
-                  // Row 3: Lý do + Số lô + SL + TL
-                  _buildRowLabels(['Lý do xuất', 'Số lô', 'SL', 'TL (kg)'], [null, 50, 60, 70]),
+                  // Row 3: Số lượng + Trọng lượng (kg) + (empty or future field)
+                  _buildRowLabels(
+                      ['Số lượng', 'Trọng lượng (kg)', ''], [null, null, null]),
                   Expanded(
                     child: Row(
                       children: [
+                        Expanded(child: _buildQuantityFieldWithButtons()),
+                        const SizedBox(width: 4),
                         Expanded(
-                            child: _buildSimpleTextField(_farmNameController)),
-                        const SizedBox(width: 4),
-                        SizedBox(
-                            width: 50,
-                            child:
-                                _buildSimpleTextField(_batchNumberController)),
-                        const SizedBox(width: 4),
-                        SizedBox(
-                            width: 60,
-                            child: _buildQuantityFieldWithButtons()),
-                        const SizedBox(width: 4),
-                        SizedBox(
-                          width: 70,
                           child: _buildSimpleTextField(
                             _scaleInputController,
                             isDecimal: true,
@@ -539,6 +537,8 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                             },
                           ),
                         ),
+                        const SizedBox(width: 4),
+                        Expanded(child: const SizedBox()), // Placeholder
                       ],
                     ),
                   ),
@@ -572,7 +572,8 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
         } else {
           return Expanded(child: _buildTableLabel(label));
         }
-      }).expand((w) => [w, const SizedBox(width: 4)]).toList()..removeLast(),
+      }).expand((w) => [w, const SizedBox(width: 4)]).toList()
+        ..removeLast(),
     );
   }
 
@@ -587,6 +588,71 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
           color: Colors.grey[600],
         ),
       ),
+    );
+  }
+
+  Widget _buildFarmDropdown() {
+    if (_selectedPartner == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(6),
+          color: Colors.grey.shade100,
+        ),
+        child: const Text(
+          'Chọn NCC trước',
+          style: TextStyle(fontSize: 13, color: Colors.grey),
+        ),
+      );
+    }
+
+    return StreamBuilder<List<FarmEntity>>(
+      stream: _farmRepo.watchFarmsByPartner(_selectedPartner!.id),
+      builder: (context, snapshot) {
+        final farms = snapshot.data ?? [];
+        
+        if (farms.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.centerLeft,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.orange.shade400),
+              borderRadius: BorderRadius.circular(6),
+              color: Colors.orange.shade50,
+            ),
+            child: Text(
+              'Chưa có trại',
+              style: TextStyle(fontSize: 13, color: Colors.orange.shade700),
+            ),
+          );
+        }
+
+        return DropdownButtonFormField<FarmEntity>(
+          value: _selectedFarm,
+          isExpanded: true,
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.home_work, size: 18),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          ),
+          style: const TextStyle(fontSize: 13, color: Colors.black),
+          hint: const Text('Chọn trại', style: TextStyle(fontSize: 13)),
+          items: farms.map((farm) {
+            return DropdownMenuItem<FarmEntity>(
+              value: farm,
+              child: Text(farm.name, style: const TextStyle(fontSize: 13)),
+            );
+          }).toList(),
+          onChanged: (farm) {
+            setState(() {
+              _selectedFarm = farm;
+            });
+          },
+        );
+      },
     );
   }
 
@@ -810,13 +876,11 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
         return DropdownButtonFormField<PigTypeEntity?>(
           value: selected,
           decoration: InputDecoration(
-            labelText: 'Loại heo',
-            labelStyle: const TextStyle(fontSize: 12),
             prefixIcon: const Icon(Icons.pets, size: 18),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
             isDense: true,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           ),
           style: const TextStyle(fontSize: 13, color: Colors.black),
           items: types
@@ -876,9 +940,15 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
   }
 
   Widget _buildInventoryContainer(int qty) {
-    return _buildCompactField(
-      'Tồn kho',
-      Text(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        border: Border.all(color: Colors.green.shade200),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      alignment: Alignment.centerLeft,
+      child: Text(
         '$qty con',
         style: TextStyle(
           fontSize: 13,
@@ -886,8 +956,6 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
           color: Colors.green[700],
         ),
       ),
-      icon: Icons.inventory_2,
-      bgColor: Colors.green.shade50,
     );
   }
 
@@ -898,13 +966,10 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
       style: const TextStyle(fontSize: 13),
       onChanged: (_) => setState(() {}),
       decoration: InputDecoration(
-        labelText: 'Số lượng',
-        labelStyle: const TextStyle(fontSize: 12),
         prefixIcon: const Icon(Icons.format_list_numbered, size: 18),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         suffixIcon: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,

@@ -6,11 +6,13 @@ import 'data/repositories/invoice_repository_impl.dart';
 import 'data/repositories/partner_repository_impl.dart';
 import 'data/repositories/transaction_repository_impl.dart';
 import 'data/repositories/pigtype_repository_impl.dart';
+import 'data/repositories/farm_repository_impl.dart';
 
 import 'domain/repositories/i_invoice_repository.dart';
 import 'domain/repositories/i_partner_repository.dart';
 import 'domain/repositories/i_transaction_repository.dart';
 import 'domain/repositories/i_pigtype_repository.dart';
+import 'domain/repositories/i_farm_repository.dart';
 
 import 'presentation/features/weighing/bloc/weighing_bloc.dart';
 import 'presentation/features/history/bloc/invoice_history_bloc.dart';
@@ -44,6 +46,10 @@ Future<void> init() async {
 
   sl.registerLazySingleton<IPigTypeRepository>(
     () => PigTypeRepositoryImpl(sl<AppDatabase>()),
+  );
+
+  sl.registerLazySingleton<IFarmRepository>(
+    () => FarmRepositoryImpl(sl<AppDatabase>()),
   );
 
   // Blocs / Cubits

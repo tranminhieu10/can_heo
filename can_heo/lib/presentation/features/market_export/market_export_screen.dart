@@ -10,7 +10,10 @@ import '../../../core/services/nhb300_scale_service.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/partner.dart';
 import '../../../domain/entities/pig_type.dart';
+import '../../../domain/entities/farm.dart';
 import '../../../domain/repositories/i_pigtype_repository.dart';
+import '../../../domain/repositories/i_farm_repository.dart';
+import '../../../domain/repositories/i_partner_repository.dart';
 import '../pig_types/pig_types_screen.dart';
 import '../../../domain/entities/invoice.dart';
 import '../../../domain/repositories/i_invoice_repository.dart';
@@ -71,6 +74,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
       TextEditingController(text: '0');
   final TextEditingController _discountController =
       TextEditingController(text: '0');
+  final TextEditingController _farmNameController = TextEditingController();
+  final TextEditingController _farmWeightController = TextEditingController();
+  final TextEditingController _marketWeightController = TextEditingController();
 
   // Search controllers
   final TextEditingController _searchPartnerController =
@@ -85,8 +91,12 @@ class _MarketExportViewState extends State<_MarketExportView> {
   final NumberFormat _currencyFormat =
       NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
-  PartnerEntity? _selectedPartner;
+  PartnerEntity? _selectedPartner; // Khách hàng
+  PartnerEntity? _selectedSupplier; // Nhà cung cấp
+  FarmEntity? _selectedFarm;
   final _invoiceRepo = sl<IInvoiceRepository>();
+  final _farmRepo = sl<IFarmRepository>();
+  final _partnerRepo = sl<IPartnerRepository>();
   final _db = sl<AppDatabase>();
 
   // Track which search columns are visible
@@ -129,7 +139,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   void _setupNhb300Listeners() {
-    _connectionSubscription = _nhb300Service.connectionStream.listen((connected) {
+    _connectionSubscription =
+        _nhb300Service.connectionStream.listen((connected) {
       if (mounted) {
         setState(() => _isNhb300Connected = connected);
         if (connected) {
@@ -165,6 +176,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
     _quantityController.dispose();
     _deductionController.dispose();
     _discountController.dispose();
+    _farmNameController.dispose();
+    _farmWeightController.dispose();
+    _marketWeightController.dispose();
     _searchPartnerController.dispose();
     _searchPigTypeController.dispose();
     _searchQuantityController.dispose();
@@ -239,16 +253,18 @@ class _MarketExportViewState extends State<_MarketExportView> {
               builder: (context, constraints) {
                 // Initialize responsive values
                 Responsive.init(context);
-                
+
                 // Adaptive heights based on screen size
-                final topSectionHeight = Responsive.screenType == ScreenType.desktop27 
-                    ? 400.0 
-                    : Responsive.screenType == ScreenType.desktop24 
-                        ? 380.0 
-                        : Responsive.screenType == ScreenType.laptop15 
-                            ? 360.0 
-                            : 340.0;
-                final debtBarHeight = Responsive.screenType == ScreenType.desktop27 ? 48.0 : 44.0;
+                final topSectionHeight =
+                    Responsive.screenType == ScreenType.desktop27
+                        ? 400.0
+                        : Responsive.screenType == ScreenType.desktop24
+                            ? 380.0
+                            : Responsive.screenType == ScreenType.laptop15
+                                ? 360.0
+                                : 340.0;
+                final debtBarHeight =
+                    Responsive.screenType == ScreenType.desktop27 ? 48.0 : 44.0;
                 final padding = Responsive.spacing;
 
                 return Padding(
@@ -264,7 +280,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
                             const dividerWidth = 12.0;
                             final availableWidth = totalWidth - dividerWidth;
                             final leftWidth = availableWidth * _panelRatio;
-                            final rightWidth = availableWidth * (1 - _panelRatio);
+                            final rightWidth =
+                                availableWidth * (1 - _panelRatio);
 
                             return Row(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -296,7 +313,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
                                           height: 40,
                                           decoration: BoxDecoration(
                                             color: Colors.grey.shade400,
-                                            borderRadius: BorderRadius.circular(2),
+                                            borderRadius:
+                                                BorderRadius.circular(2),
                                           ),
                                         ),
                                       ),
@@ -468,7 +486,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
       });
       return;
     }
-    
+
     // Fallback về bloc scale
     final state = context.read<WeighingBloc>().state;
     if (state.isScaleConnected && state.scaleWeight > 0) {
@@ -513,7 +531,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 // NHB300 Connection status bar
                 _buildNhb300ConnectionBar(),
                 const SizedBox(height: 6),
-                
+
                 // ROW 1: Scale display - compact
                 Container(
                   height: 70,
@@ -830,11 +848,12 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
   Widget _buildNhb300ConnectionBar() {
     final ports = NHB300ScaleService.getAvailablePorts();
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _isNhb300Connected ? Colors.green.shade100 : Colors.grey.shade200,
+        color:
+            _isNhb300Connected ? Colors.green.shade100 : Colors.grey.shade200,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: _isNhb300Connected ? Colors.green : Colors.grey,
@@ -856,10 +875,13 @@ class _MarketExportViewState extends State<_MarketExportView> {
                   value: ports.isNotEmpty ? ports.first : null,
                   hint: const Text('Chọn cổng', style: TextStyle(fontSize: 11)),
                   isDense: true,
-                  items: ports.map((p) => DropdownMenuItem(
-                    value: p,
-                    child: Text(p, style: const TextStyle(fontSize: 11)),
-                  )).toList(),
+                  items: ports
+                      .map((p) => DropdownMenuItem(
+                            value: p,
+                            child:
+                                Text(p, style: const TextStyle(fontSize: 11)),
+                          ))
+                      .toList(),
                   onChanged: (port) async {
                     if (port != null) {
                       try {
@@ -898,7 +920,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
             Expanded(
               child: Text(
                 'Đã kết nối: ${_nhb300Service.currentPortName}',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ),
             TextButton.icon(
@@ -1005,23 +1028,33 @@ class _MarketExportViewState extends State<_MarketExportView> {
               ],
             ),
             const SizedBox(height: 4),
-            // Form rows - 5 rows as specified
+            // Form rows - 6 rows layout
             Expanded(
               child: Column(
                 children: [
-                  // Row 1: Mã KH, Tên KH, Công nợ
+                  // Row 1: Khách hàng + Nhà cung cấp + Trại
+                  _buildRowLabels(['Khách hàng', 'Nhà cung cấp', 'Trại']),
+                  const SizedBox(height: 2),
                   Expanded(child: _buildFormRow1()),
+                  const SizedBox(height: 4),
+                  // Row 2: Lô + Loại heo + (Tồn kho + Số lượng)
+                  _buildRowLabelsRow2(),
                   const SizedBox(height: 2),
-                  // Row 2: Loại heo, Số lô, Tồn kho
                   Expanded(child: _buildFormRow2()),
+                  const SizedBox(height: 4),
+                  // Row 3: TL Trại + TL Chợ + Trừ hao
+                  _buildRowLabels(['TL Trại', 'TL Chợ', 'Trừ hao']),
                   const SizedBox(height: 2),
-                  // Row 3: Số lượng, Trọng lượng, Trừ hao, TL Thực
                   Expanded(child: _buildFormRow3()),
+                  const SizedBox(height: 4),
+                  // Row 4: Đơn giá + Thành tiền + Chiết khấu
+                  _buildRowLabels(['Đơn giá', 'Thành tiền', 'Chiết khấu']),
                   const SizedBox(height: 2),
-                  // Row 4: Đơn giá, Thành tiền, Chiết khấu, Thực thu
                   Expanded(child: _buildFormRow4()),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   // Row 5: Ghi chú
+                  _buildRowLabels(['Ghi chú']),
+                  const SizedBox(height: 2),
                   Expanded(child: _buildFormRow5()),
                 ],
               ),
@@ -1035,54 +1068,118 @@ class _MarketExportViewState extends State<_MarketExportView> {
     );
   }
 
+  Widget _buildFarmDropdown() {
+    if (_selectedSupplier == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(6),
+          color: Colors.grey.shade100,
+        ),
+        child: const Text(
+          'Chọn NCC trước',
+          style: TextStyle(fontSize: 13, color: Colors.grey),
+        ),
+      );
+    }
+
+    return StreamBuilder<List<FarmEntity>>(
+      stream: _farmRepo.watchFarmsByPartner(_selectedSupplier!.id),
+      builder: (context, snapshot) {
+        final farms = snapshot.data ?? [];
+        
+        if (farms.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.centerLeft,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.orange.shade400),
+              borderRadius: BorderRadius.circular(6),
+              color: Colors.orange.shade50,
+            ),
+            child: Text(
+              'Chưa có trại',
+              style: TextStyle(fontSize: 13, color: Colors.orange.shade700),
+            ),
+          );
+        }
+
+        return DropdownButtonFormField<FarmEntity>(
+          value: _selectedFarm,
+          isExpanded: true,
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.home_work, size: 18),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          ),
+          style: const TextStyle(fontSize: 13, color: Colors.black),
+          hint: const Text('Chọn trại', style: TextStyle(fontSize: 13)),
+          items: farms.map((farm) {
+            return DropdownMenuItem<FarmEntity>(
+              value: farm,
+              child: Text(farm.name, style: const TextStyle(fontSize: 13)),
+            );
+          }).toList(),
+          onChanged: (farm) {
+            setState(() {
+              _selectedFarm = farm;
+            });
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildFormRow1() {
-    // Row 1: Mã KH, Tên KH, Công nợ - compact
+    // Row 1: Khách hàng + Nhà cung cấp + Trại - 3 cột đều
     return BlocBuilder<PartnerBloc, PartnerState>(
       builder: (context, state) {
-        final partners = state.partners;
-        final safeValue =
-            (partners.contains(_selectedPartner)) ? _selectedPartner : null;
+        final customers = state.partners; // Khách hàng (isSupplier=false)
+        final safeCustomer =
+            (customers.contains(_selectedPartner)) ? _selectedPartner : null;
 
         return Row(
           children: [
-            SizedBox(
-              width: 50,
-              child: _buildCompactField(
-                'Mã',
-                Text(
-                  _selectedPartner?.id ?? '---',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                icon: Icons.badge,
-              ),
-            ),
-            const SizedBox(width: 4),
+            // Khách hàng
             Expanded(
-              flex: 2,
               child: DropdownButtonFormField<PartnerEntity>(
                 isExpanded: true,
                 decoration: InputDecoration(
-                  labelText: 'Khách hàng',
-                  labelStyle: const TextStyle(fontSize: 10),
-                  prefixIcon: const Icon(Icons.person, size: 14),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                  hintText: 'Chọn KH',
+                  hintStyle: const TextStyle(fontSize: 13),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6)),
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                 ),
-                value: safeValue,
-                style: const TextStyle(fontSize: 11, color: Colors.black),
-                items: partners
+                value: safeCustomer,
+                style: const TextStyle(fontSize: 13, color: Colors.black),
+                items: customers
                     .map((p) => DropdownMenuItem(
                         value: p,
-                        child: Text(p.name, style: const TextStyle(fontSize: 11))))
+                        child:
+                            Text(p.name, style: const TextStyle(fontSize: 13))))
                     .toList(),
-                onChanged: (value) => setState(() => _selectedPartner = value),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedPartner = value;
+                  });
+                },
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 8),
+            // Nhà cung cấp - StreamBuilder
             Expanded(
-              child: _buildPartnerDebtFieldCompact(),
+              child: _buildSupplierDropdown(),
+            ),
+            const SizedBox(width: 8),
+            // Trại - Dropdown (theo NCC)
+            Expanded(
+              child: _buildFarmDropdown(),
             ),
           ],
         );
@@ -1090,76 +1187,264 @@ class _MarketExportViewState extends State<_MarketExportView> {
     );
   }
 
-  Widget _buildFormRow2() {
-    // Row 2: Loại heo, Số lô, Tồn kho - compact
+  Widget _buildSupplierDropdown() {
+    return StreamBuilder<List<PartnerEntity>>(
+      stream: _partnerRepo.watchPartners(true),
+      builder: (context, snapshot) {
+        final suppliers = snapshot.data ?? [];
+        final safeValue = suppliers.contains(_selectedSupplier) ? _selectedSupplier : null;
+
+        return DropdownButtonFormField<PartnerEntity>(
+          isExpanded: true,
+          decoration: InputDecoration(
+            hintText: 'Chọn NCC',
+            hintStyle: const TextStyle(fontSize: 13),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          ),
+          value: safeValue,
+          style: const TextStyle(fontSize: 13, color: Colors.black),
+          items: suppliers
+              .map((p) => DropdownMenuItem(
+                  value: p,
+                  child: Text(p.name, style: const TextStyle(fontSize: 13))))
+              .toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedSupplier = value;
+              _selectedFarm = null; // Reset farm when supplier changes
+            });
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRowLabelsRow2() {
+    // Row 2 labels: Lô + Loại heo + (Tồn kho | Số lượng) - aligned with Row 1
     return Row(
       children: [
+        // Lô - same width as Khách hàng
+        const Expanded(
+          child: Text(
+            'Lô',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+        // Loại heo - same width as Nhà cung cấp
+        const Expanded(
+          child: Text(
+            'Loại heo',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+        // Tồn kho + Số lượng - same width as Trại
+        Expanded(
+          child: Row(
+            children: const [
+              Expanded(
+                child: Text(
+                  'Tồn kho',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'Số lượng',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormRow2() {
+    // Row 2: Lô + Loại heo + (Tồn kho + Số lượng) - aligned with Row 1
+    return Row(
+      children: [
+        // Lô - same width as Khách hàng
+        Expanded(
+          child: TextField(
+            controller: _batchNumberController,
+            decoration: InputDecoration(
+              hintText: 'Số lô',
+              hintStyle: const TextStyle(fontSize: 13),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            style: const TextStyle(fontSize: 13),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Loại heo - same width as Nhà cung cấp
         Expanded(
           child: _buildPigTypeDropdownCompact(),
         ),
-        const SizedBox(width: 4),
-        SizedBox(
-          width: 60,
-          child: _buildCompactTextField(
-            'Số lô',
-            _batchNumberController,
-            hintText: 'Lô',
-            icon: Icons.inventory_2,
+        const SizedBox(width: 8),
+        // Tồn kho + Số lượng - same width as Trại
+        Expanded(
+          child: Row(
+            children: [
+              // Tồn kho
+              Expanded(
+                child: _buildInventoryDisplayFieldCompact(),
+              ),
+              const SizedBox(width: 4),
+              // Số lượng
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    children: [
+                      // Nút giảm
+                      InkWell(
+                        onTap: () {
+                          final current = int.tryParse(_quantityController.text) ?? 1;
+                          if (current > 1) {
+                            setState(
+                                () => _quantityController.text = '${current - 1}');
+                          }
+                        },
+                        child: Container(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                          child: const Icon(Icons.remove, size: 12),
+                        ),
+                      ),
+                      // TextField
+                      Expanded(
+                        child: TextField(
+                          controller: _quantityController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          textAlign: TextAlign.center,
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(
+                            hintText: '1',
+                            hintStyle: TextStyle(fontSize: 12),
+                            isDense: true,
+                            contentPadding:
+                                EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                            border: InputBorder.none,
+                          ),
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      // Nút tăng
+                      InkWell(
+                        onTap: () {
+                          final current = int.tryParse(_quantityController.text) ?? 1;
+                          setState(() => _quantityController.text = '${current + 1}');
+                        },
+                        child: Container(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                          child: const Icon(Icons.add, size: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 4),
-        SizedBox(
-          width: 70,
-          child: _buildInventoryDisplayFieldCompact(),
         ),
       ],
     );
   }
 
   Widget _buildFormRow3() {
-    // Row 3: Số lượng, Trọng lượng, Trừ hao, TL Thực - compact
+    // Row 3: TL Trại + TL Chợ + Trừ hao - 3 cột đều
     return Row(
       children: [
-        SizedBox(
-          width: 70,
-          child: _buildQuantityFieldWithButtonsCompact(),
-        ),
-        const SizedBox(width: 4),
-        SizedBox(
-          width: 80,
-          child: _buildCompactField(
-            'TL (kg)',
-            Text(
-              _numberFormat.format(_grossWeight),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 11,
-                color: Colors.blue.shade700,
-              ),
+        // TL Trại
+        Expanded(
+          child: TextField(
+            controller: _farmWeightController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
+            ],
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: '0.0',
+              hintStyle: const TextStyle(fontSize: 13),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
             ),
-            icon: Icons.scale,
-            bgColor: Colors.blue.shade50,
+            style: const TextStyle(fontSize: 13),
           ),
         ),
-        const SizedBox(width: 4),
-        SizedBox(
-          width: 70,
-          child: _buildDeductionFieldCompact(),
-        ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 8),
+        // TL Chợ
         Expanded(
-          child: _buildCompactField(
-            'TL Thực',
-            Text(
-              _numberFormat.format(_netWeight),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 11,
-                color: Colors.green.shade700,
-              ),
+          child: TextField(
+            controller: _marketWeightController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
+            ],
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: '0.0',
+              hintStyle: const TextStyle(fontSize: 13),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
             ),
-            icon: Icons.monitor_weight,
-            bgColor: Colors.green.shade50,
+            style: const TextStyle(fontSize: 13),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Trừ hao
+        Expanded(
+          child: TextField(
+            controller: _deductionController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
+            ],
+            onChanged: (_) => setState(() => _updateAutoDiscount()),
+            decoration: InputDecoration(
+              hintText: '0',
+              hintStyle: const TextStyle(fontSize: 13),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            style: const TextStyle(fontSize: 13),
           ),
         ),
       ],
@@ -1167,69 +1452,74 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildFormRow4() {
-    // Row 4: Đơn giá, Thành tiền, Chiết khấu, Thực thu - compact
+    // Row 4: Đơn giá + Thành tiền + Chiết khấu - 3 cột đều
     return Row(
       children: [
-        SizedBox(
-          width: 80,
-          child: _buildCompactTextField(
-            'Đơn giá',
-            _priceController,
-            hintText: 'đ/kg',
-            isDecimal: true,
+        // Đơn giá
+        Expanded(
+          child: TextField(
+            controller: _priceController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
+            ],
             onChanged: (_) => _updateAutoDiscount(),
-            icon: Icons.price_change,
+            decoration: InputDecoration(
+              hintText: 'đ/kg',
+              hintStyle: const TextStyle(fontSize: 13),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            style: const TextStyle(fontSize: 13),
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 8),
+        // Thành tiền
         Expanded(
-          child: _buildCompactField(
-            'Thành tiền',
-            FittedBox(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
                 _currencyFormat.format(_subtotal),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 11,
+                  fontSize: 13,
                   color: Colors.orange.shade700,
                 ),
               ),
             ),
-            icon: Icons.calculate,
-            bgColor: Colors.orange.shade50,
           ),
         ),
-        const SizedBox(width: 4),
-        SizedBox(
-          width: 80,
-          child: _buildCompactTextField(
-            'Chiết khấu',
-            _discountController,
-            hintText: '0',
-            isDecimal: true,
-            icon: Icons.discount,
-          ),
-        ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 8),
+        // Chiết khấu
         Expanded(
-          child: _buildCompactField(
-            'Thực thu',
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _currencyFormat.format(_totalAmount),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
-                  color: Colors.blue.shade800,
-                ),
-              ),
+          child: TextField(
+            controller: _discountController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
+            ],
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: '0',
+              hintStyle: const TextStyle(fontSize: 13),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
             ),
-            icon: Icons.attach_money,
-            bgColor: Colors.blue.shade100,
+            style: const TextStyle(fontSize: 13),
           ),
         ),
       ],
@@ -1237,12 +1527,51 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildFormRow5() {
-    // Row 5: Ghi chú - compact
-    return _buildCompactTextField(
-      'Ghi chú',
-      _noteController,
-      hintText: 'Ghi chú...',
-      icon: Icons.note,
+    // Row 5: Ghi chú - toàn chiều rộng
+    return TextField(
+      controller: _noteController,
+      decoration: InputDecoration(
+        hintText: 'Ghi chú...',
+        hintStyle: const TextStyle(fontSize: 13),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      style: const TextStyle(fontSize: 13),
+    );
+  }
+
+  Widget _buildRowLabels(List<String> labels) {
+    return Row(
+      children: labels.map((label) {
+        return Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildRowLabels4(List<String> labels) {
+    return Row(
+      children: labels.map((label) {
+        return Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -1348,9 +1677,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
-                color: remaining > 0
-                    ? Colors.red.shade700
-                    : Colors.green.shade700,
+                color:
+                    remaining > 0 ? Colors.red.shade700 : Colors.green.shade700,
               ),
             ),
           ),
@@ -1374,19 +1702,18 @@ class _MarketExportViewState extends State<_MarketExportView> {
         return DropdownButtonFormField<PigTypeEntity?>(
           value: selected,
           decoration: InputDecoration(
-            labelText: 'Loại heo',
-            labelStyle: const TextStyle(fontSize: 12),
-            prefixIcon: const Icon(Icons.pets, size: 18),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            hintText: 'Chọn loại heo',
+            hintStyle: const TextStyle(fontSize: 13),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
             isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           ),
           style: const TextStyle(fontSize: 13, color: Colors.black),
           items: types
               .map((type) => DropdownMenuItem(
                   value: type,
-                  child:
-                      Text(type.name, style: const TextStyle(fontSize: 13))))
+                  child: Text(type.name, style: const TextStyle(fontSize: 13))))
               .toList(),
           onChanged: (v) {
             if (v != null) setState(() => _pigTypeController.text = v.name);
@@ -1449,9 +1776,14 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildInventoryContainerCompact(int qty, bool isValid) {
-    return _buildCompactField(
-      'Tồn kho',
-      Text(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: isValid ? Colors.green[50] : Colors.red[50],
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Text(
         '$qty con',
         style: TextStyle(
           fontSize: 13,
@@ -1459,8 +1791,6 @@ class _MarketExportViewState extends State<_MarketExportView> {
           color: isValid ? Colors.green[700] : Colors.red[700],
         ),
       ),
-      icon: Icons.inventory,
-      bgColor: isValid ? Colors.green[50] : Colors.red[50],
     );
   }
 

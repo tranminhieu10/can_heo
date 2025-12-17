@@ -8,6 +8,7 @@ import '../../../../injection_container.dart';
 import 'bloc/partner_bloc.dart';
 import 'bloc/partner_event.dart';
 import 'bloc/partner_state.dart';
+import 'company_farm_screen.dart';
 
 class PartnersScreen extends StatelessWidget {
   const PartnersScreen({super.key});
@@ -34,6 +35,19 @@ class _PartnersView extends StatelessWidget {
           title: const Text("QUẢN LÝ ĐỐI TÁC"),
           elevation: 0,
           backgroundColor: Colors.white,
+          actions: [
+            // Nút quản lý Công ty & Trại
+            IconButton(
+              icon: const Icon(Icons.business, color: Colors.orange),
+              tooltip: 'Quản lý Công ty & Trại',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CompanyFarmScreen()),
+                );
+              },
+            ),
+          ],
           bottom: TabBar(
             labelColor: Colors.blue,
             unselectedLabelColor: Colors.grey,
@@ -43,7 +57,7 @@ class _PartnersView extends StatelessWidget {
             },
             tabs: const [
               Tab(icon: Icon(Icons.people), text: "KHÁCH HÀNG (LÁI)"),
-              Tab(icon: Icon(Icons.store), text: "TRẠI HEO (NCC)"),
+              Tab(icon: Icon(Icons.store), text: "NHÀ CUNG CẤP"),
             ],
           ),
         ),

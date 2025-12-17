@@ -11,6 +11,7 @@ import 'tables/invoices.dart';
 import 'tables/weighing_details.dart';
 import 'tables/transactions.dart';
 import 'tables/pig_types.dart';
+import 'tables/farms.dart';
 
 // Import DAOs
 import 'daos/partners_dao.dart';
@@ -18,24 +19,26 @@ import 'daos/invoices_dao.dart';
 import 'daos/weighing_details_dao.dart';
 import 'daos/transactions_dao.dart';
 import 'daos/pig_types_dao.dart';
+import 'daos/farms_dao.dart';
 
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Partners, Invoices, WeighingDetails, Transactions, PigTypes],
+  tables: [Partners, Invoices, WeighingDetails, Transactions, PigTypes, Farms],
   daos: [
     PartnersDao,
     InvoicesDao,
     WeighingDetailsDao,
     TransactionsDao,
-    PigTypesDao
+    PigTypesDao,
+    FarmsDao
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 6; // added invoiceCode to invoices
+  int get schemaVersion => 7; // added farms table
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -87,6 +90,13 @@ class AppDatabase extends _$AppDatabase {
           if (from < 6) {
             try {
               await m.addColumn(invoices, invoices.invoiceCode);
+            } catch (_) {}
+          }
+          
+          // Từ version 6 -> 7: Tạo bảng Farms
+          if (from < 7) {
+            try {
+              await m.createTable(farms);
             } catch (_) {}
           }
         },

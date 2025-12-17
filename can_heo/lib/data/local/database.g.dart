@@ -2268,6 +2268,388 @@ class PigTypesCompanion extends UpdateCompanion<PigType> {
   }
 }
 
+class $FarmsTable extends Farms with TableInfo<$FarmsTable, Farm> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FarmsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 100),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _partnerIdMeta =
+      const VerificationMeta('partnerId');
+  @override
+  late final GeneratedColumn<String> partnerId = GeneratedColumn<String>(
+      'partner_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _addressMeta =
+      const VerificationMeta('address');
+  @override
+  late final GeneratedColumn<String> address = GeneratedColumn<String>(
+      'address', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _phoneMeta = const VerificationMeta('phone');
+  @override
+  late final GeneratedColumn<String> phone = GeneratedColumn<String>(
+      'phone', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+      'note', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, name, partnerId, address, phone, note, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'farms';
+  @override
+  VerificationContext validateIntegrity(Insertable<Farm> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('partner_id')) {
+      context.handle(_partnerIdMeta,
+          partnerId.isAcceptableOrUnknown(data['partner_id']!, _partnerIdMeta));
+    } else if (isInserting) {
+      context.missing(_partnerIdMeta);
+    }
+    if (data.containsKey('address')) {
+      context.handle(_addressMeta,
+          address.isAcceptableOrUnknown(data['address']!, _addressMeta));
+    }
+    if (data.containsKey('phone')) {
+      context.handle(
+          _phoneMeta, phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta));
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+          _noteMeta, note.isAcceptableOrUnknown(data['note']!, _noteMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Farm map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Farm(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      partnerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}partner_id'])!,
+      address: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}address']),
+      phone: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}phone']),
+      note: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}note']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $FarmsTable createAlias(String alias) {
+    return $FarmsTable(attachedDatabase, alias);
+  }
+}
+
+class Farm extends DataClass implements Insertable<Farm> {
+  final String id;
+  final String name;
+  final String partnerId;
+  final String? address;
+  final String? phone;
+  final String? note;
+  final DateTime createdAt;
+  const Farm(
+      {required this.id,
+      required this.name,
+      required this.partnerId,
+      this.address,
+      this.phone,
+      this.note,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['partner_id'] = Variable<String>(partnerId);
+    if (!nullToAbsent || address != null) {
+      map['address'] = Variable<String>(address);
+    }
+    if (!nullToAbsent || phone != null) {
+      map['phone'] = Variable<String>(phone);
+    }
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  FarmsCompanion toCompanion(bool nullToAbsent) {
+    return FarmsCompanion(
+      id: Value(id),
+      name: Value(name),
+      partnerId: Value(partnerId),
+      address: address == null && nullToAbsent
+          ? const Value.absent()
+          : Value(address),
+      phone:
+          phone == null && nullToAbsent ? const Value.absent() : Value(phone),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory Farm.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Farm(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      partnerId: serializer.fromJson<String>(json['partnerId']),
+      address: serializer.fromJson<String?>(json['address']),
+      phone: serializer.fromJson<String?>(json['phone']),
+      note: serializer.fromJson<String?>(json['note']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'partnerId': serializer.toJson<String>(partnerId),
+      'address': serializer.toJson<String?>(address),
+      'phone': serializer.toJson<String?>(phone),
+      'note': serializer.toJson<String?>(note),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  Farm copyWith(
+          {String? id,
+          String? name,
+          String? partnerId,
+          Value<String?> address = const Value.absent(),
+          Value<String?> phone = const Value.absent(),
+          Value<String?> note = const Value.absent(),
+          DateTime? createdAt}) =>
+      Farm(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        partnerId: partnerId ?? this.partnerId,
+        address: address.present ? address.value : this.address,
+        phone: phone.present ? phone.value : this.phone,
+        note: note.present ? note.value : this.note,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  Farm copyWithCompanion(FarmsCompanion data) {
+    return Farm(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      partnerId: data.partnerId.present ? data.partnerId.value : this.partnerId,
+      address: data.address.present ? data.address.value : this.address,
+      phone: data.phone.present ? data.phone.value : this.phone,
+      note: data.note.present ? data.note.value : this.note,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Farm(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('partnerId: $partnerId, ')
+          ..write('address: $address, ')
+          ..write('phone: $phone, ')
+          ..write('note: $note, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, name, partnerId, address, phone, note, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Farm &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.partnerId == this.partnerId &&
+          other.address == this.address &&
+          other.phone == this.phone &&
+          other.note == this.note &&
+          other.createdAt == this.createdAt);
+}
+
+class FarmsCompanion extends UpdateCompanion<Farm> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> partnerId;
+  final Value<String?> address;
+  final Value<String?> phone;
+  final Value<String?> note;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const FarmsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.partnerId = const Value.absent(),
+    this.address = const Value.absent(),
+    this.phone = const Value.absent(),
+    this.note = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FarmsCompanion.insert({
+    required String id,
+    required String name,
+    required String partnerId,
+    this.address = const Value.absent(),
+    this.phone = const Value.absent(),
+    this.note = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        name = Value(name),
+        partnerId = Value(partnerId);
+  static Insertable<Farm> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? partnerId,
+    Expression<String>? address,
+    Expression<String>? phone,
+    Expression<String>? note,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (partnerId != null) 'partner_id': partnerId,
+      if (address != null) 'address': address,
+      if (phone != null) 'phone': phone,
+      if (note != null) 'note': note,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FarmsCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? name,
+      Value<String>? partnerId,
+      Value<String?>? address,
+      Value<String?>? phone,
+      Value<String?>? note,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return FarmsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      partnerId: partnerId ?? this.partnerId,
+      address: address ?? this.address,
+      phone: phone ?? this.phone,
+      note: note ?? this.note,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (partnerId.present) {
+      map['partner_id'] = Variable<String>(partnerId.value);
+    }
+    if (address.present) {
+      map['address'] = Variable<String>(address.value);
+    }
+    if (phone.present) {
+      map['phone'] = Variable<String>(phone.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FarmsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('partnerId: $partnerId, ')
+          ..write('address: $address, ')
+          ..write('phone: $phone, ')
+          ..write('note: $note, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2277,6 +2659,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $WeighingDetailsTable(this);
   late final $TransactionsTable transactions = $TransactionsTable(this);
   late final $PigTypesTable pigTypes = $PigTypesTable(this);
+  late final $FarmsTable farms = $FarmsTable(this);
   late final PartnersDao partnersDao = PartnersDao(this as AppDatabase);
   late final InvoicesDao invoicesDao = InvoicesDao(this as AppDatabase);
   late final WeighingDetailsDao weighingDetailsDao =
@@ -2284,12 +2667,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final TransactionsDao transactionsDao =
       TransactionsDao(this as AppDatabase);
   late final PigTypesDao pigTypesDao = PigTypesDao(this as AppDatabase);
+  late final FarmsDao farmsDao = FarmsDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [partners, invoices, weighingDetails, transactions, pigTypes];
+      [partners, invoices, weighingDetails, transactions, pigTypes, farms];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
         [
@@ -4095,6 +4479,200 @@ typedef $$PigTypesTableProcessedTableManager = ProcessedTableManager<
     (PigType, BaseReferences<_$AppDatabase, $PigTypesTable, PigType>),
     PigType,
     PrefetchHooks Function()>;
+typedef $$FarmsTableCreateCompanionBuilder = FarmsCompanion Function({
+  required String id,
+  required String name,
+  required String partnerId,
+  Value<String?> address,
+  Value<String?> phone,
+  Value<String?> note,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$FarmsTableUpdateCompanionBuilder = FarmsCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<String> partnerId,
+  Value<String?> address,
+  Value<String?> phone,
+  Value<String?> note,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$FarmsTableFilterComposer extends Composer<_$AppDatabase, $FarmsTable> {
+  $$FarmsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get partnerId => $composableBuilder(
+      column: $table.partnerId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get address => $composableBuilder(
+      column: $table.address, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get phone => $composableBuilder(
+      column: $table.phone, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get note => $composableBuilder(
+      column: $table.note, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$FarmsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FarmsTable> {
+  $$FarmsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get partnerId => $composableBuilder(
+      column: $table.partnerId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get address => $composableBuilder(
+      column: $table.address, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get phone => $composableBuilder(
+      column: $table.phone, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get note => $composableBuilder(
+      column: $table.note, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$FarmsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FarmsTable> {
+  $$FarmsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get partnerId =>
+      $composableBuilder(column: $table.partnerId, builder: (column) => column);
+
+  GeneratedColumn<String> get address =>
+      $composableBuilder(column: $table.address, builder: (column) => column);
+
+  GeneratedColumn<String> get phone =>
+      $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$FarmsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $FarmsTable,
+    Farm,
+    $$FarmsTableFilterComposer,
+    $$FarmsTableOrderingComposer,
+    $$FarmsTableAnnotationComposer,
+    $$FarmsTableCreateCompanionBuilder,
+    $$FarmsTableUpdateCompanionBuilder,
+    (Farm, BaseReferences<_$AppDatabase, $FarmsTable, Farm>),
+    Farm,
+    PrefetchHooks Function()> {
+  $$FarmsTableTableManager(_$AppDatabase db, $FarmsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FarmsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FarmsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FarmsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String> partnerId = const Value.absent(),
+            Value<String?> address = const Value.absent(),
+            Value<String?> phone = const Value.absent(),
+            Value<String?> note = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              FarmsCompanion(
+            id: id,
+            name: name,
+            partnerId: partnerId,
+            address: address,
+            phone: phone,
+            note: note,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String name,
+            required String partnerId,
+            Value<String?> address = const Value.absent(),
+            Value<String?> phone = const Value.absent(),
+            Value<String?> note = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              FarmsCompanion.insert(
+            id: id,
+            name: name,
+            partnerId: partnerId,
+            address: address,
+            phone: phone,
+            note: note,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$FarmsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $FarmsTable,
+    Farm,
+    $$FarmsTableFilterComposer,
+    $$FarmsTableOrderingComposer,
+    $$FarmsTableAnnotationComposer,
+    $$FarmsTableCreateCompanionBuilder,
+    $$FarmsTableUpdateCompanionBuilder,
+    (Farm, BaseReferences<_$AppDatabase, $FarmsTable, Farm>),
+    Farm,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4109,4 +4687,6 @@ class $AppDatabaseManager {
       $$TransactionsTableTableManager(_db, _db.transactions);
   $$PigTypesTableTableManager get pigTypes =>
       $$PigTypesTableTableManager(_db, _db.pigTypes);
+  $$FarmsTableTableManager get farms =>
+      $$FarmsTableTableManager(_db, _db.farms);
 }

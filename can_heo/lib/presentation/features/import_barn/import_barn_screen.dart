@@ -9,8 +9,10 @@ import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/partner.dart';
 import '../../../domain/entities/pig_type.dart';
 import '../../../domain/entities/invoice.dart';
+import '../../../domain/entities/farm.dart';
 import '../../../domain/repositories/i_pigtype_repository.dart';
 import '../../../domain/repositories/i_invoice_repository.dart';
+import '../../../domain/repositories/i_farm_repository.dart';
 import '../../../injection_container.dart';
 import '../partners/bloc/partner_bloc.dart';
 import '../partners/bloc/partner_event.dart';
@@ -84,7 +86,9 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
       NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
   PartnerEntity? _selectedPartner;
+  FarmEntity? _selectedFarm;
   final _invoiceRepo = sl<IInvoiceRepository>();
+  final _farmRepo = sl<IFarmRepository>();
 
   // Scale data - nhập trực tiếp từ người dùng
   double _totalMarketWeight = 0.0; // TL Chợ - nhập trực tiếp
@@ -444,33 +448,36 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
               ),
             ),
             const SizedBox(height: 4),
-            // Form - 4 rows layout with equal height fields
+            // Form - 4 rows layout: 3 rows x 3 cols equal + 1 row ghi chú
             Expanded(
               child: Column(
                 children: [
-                  // Row 1: Mã + Nhà cung cấp
-                  _buildRowLabels(['Mã', 'Nhà cung cấp'], [50, null]),
+                  // Row 1: Mã + Nhà cung cấp + Trại
+                  _buildRowLabels(
+                      ['Mã', 'Nhà cung cấp', 'Trại'], [null, null, null]),
                   Expanded(
                     child: Row(
                       children: [
-                        SizedBox(
-                          width: 50,
+                        // Mã NCC
+                        Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 10),
                             decoration: BoxDecoration(
                               border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                             alignment: Alignment.centerLeft,
                             child: Text(
                               _selectedPartner?.id ?? '---',
                               style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 11),
+                                  fontWeight: FontWeight.bold, fontSize: 13),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),
                         const SizedBox(width: 4),
+                        // Nhà cung cấp
                         Expanded(
                           child: BlocBuilder<PartnerBloc, PartnerState>(
                             builder: (context, state) {
@@ -483,67 +490,72 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                                 isExpanded: true,
                                 decoration: InputDecoration(
                                   border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(4)),
+                                      borderRadius: BorderRadius.circular(6)),
                                   isDense: true,
                                   contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 4),
+                                      horizontal: 8, vertical: 10),
                                 ),
                                 value: safeValue,
                                 style: const TextStyle(
-                                    fontSize: 11, color: Colors.black),
+                                    fontSize: 13, color: Colors.black),
                                 items: partners
                                     .map((p) => DropdownMenuItem(
                                           value: p,
                                           child: Text(p.name,
                                               style: const TextStyle(
-                                                  fontSize: 11)),
+                                                  fontSize: 13)),
                                         ))
                                     .toList(),
-                                onChanged: (value) =>
-                                    setState(() => _selectedPartner = value),
+                                onChanged: (value) {
+                                    setState(() {
+                                      _selectedPartner = value;
+                                      _selectedFarm = null; // Reset farm when partner changes
+                                    });
+                                  },
                               );
                             },
                           ),
+                        ),
+                        const SizedBox(width: 4),
+                        // Trại - Dropdown
+                        Expanded(
+                          child: _buildFarmDropdown(),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 2),
-                  // Row 2: Loại heo + Tồn kho
-                  _buildRowLabels(['Loại heo', 'Tồn kho'], [null, 60]),
+                  // Row 2: Loại heo + Tồn kho + Số lô
+                  _buildRowLabels(
+                      ['Loại heo', 'Tồn kho', 'Số lô'], [null, null, null]),
                   Expanded(
                     child: Row(
                       children: [
                         Expanded(child: _buildPigTypeDropdown()),
                         const SizedBox(width: 4),
-                        SizedBox(
-                            width: 60, child: _buildInventoryDisplayField()),
+                        Expanded(child: _buildInventoryDisplayField()),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: _buildSimpleTextField(_batchNumberController),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 2),
-                  // Row 3: Số lô + SL + TL Trại + TL Chợ
-                  _buildRowLabels(['Số lô', 'SL', 'TL Trại', 'TL Chợ'], [50, 60, 70, 70]),
+                  // Row 3: Số lượng + TL Trại + TL Chợ
+                  _buildRowLabels(
+                      ['Số lượng', 'TL Trại', 'TL Chợ'], [null, null, null]),
                   Expanded(
                     child: Row(
                       children: [
-                        SizedBox(
-                          width: 50,
-                          child: _buildSimpleTextField(_batchNumberController),
-                        ),
+                        Expanded(child: _buildQuantityFieldWithButtons()),
                         const SizedBox(width: 4),
-                        SizedBox(
-                            width: 60,
-                            child: _buildQuantityFieldWithButtons()),
-                        const SizedBox(width: 4),
-                        SizedBox(
-                          width: 70,
+                        Expanded(
                           child: _buildSimpleTextField(_farmWeightController,
                               isDecimal: true),
                         ),
                         const SizedBox(width: 4),
-                        SizedBox(
-                          width: 70,
+                        Expanded(
                           child: _buildSimpleTextField(
                             _scaleInputController,
                             isDecimal: true,
@@ -587,7 +599,8 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         } else {
           return Expanded(child: _buildTableLabel(label));
         }
-      }).expand((w) => [w, const SizedBox(width: 4)]).toList()..removeLast(),
+      }).expand((w) => [w, const SizedBox(width: 4)]).toList()
+        ..removeLast(),
     );
   }
 
@@ -826,6 +839,53 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     );
   }
 
+  Widget _buildFarmDropdown() {
+    if (_selectedPartner == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(6),
+          color: Colors.grey[100],
+        ),
+        child: const Text(
+          'Chọn NCC trước',
+          style: TextStyle(fontSize: 13, color: Colors.grey),
+        ),
+      );
+    }
+
+    return StreamBuilder<List<FarmEntity>>(
+      stream: _farmRepo.watchFarmsByPartner(_selectedPartner!.id),
+      builder: (context, snapshot) {
+        final farms = snapshot.data ?? [];
+        
+        // Kiểm tra xem farm đã chọn còn trong list không
+        final safeValue = farms.contains(_selectedFarm) ? _selectedFarm : null;
+
+        return DropdownButtonFormField<FarmEntity>(
+          value: safeValue,
+          isExpanded: true,
+          decoration: InputDecoration(
+            hintText: farms.isEmpty ? 'Chưa có trại' : 'Chọn trại',
+            hintStyle: const TextStyle(fontSize: 13),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          ),
+          style: const TextStyle(fontSize: 13, color: Colors.black),
+          items: farms
+              .map((farm) => DropdownMenuItem(
+                    value: farm,
+                    child: Text(farm.name, style: const TextStyle(fontSize: 13)),
+                  ))
+              .toList(),
+          onChanged: (value) => setState(() => _selectedFarm = value),
+        );
+      },
+    );
+  }
+
   Widget _buildPigTypeDropdown() {
     return StreamBuilder<List<PigTypeEntity>>(
       stream: sl<IPigTypeRepository>().watchPigTypes(),
@@ -839,13 +899,11 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         return DropdownButtonFormField<PigTypeEntity?>(
           value: selected,
           decoration: InputDecoration(
-            labelText: 'Loại heo',
-            labelStyle: const TextStyle(fontSize: 12),
             prefixIcon: const Icon(Icons.pets, size: 18),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
             isDense: true,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           ),
           style: const TextStyle(fontSize: 13, color: Colors.black),
           items: types
@@ -905,9 +963,15 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
   }
 
   Widget _buildInventoryContainer(int qty) {
-    return _buildCompactField(
-      'Tồn kho',
-      Text(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        border: Border.all(color: Colors.green.shade200),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      alignment: Alignment.centerLeft,
+      child: Text(
         '$qty con',
         style: TextStyle(
           fontSize: 13,
@@ -915,7 +979,6 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
           color: Colors.green[700],
         ),
       ),
-      bgColor: Colors.green.shade50,
     );
   }
 
@@ -926,13 +989,10 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
       style: const TextStyle(fontSize: 13),
       onChanged: (_) => setState(() {}),
       decoration: InputDecoration(
-        labelText: 'Số lượng',
-        labelStyle: const TextStyle(fontSize: 12),
         prefixIcon: const Icon(Icons.format_list_numbered, size: 18),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         suffixIcon: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1069,8 +1129,9 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         );
 
     // Update invoice info - Chỉ lưu thông tin cơ bản (không tính tiền)
-    final note = _farmNameController.text.isNotEmpty
-        ? 'Trại: ${_farmNameController.text}${_noteController.text.isNotEmpty ? ' | ${_noteController.text}' : ''}'
+    final farmName = _selectedFarm?.name ?? '';
+    final note = farmName.isNotEmpty
+        ? 'Trại: $farmName${_noteController.text.isNotEmpty ? ' | ${_noteController.text}' : ''}'
         : _noteController.text;
 
     context.read<WeighingBloc>().add(
@@ -1096,12 +1157,12 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     _pigTypeController.clear();
     _priceController.clear();
     _quantityController.text = '1';
-    _farmNameController.clear();
     _farmWeightController.clear();
     _transportFeeController.text = '0';
     _paymentAmountController.clear();
     setState(() {
       _selectedPartner = null;
+      _selectedFarm = null;
       _selectedInvoice = null;
       _isEditMode = false;
       _totalMarketWeight = 0;
@@ -1168,8 +1229,8 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                 currentDebt: 0),
       );
 
-      // Load form fields
-      _farmNameController.text = farmName;
+      // Load form fields - Note: farmName will be matched to dropdown later
+      _selectedFarm = null; // Reset, user needs to select again
       _noteController.text = otherNote;
       _pigTypeController.text = pigType;
       _batchNumberController.text = batchNumber;
@@ -1208,8 +1269,9 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
       final pigType = _pigTypeController.text.trim();
 
       // Build note
-      final note = _farmNameController.text.isNotEmpty
-          ? 'Trại: ${_farmNameController.text}${_noteController.text.isNotEmpty ? ' | ${_noteController.text}' : ''}'
+      final farmName = _selectedFarm?.name ?? '';
+      final note = farmName.isNotEmpty
+          ? 'Trại: $farmName${_noteController.text.isNotEmpty ? ' | ${_noteController.text}' : ''}'
           : _noteController.text;
 
       // Calculate payment amount
