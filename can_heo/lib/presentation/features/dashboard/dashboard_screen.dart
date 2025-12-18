@@ -10,6 +10,7 @@ import '../history/invoice_history_screen.dart';
 import '../partners/partners_screen.dart';
 import '../pig_types/pig_types_screen.dart';
 import '../finance/finance_screen.dart';
+import 'widgets/overview_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -120,7 +121,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildBody(int index) {
     switch (index) {
       case 0:
-        return const Center(child: Text("Màn hình Thống kê (Coming Soon)"));
+        return const OverviewScreen(); // Màn hình Tổng quan
       case 1:
         return const ImportBarnScreen(); // Màn hình Nhập Kho
       case 2:

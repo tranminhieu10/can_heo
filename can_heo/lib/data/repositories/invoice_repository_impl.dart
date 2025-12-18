@@ -27,37 +27,33 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
       fromDate = start;
     }
 
-    // We need to include at least the first detail (batch/pigType) so UI can show
-    // Số lô / Loại heo in the saved-invoices grid. Use asyncMap so we can
-    // fetch the first weighing detail per invoice.
+    // Fetch ALL weighing details for proper filtering (e.g., by pigType, batchNumber)
     return _db.invoicesDao
         .watchInvoicesFiltered(
-          type: type,
-          keyword: keyword,
-          fromDate: fromDate,
-        )
+      type: type,
+      keyword: keyword,
+      fromDate: fromDate,
+    )
         .asyncMap((rows) async {
       final results = <InvoiceEntity>[];
       for (final row in rows) {
-        // Try to read the first detail (sequence asc) for this invoice
-        final firstDetail = await (_db.select(_db.weighingDetails)
+        // Get ALL weighing details for this invoice (not just first one)
+        final allDetails = await (_db.select(_db.weighingDetails)
               ..where((t) => t.invoiceId.equals(row.invoice.id))
-              ..orderBy([(t) => OrderingTerm.asc(t.sequence)])
-              ..limit(1))
-            .getSingleOrNull();
+              ..orderBy([(t) => OrderingTerm.asc(t.sequence)]))
+            .get();
 
-        final details = <WeighingItemEntity>[];
-        if (firstDetail != null) {
-          details.add(WeighingItemEntity(
-            id: firstDetail.id,
-            sequence: firstDetail.sequence,
-            weight: firstDetail.weight,
-            quantity: firstDetail.quantity,
-            time: firstDetail.weighingTime,
-            batchNumber: firstDetail.batchNumber,
-            pigType: firstDetail.pigType,
-          ));
-        }
+        final details = allDetails
+            .map((d) => WeighingItemEntity(
+                  id: d.id,
+                  sequence: d.sequence,
+                  weight: d.weight,
+                  quantity: d.quantity,
+                  time: d.weighingTime,
+                  batchNumber: d.batchNumber,
+                  pigType: d.pigType,
+                ))
+            .toList();
 
         results.add(InvoiceEntity(
           id: row.invoice.id,
@@ -147,7 +143,8 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
         totalWeight: Value(invoice.totalWeight),
         totalQuantity: Value(invoice.totalQuantity),
         pricePerKg: Value(invoice.pricePerKg),
-        truckCost: Value(invoice.deduction), // Store deduction (farmWeight for import) directly
+        truckCost: Value(invoice
+            .deduction), // Store deduction (farmWeight for import) directly
         discount: Value(invoice.discount),
         finalAmount: Value(invoice.finalAmount),
         paidAmount: Value(invoice.paidAmount),
@@ -201,14 +198,17 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
     debugPrint('deduction: ${invoice.deduction}');
     debugPrint('discount: ${invoice.discount}');
     debugPrint('finalAmount: ${invoice.finalAmount}');
-    
-    final rowsAffected = await (_db.update(_db.invoices)..where((t) => t.id.equals(invoice.id))).write(
+
+    final rowsAffected = await (_db.update(_db.invoices)
+          ..where((t) => t.id.equals(invoice.id)))
+        .write(
       InvoicesCompanion(
         partnerId: Value(invoice.partnerId),
         totalWeight: Value(invoice.totalWeight),
         totalQuantity: Value(invoice.totalQuantity),
         pricePerKg: Value(invoice.pricePerKg),
-        truckCost: Value(invoice.deduction), // Store deduction (farmWeight) directly
+        truckCost:
+            Value(invoice.deduction), // Store deduction (farmWeight) directly
         discount: Value(invoice.discount),
         finalAmount: Value(invoice.finalAmount),
         paidAmount: Value(invoice.paidAmount),
@@ -224,8 +224,10 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
     debugPrint('Updating item ID: ${item.id}');
     debugPrint('pigType: ${item.pigType}');
     debugPrint('weight: ${item.weight}');
-    
-    final rowsAffected = await (_db.update(_db.weighingDetails)..where((t) => t.id.equals(item.id))).write(
+
+    final rowsAffected = await (_db.update(_db.weighingDetails)
+          ..where((t) => t.id.equals(item.id)))
+        .write(
       WeighingDetailsCompanion(
         weight: Value(item.weight),
         quantity: Value(item.quantity),
@@ -241,8 +243,8 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
     if (pigType.isEmpty) return Stream.value(0);
 
     final query = _db.select(_db.weighingDetails).join([
-      innerJoin(
-          _db.invoices, _db.invoices.id.equalsExp(_db.weighingDetails.invoiceId))
+      innerJoin(_db.invoices,
+          _db.invoices.id.equalsExp(_db.weighingDetails.invoiceId))
     ])
       ..where(_db.weighingDetails.pigType.equals(pigType));
 
@@ -253,11 +255,15 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
       for (final row in rows) {
         final invoice = row.readTable(_db.invoices);
         final detail = row.readTable(_db.weighingDetails);
-        if (invoice.type == 0) {
+        if (invoice.type == 0 || invoice.type == 3) {
+          // Type 0 = Nhập kho từ NCC
+          // Type 3 = Nhập chợ (hàng trả về từ chợ)
           imported += detail.quantity;
         } else if (invoice.type == 2) {
+          // Type 2 = Xuất chợ (bán hàng)
           exported += detail.quantity;
         }
+        // Type 1 = Xuất kho (trả hàng NCC) - không ảnh hưởng tồn kho vì đã bị trừ khi nhập
       }
       return imported - exported;
     });
@@ -266,28 +272,37 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
   @override
   Future<String> generateInvoiceCode(int type) async {
     final now = DateTime.now();
-    final dateStr = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    final prefix = type == 0 ? 'NK' : 'XC'; // NK = Nhập Kho, XC = Xuất Chợ
-    
+    final dateStr =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    // Type: 0=Nhập Kho, 1=Xuất Kho, 2=Xuất Chợ, 3=Nhập Chợ
+    final prefix = switch (type) {
+      0 => 'NK', // Nhập Kho
+      1 => 'XK', // Xuất Kho
+      2 => 'XC', // Xuất Chợ
+      3 => 'NC', // Nhập Chợ
+      _ => 'XX', // Unknown
+    };
+
     // Đếm số phiếu cùng loại trong ngày (chỉ đếm phiếu gốc, không đếm chiết khấu/trả nợ)
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    
+
     final query = _db.select(_db.invoices)
-      ..where((tbl) => tbl.type.equals(type) & 
-                       tbl.createdDate.isBiggerOrEqualValue(startOfDay) &
-                       tbl.createdDate.isSmallerThanValue(endOfDay));
-    
+      ..where((tbl) =>
+          tbl.type.equals(type) &
+          tbl.createdDate.isBiggerOrEqualValue(startOfDay) &
+          tbl.createdDate.isSmallerThanValue(endOfDay));
+
     final todayInvoices = await query.get();
-    
+
     // Chỉ đếm phiếu có invoiceCode (phiếu gốc), không đếm phiếu chiết khấu/trả nợ
     final originalInvoices = todayInvoices.where((inv) {
       final note = inv.note ?? '';
       return !note.contains('[TRẢ NỢ]') && !note.contains('[CHIẾT KHẤU]');
     }).toList();
-    
+
     final count = originalInvoices.length + 1;
-    
+
     return '$dateStr-$prefix${count.toString().padLeft(2, '0')}';
   }
 }

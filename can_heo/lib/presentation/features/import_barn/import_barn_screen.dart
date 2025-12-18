@@ -124,6 +124,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
   double get _farmWeight =>
       double.tryParse(_farmWeightController.text.replaceAll(',', '')) ?? 0;
   double get _marketWeight => _totalMarketWeight;
+  double get _diffWeight => (_farmWeight - _marketWeight).clamp(0, double.infinity); // Chênh lệch
   double get _pricePerKg =>
       double.tryParse(_priceController.text.replaceAll(',', '')) ?? 0;
   double get _subtotal => _marketWeight * _pricePerKg; // Thành tiền
@@ -525,34 +526,33 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  // Row 2: Loại heo + Tồn kho + Số lô
+                  // Row 2: Số lô + Loại heo + Số lượng+Tồn kho
                   _buildRowLabels(
-                      ['Loại heo', 'Tồn kho', 'Số lô'], [null, null, null]),
+                      ['Số lô', 'Loại heo', 'Số lượng + Tồn kho'], [null, null, null]),
                   Expanded(
                     child: Row(
                       children: [
-                        Expanded(child: _buildPigTypeDropdown()),
-                        const SizedBox(width: 4),
-                        Expanded(child: _buildInventoryDisplayField()),
-                        const SizedBox(width: 4),
                         Expanded(
                           child: _buildSimpleTextField(_batchNumberController),
                         ),
+                        const SizedBox(width: 4),
+                        Expanded(child: _buildPigTypeDropdown()),
+                        const SizedBox(width: 4),
+                        Expanded(child: _buildQuantityWithInventoryField()),
                       ],
                     ),
                   ),
                   const SizedBox(height: 2),
-                  // Row 3: Số lượng + TL Trại + TL Chợ
+                  // Row 3: TL Trại + TL Chợ + Chênh lệch
                   _buildRowLabels(
-                      ['Số lượng', 'TL Trại', 'TL Chợ'], [null, null, null]),
+                      ['TL Trại', 'TL Chợ', 'Chênh lệch'], [null, null, null]),
                   Expanded(
                     child: Row(
                       children: [
-                        Expanded(child: _buildQuantityFieldWithButtons()),
-                        const SizedBox(width: 4),
                         Expanded(
                           child: _buildSimpleTextField(_farmWeightController,
-                              isDecimal: true),
+                              isDecimal: true,
+                              onChanged: (_) => setState(() {})),
                         ),
                         const SizedBox(width: 4),
                         Expanded(
@@ -563,6 +563,26 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                               final weight = double.tryParse(value) ?? 0;
                               setState(() => _totalMarketWeight = weight);
                             },
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _diffWeight > 0 ? Colors.red.shade50 : Colors.grey.shade100,
+                              border: Border.all(color: _diffWeight > 0 ? Colors.red.shade300 : Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _numberFormat.format(_diffWeight),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: _diffWeight > 0 ? Colors.red.shade700 : Colors.grey.shade600,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -696,7 +716,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
   }
 
   Widget _buildFormRow2() {
-    // Row 2: Tên Trại, Số lô
+    // Row 2: Tên Trại, Loại heo
     return Row(
       children: [
         Expanded(
@@ -709,23 +729,23 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildCompactTextField(
-            'Số lô',
-            _batchNumberController,
-            hintText: 'Số lô',
-            icon: Icons.numbers,
-          ),
+          child: _buildPigTypeDropdown(),
         ),
       ],
     );
   }
 
   Widget _buildFormRow3() {
-    // Row 3: Loại heo, Tồn kho
+    // Row 3: Số lô, Tồn kho
     return Row(
       children: [
         Expanded(
-          child: _buildPigTypeDropdown(),
+          child: _buildCompactTextField(
+            'Số lô',
+            _batchNumberController,
+            hintText: 'Số lô',
+            icon: Icons.numbers,
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -736,7 +756,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
   }
 
   Widget _buildFormRow4() {
-    // Row 4: Số lượng, TL Trại, TL Chợ (nhập trực tiếp)
+    // Row 4: Số lượng, TL Trại, TL Chợ, Chênh lệch
     return Row(
       children: [
         Expanded(
@@ -750,6 +770,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
             hintText: 'TL từ NCC',
             isDecimal: true,
             icon: Icons.scale,
+            onChanged: (_) => setState(() {}),
           ),
         ),
         const SizedBox(width: 8),
@@ -764,6 +785,22 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
               final weight = double.tryParse(value) ?? 0;
               setState(() => _totalMarketWeight = weight);
             },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildCompactField(
+            'Chênh lệch (kg)',
+            Text(
+              _numberFormat.format(_diffWeight),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: _diffWeight > 0 ? Colors.red.shade700 : Colors.grey.shade600,
+              ),
+            ),
+            icon: Icons.compare_arrows,
+            bgColor: _diffWeight > 0 ? Colors.red.shade50 : Colors.grey.shade100,
           ),
         ),
       ],
@@ -979,6 +1016,109 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
           color: Colors.green[700],
         ),
       ),
+    );
+  }
+
+  // Widget kết hợp Số lượng + Tồn kho
+  Widget _buildQuantityWithInventoryField() {
+    final pigType = _pigTypeController.text.trim();
+    
+    return StreamBuilder<List<List<InvoiceEntity>>>(
+      stream: Rx.combineLatest2(
+        _invoiceRepo.watchInvoices(type: 0),
+        _invoiceRepo.watchInvoices(type: 2),
+        (List<InvoiceEntity> imports, List<InvoiceEntity> exports) =>
+            [imports, exports],
+      ),
+      builder: (context, snapshot) {
+        int availableQty = 0;
+        
+        if (snapshot.hasData && pigType.isNotEmpty) {
+          final importSnap = snapshot.data![0];
+          final exportSnap = snapshot.data![1];
+          int imported = 0;
+          int exported = 0;
+          
+          for (final inv in importSnap) {
+            for (final item in inv.details) {
+              if ((item.pigType ?? '').trim() == pigType)
+                imported += item.quantity;
+            }
+          }
+          for (final inv in exportSnap) {
+            for (final item in inv.details) {
+              if ((item.pigType ?? '').trim() == pigType)
+                exported += item.quantity;
+            }
+          }
+          availableQty = imported - exported;
+        }
+
+        return Row(
+          children: [
+            // Số lượng input (2/3 width)
+            Expanded(
+              flex: 2,
+              child: TextField(
+                controller: _quantityController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(fontSize: 13),
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.format_list_numbered, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  suffixIcon: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      InkWell(
+                        onTap: () {
+                          final current = int.tryParse(_quantityController.text) ?? 1;
+                          setState(() => _quantityController.text = '${current + 1}');
+                        },
+                        child: const Icon(Icons.keyboard_arrow_up, size: 18),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          final current = int.tryParse(_quantityController.text) ?? 1;
+                          if (current > 1) {
+                            setState(() => _quantityController.text = '${current - 1}');
+                          }
+                        },
+                        child: const Icon(Icons.keyboard_arrow_down, size: 18),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            // Tồn kho display (1/3 width)
+            Expanded(
+              flex: 1,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  border: Border.all(color: Colors.green.shade200),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$availableQty',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green[700],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1635,7 +1775,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                         DataColumn(label: Text('SL')),
                         DataColumn(label: Text('TL Trại')),
                         DataColumn(label: Text('TL Chợ')),
-                        DataColumn(label: Text('Hao hụt')),
+                        DataColumn(label: Text('Chênh lệch')),
                         DataColumn(label: Text('Đơn giá')),
                         DataColumn(label: Text('Thành tiền')),
                         DataColumn(label: Text('Cước xe')),

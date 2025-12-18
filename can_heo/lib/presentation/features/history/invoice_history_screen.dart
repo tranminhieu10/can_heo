@@ -36,30 +36,92 @@ class _InvoiceHistoryView extends StatefulWidget {
 
 class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
   final _searchController = TextEditingController();
+  final _pigTypeController = TextEditingController();
+  final _batchNumberController = TextEditingController();
+  final _minWeightController = TextEditingController();
+  final _maxWeightController = TextEditingController();
+  final _minAmountController = TextEditingController();
+  final _maxAmountController = TextEditingController();
+
   int? _daysFilter; // null = tất cả
   Timer? _debounce;
+  bool _showAdvancedFilters = false;
+  int _selectedType = 2; // Mặc định Xuất chợ
+
+  @override
+  void initState() {
+    super.initState();
+    // Lấy type từ widget ban đầu
+    _selectedType = (context.read<InvoiceHistoryBloc>().state as dynamic)
+            .toString()
+            .contains('type')
+        ? context.read<InvoiceHistoryBloc>().state.hashCode
+        : 2;
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _pigTypeController.dispose();
+    _batchNumberController.dispose();
+    _minWeightController.dispose();
+    _maxWeightController.dispose();
+    _minAmountController.dispose();
+    _maxAmountController.dispose();
     _debounce?.cancel();
     super.dispose();
   }
 
-  // Gửi event lọc xuống Bloc với debounce
+  // Áp dụng bộ lọc ngay lập tức (không debounce)
+  void _applyFilter() {
+    context.read<InvoiceHistoryBloc>().add(
+          FilterInvoices(
+            keyword: _searchController.text.trim().isEmpty
+                ? null
+                : _searchController.text.trim(),
+            daysFilter: _daysFilter,
+            pigType: _pigTypeController.text.trim().isEmpty
+                ? null
+                : _pigTypeController.text.trim(),
+            batchNumber: _batchNumberController.text.trim().isEmpty
+                ? null
+                : _batchNumberController.text.trim(),
+            minWeight: _minWeightController.text.trim().isEmpty
+                ? null
+                : double.tryParse(_minWeightController.text.trim()),
+            maxWeight: _maxWeightController.text.trim().isEmpty
+                ? null
+                : double.tryParse(_maxWeightController.text.trim()),
+            minAmount: _minAmountController.text.trim().isEmpty
+                ? null
+                : double.tryParse(_minAmountController.text.trim()),
+            maxAmount: _maxAmountController.text.trim().isEmpty
+                ? null
+                : double.tryParse(_maxAmountController.text.trim()),
+          ),
+        );
+  }
+
+  // Gửi event lọc xuống Bloc với debounce (tự động)
   void _onFilterChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-
     _debounce = Timer(const Duration(milliseconds: 400), () {
-      context.read<InvoiceHistoryBloc>().add(
-            FilterInvoices(
-              keyword: _searchController.text.trim().isEmpty
-                  ? null
-                  : _searchController.text.trim(),
-              daysFilter: _daysFilter,
-            ),
-          );
+      _applyFilter();
     });
+  }
+
+  void _clearAllFilters() {
+    setState(() {
+      _searchController.clear();
+      _pigTypeController.clear();
+      _batchNumberController.clear();
+      _minWeightController.clear();
+      _maxWeightController.clear();
+      _minAmountController.clear();
+      _maxAmountController.clear();
+      _daysFilter = null;
+    });
+    _applyFilter(); // Áp dụng ngay sau khi xóa
   }
 
   Future<void> _exportExcel(BuildContext context) async {
@@ -91,6 +153,22 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
         title: const Text('Lịch sử phiếu'),
         actions: [
           IconButton(
+            tooltip: 'Bộ lọc nâng cao',
+            icon: Icon(_showAdvancedFilters
+                ? Icons.filter_alt
+                : Icons.filter_alt_outlined),
+            onPressed: () {
+              setState(() {
+                _showAdvancedFilters = !_showAdvancedFilters;
+              });
+            },
+          ),
+          IconButton(
+            tooltip: 'Xóa tất cả bộ lọc',
+            icon: const Icon(Icons.clear_all),
+            onPressed: _clearAllFilters,
+          ),
+          IconButton(
             tooltip: 'Xuất Excel',
             icon: const Icon(Icons.download),
             onPressed: () => _exportExcel(context),
@@ -99,10 +177,30 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
       ),
       body: Column(
         children: [
+          // Tabs chọn loại phiếu
+          Container(
+            color: Colors.grey[200],
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildTypeTab(0, 'Nhập kho', Icons.input),
+                ),
+                Expanded(
+                  child: _buildTypeTab(1, 'Xuất kho', Icons.outbox),
+                ),
+                Expanded(
+                  child: _buildTypeTab(2, 'Xuất chợ', Icons.storefront),
+                ),
+                Expanded(
+                  child: _buildTypeTab(3, 'Nhập chợ', Icons.shopping_basket),
+                ),
+              ],
+            ),
+          ),
           _buildFilterBar(context),
+          if (_showAdvancedFilters) _buildAdvancedFilterBar(context),
           Expanded(
-            child:
-                BlocBuilder<InvoiceHistoryBloc, InvoiceHistoryState>(
+            child: BlocBuilder<InvoiceHistoryBloc, InvoiceHistoryState>(
               builder: (context, state) {
                 if (state.status == HistoryStatus.loading) {
                   return const Center(child: CircularProgressIndicator());
@@ -128,6 +226,49 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
     );
   }
 
+  Widget _buildTypeTab(int type, String label, IconData icon) {
+    final isSelected = _selectedType == type;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedType = type;
+        });
+        context.read<InvoiceHistoryBloc>().add(LoadInvoices(type));
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue : Colors.transparent,
+          border: Border(
+            bottom: BorderSide(
+              color: isSelected ? Colors.blue : Colors.transparent,
+              width: 3,
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.grey[700],
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey[700],
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilterBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -140,6 +281,9 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
               decoration: const InputDecoration(
                 hintText: 'Tìm theo khách hàng hoặc mã phiếu...',
                 prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               onChanged: (_) => _onFilterChanged(),
             ),
@@ -151,25 +295,15 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
               value: _daysFilter,
               decoration: const InputDecoration(
                 labelText: 'Thời gian',
-                isDense: true,
+                border: OutlineInputBorder(),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               items: const [
-                DropdownMenuItem(
-                  value: null,
-                  child: Text('Tất cả'),
-                ),
-                DropdownMenuItem(
-                  value: 0,
-                  child: Text('Hôm nay'),
-                ),
-                DropdownMenuItem(
-                  value: 7,
-                  child: Text('7 ngày qua'),
-                ),
-                DropdownMenuItem(
-                  value: 30,
-                  child: Text('30 ngày qua'),
-                ),
+                DropdownMenuItem(value: null, child: Text('Tất cả')),
+                DropdownMenuItem(value: 0, child: Text('Hôm nay')),
+                DropdownMenuItem(value: 7, child: Text('7 ngày qua')),
+                DropdownMenuItem(value: 30, child: Text('30 ngày qua')),
               ],
               onChanged: (value) {
                 setState(() => _daysFilter = value);
@@ -182,10 +316,164 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
     );
   }
 
+  Widget _buildAdvancedFilterBar(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.filter_list, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Bộ lọc nâng cao',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _pigTypeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Loại heo',
+                    hintText: 'VD: Nái, Thịt...',
+                    prefixIcon: Icon(Icons.pets, size: 18),
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  onChanged: (_) => _onFilterChanged(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _batchNumberController,
+                  decoration: const InputDecoration(
+                    labelText: 'Số lô',
+                    hintText: 'VD: LOT001...',
+                    prefixIcon: Icon(Icons.qr_code, size: 18),
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  onChanged: (_) => _onFilterChanged(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _minWeightController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Khối lượng từ (kg)',
+                    prefixIcon: Icon(Icons.scale, size: 18),
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  onChanged: (_) => _onFilterChanged(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _maxWeightController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Khối lượng đến (kg)',
+                    prefixIcon: Icon(Icons.scale, size: 18),
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  onChanged: (_) => _onFilterChanged(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _minAmountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Giá trị từ (đ)',
+                    prefixIcon: Icon(Icons.attach_money, size: 18),
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  onChanged: (_) => _onFilterChanged(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _maxAmountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Giá trị đến (đ)',
+                    prefixIcon: Icon(Icons.attach_money, size: 18),
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  onChanged: (_) => _onFilterChanged(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Nút tìm kiếm
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _clearAllFilters,
+                icon: const Icon(Icons.clear, size: 18),
+                label: const Text('Xóa bộ lọc'),
+                style: OutlinedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: _applyFilter,
+                icon: const Icon(Icons.search, size: 18),
+                label: const Text('Tìm kiếm'),
+                style: ElevatedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildList(BuildContext context, List<InvoiceEntity> invoices) {
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
-    final currencyFormat =
-        NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
+    final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
     return ListView.separated(
       padding: const EdgeInsets.all(16),
@@ -200,8 +488,7 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) =>
-                      InvoiceDetailScreen(invoiceId: invoice.id),
+                  builder: (_) => InvoiceDetailScreen(invoiceId: invoice.id),
                 ),
               );
             },
@@ -213,8 +500,7 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           invoice.partnerName ?? 'Khách lẻ',
@@ -281,7 +567,8 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
       final canDelete = await _canDeleteImportInvoice(invoice);
       if (!canDelete) {
         if (context.mounted) {
-          String pigTypes = invoice.details.map((d) => d.pigType ?? 'N/A').toSet().join(', ');
+          String pigTypes =
+              invoice.details.map((d) => d.pigType ?? 'N/A').toSet().join(', ');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -295,7 +582,7 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
         return;
       }
     }
-    
+
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -340,7 +627,8 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
       for (final item in invoice.details) {
         final pigType = (item.pigType ?? '').trim();
         if (pigType.isNotEmpty) {
-          invoicePigTypes[pigType] = (invoicePigTypes[pigType] ?? 0) + item.quantity;
+          invoicePigTypes[pigType] =
+              (invoicePigTypes[pigType] ?? 0) + item.quantity;
         }
       }
 
