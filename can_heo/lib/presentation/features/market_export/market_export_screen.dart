@@ -1128,7 +1128,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildRowLabelsRow2() {
-    // Row 2 labels: Số lô + Loại heo + (Tồn kho | Số lượng)
+    // Row 2 labels: Số lô + Loại heo + (Tồn chợ | Số lượng)
     return Row(
       children: [
         // Số lô
@@ -1155,13 +1155,13 @@ class _MarketExportViewState extends State<_MarketExportView> {
           ),
         ),
         const SizedBox(width: 8),
-        // Tồn kho + Số lượng
+        // Tồn chợ + Số lượng
         Expanded(
           child: Row(
             children: const [
               Expanded(
                 child: Text(
-                  'Tồn kho',
+                  'Tồn chợ',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
@@ -1640,39 +1640,39 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
     return RepaintBoundary(
       child: StreamBuilder<List<InvoiceEntity>>(
-        stream: _invoiceRepo.watchInvoices(type: 0),
-        builder: (context, importSnap) {
-          if (!importSnap.hasData) {
+        stream: _invoiceRepo.watchInvoices(type: 3),
+        builder: (context, marketImportSnap) {
+          if (!marketImportSnap.hasData) {
             return _buildInventoryContainerCompact(0, true);
           }
 
           return StreamBuilder<List<InvoiceEntity>>(
             stream: _invoiceRepo.watchInvoices(type: 2),
-            builder: (context, exportSnap) {
-              if (!exportSnap.hasData) {
+            builder: (context, marketExportSnap) {
+              if (!marketExportSnap.hasData) {
                 return _buildInventoryContainerCompact(0, true);
               }
 
-              int imported = 0;
-              int exported = 0;
+              int marketImported = 0;
+              int marketExported = 0;
 
-              for (final inv in importSnap.data!) {
+              for (final inv in marketImportSnap.data!) {
                 for (final item in inv.details) {
                   if ((item.pigType ?? '').trim() == pigType) {
-                    imported += item.quantity;
+                    marketImported += item.quantity;
                   }
                 }
               }
 
-              for (final inv in exportSnap.data!) {
+              for (final inv in marketExportSnap.data!) {
                 for (final item in inv.details) {
                   if ((item.pigType ?? '').trim() == pigType) {
-                    exported += item.quantity;
+                    marketExported += item.quantity;
                   }
                 }
               }
 
-              final availableQty = imported - exported;
+              final availableQty = marketImported - marketExported;
               final requestedQty = int.tryParse(_quantityController.text) ?? 0;
               final isValid = requestedQty <= availableQty;
 
@@ -2148,39 +2148,39 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
     return RepaintBoundary(
       child: StreamBuilder<List<InvoiceEntity>>(
-        stream: _invoiceRepo.watchInvoices(type: 0),
-        builder: (context, importSnap) {
-          if (!importSnap.hasData) {
+        stream: _invoiceRepo.watchInvoices(type: 3),
+        builder: (context, marketImportSnap) {
+          if (!marketImportSnap.hasData) {
             return _buildInventoryContainer(0, true);
           }
 
           return StreamBuilder<List<InvoiceEntity>>(
             stream: _invoiceRepo.watchInvoices(type: 2),
-            builder: (context, exportSnap) {
-              if (!exportSnap.hasData) {
+            builder: (context, marketExportSnap) {
+              if (!marketExportSnap.hasData) {
                 return _buildInventoryContainer(0, true);
               }
 
-              int imported = 0;
-              int exported = 0;
+              int marketImported = 0;
+              int marketExported = 0;
 
-              for (final inv in importSnap.data!) {
+              for (final inv in marketImportSnap.data!) {
                 for (final item in inv.details) {
                   if ((item.pigType ?? '').trim() == pigType) {
-                    imported += item.quantity;
+                    marketImported += item.quantity;
                   }
                 }
               }
 
-              for (final inv in exportSnap.data!) {
+              for (final inv in marketExportSnap.data!) {
                 for (final item in inv.details) {
                   if ((item.pigType ?? '').trim() == pigType) {
-                    exported += item.quantity;
+                    marketExported += item.quantity;
                   }
                 }
               }
 
-              final availableQty = imported - exported;
+              final availableQty = marketImported - marketExported;
               final requestedQty = int.tryParse(_quantityController.text) ?? 0;
               final isValid = requestedQty <= availableQty;
 
@@ -2209,7 +2209,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Tồn kho',
+            'Tồn chợ',
             style: TextStyle(
               fontSize: 10,
               color: isValid ? Colors.green[700] : Colors.red[700],
@@ -2482,7 +2482,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 child: Row(
                   children: [
                     Text(
-                      'PHIẾU XUẤT ĐÃ LƯU (${invoices.length})',
+                      '📋PHIẾU XUẤT ĐÃ LƯU (${invoices.length})',
                       style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,

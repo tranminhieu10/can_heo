@@ -66,6 +66,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
       TextEditingController(text: '0');
   final TextEditingController _paymentAmountController =
       TextEditingController();
+  final TextEditingController _cageController = TextEditingController();
 
   // Controllers for action row below saved invoices
   final TextEditingController _debtPaymentController = TextEditingController();
@@ -114,6 +115,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     _farmWeightController.dispose();
     _transportFeeController.dispose();
     _paymentAmountController.dispose();
+    _cageController.dispose();
     _debtPaymentController.dispose();
     _discountController.dispose();
     _scaleInputFocus.dispose();
@@ -124,7 +126,8 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
   double get _farmWeight =>
       double.tryParse(_farmWeightController.text.replaceAll(',', '')) ?? 0;
   double get _marketWeight => _totalMarketWeight;
-  double get _diffWeight => (_farmWeight - _marketWeight).clamp(0, double.infinity); // Chênh lệch
+  double get _diffWeight =>
+      (_farmWeight - _marketWeight).clamp(0, double.infinity); // Chênh lệch
   double get _pricePerKg =>
       double.tryParse(_priceController.text.replaceAll(',', '')) ?? 0;
   double get _subtotal => _marketWeight * _pricePerKg; // Thành tiền
@@ -508,11 +511,12 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                                         ))
                                     .toList(),
                                 onChanged: (value) {
-                                    setState(() {
-                                      _selectedPartner = value;
-                                      _selectedFarm = null; // Reset farm when partner changes
-                                    });
-                                  },
+                                  setState(() {
+                                    _selectedPartner = value;
+                                    _selectedFarm =
+                                        null; // Reset farm when partner changes
+                                  });
+                                },
                               );
                             },
                           ),
@@ -526,9 +530,29 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  // Row 2: Số lô + Loại heo + Số lượng+Tồn kho
+                  // Row 2: Loại heo + Số lượng + Tồn kho/Tồn chợ
+                  _buildRowLabels(['Loại heo', 'Số lượng', 'Tồn kho / Tồn chợ'],
+                      [null, null, null]),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(child: _buildPigTypeDropdown()),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: _buildSimpleTextField(_quantityController,
+                              isDecimal: false),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: _buildCombinedInventoryDisplayField(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  // Row 3: Số lô + Chuồng + TL Trại
                   _buildRowLabels(
-                      ['Số lô', 'Loại heo', 'Số lượng + Tồn kho'], [null, null, null]),
+                      ['Số lô', 'Chuồng', 'TL Trại'], [null, null, null]),
                   Expanded(
                     child: Row(
                       children: [
@@ -536,25 +560,25 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                           child: _buildSimpleTextField(_batchNumberController),
                         ),
                         const SizedBox(width: 4),
-                        Expanded(child: _buildPigTypeDropdown()),
+                        Expanded(
+                          child: _buildSimpleTextField(_cageController),
+                        ),
                         const SizedBox(width: 4),
-                        Expanded(child: _buildQuantityWithInventoryField()),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  // Row 3: TL Trại + TL Chợ + Chênh lệch
-                  _buildRowLabels(
-                      ['TL Trại', 'TL Chợ', 'Chênh lệch'], [null, null, null]),
-                  Expanded(
-                    child: Row(
-                      children: [
                         Expanded(
                           child: _buildSimpleTextField(_farmWeightController,
                               isDecimal: true,
                               onChanged: (_) => setState(() {})),
                         ),
-                        const SizedBox(width: 4),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  // Row 4: TL Chợ + Chênh lệch + Ghi chú
+                  _buildRowLabels(
+                      ['TL Chợ', 'Chênh lệch', 'Ghi chú'], [null, null, null]),
+                  Expanded(
+                    child: Row(
+                      children: [
                         Expanded(
                           child: _buildSimpleTextField(
                             _scaleInputController,
@@ -568,10 +592,16 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 10),
                             decoration: BoxDecoration(
-                              color: _diffWeight > 0 ? Colors.red.shade50 : Colors.grey.shade100,
-                              border: Border.all(color: _diffWeight > 0 ? Colors.red.shade300 : Colors.grey.shade300),
+                              color: _diffWeight > 0
+                                  ? Colors.red.shade50
+                                  : Colors.grey.shade100,
+                              border: Border.all(
+                                  color: _diffWeight > 0
+                                      ? Colors.red.shade300
+                                      : Colors.grey.shade300),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             alignment: Alignment.centerLeft,
@@ -580,19 +610,19 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
-                                color: _diffWeight > 0 ? Colors.red.shade700 : Colors.grey.shade600,
+                                color: _diffWeight > 0
+                                    ? Colors.red.shade700
+                                    : Colors.grey.shade600,
                               ),
                             ),
                           ),
                         ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: _buildSimpleTextField(_noteController),
+                        ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  // Row 4: Ghi chú
-                  _buildRowLabels(['Ghi chú'], [null]),
-                  Expanded(
-                    child: _buildSimpleTextField(_noteController),
                   ),
                 ],
               ),
@@ -736,7 +766,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
   }
 
   Widget _buildFormRow3() {
-    // Row 3: Số lô, Tồn kho
+    // Row 3: Số lô, Tồn kho, Tồn chợ
     return Row(
       children: [
         Expanded(
@@ -750,6 +780,10 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         const SizedBox(width: 8),
         Expanded(
           child: _buildInventoryDisplayField(),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildMarketInventoryDisplayField(),
         ),
       ],
     );
@@ -796,11 +830,14 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
-                color: _diffWeight > 0 ? Colors.red.shade700 : Colors.grey.shade600,
+                color: _diffWeight > 0
+                    ? Colors.red.shade700
+                    : Colors.grey.shade600,
               ),
             ),
             icon: Icons.compare_arrows,
-            bgColor: _diffWeight > 0 ? Colors.red.shade50 : Colors.grey.shade100,
+            bgColor:
+                _diffWeight > 0 ? Colors.red.shade50 : Colors.grey.shade100,
           ),
         ),
       ],
@@ -896,7 +933,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
       stream: _farmRepo.watchFarmsByPartner(_selectedPartner!.id),
       builder: (context, snapshot) {
         final farms = snapshot.data ?? [];
-        
+
         // Kiểm tra xem farm đã chọn còn trong list không
         final safeValue = farms.contains(_selectedFarm) ? _selectedFarm : null;
 
@@ -908,13 +945,15 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
             hintStyle: const TextStyle(fontSize: 13),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
             isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           ),
           style: const TextStyle(fontSize: 13, color: Colors.black),
           items: farms
               .map((farm) => DropdownMenuItem(
                     value: farm,
-                    child: Text(farm.name, style: const TextStyle(fontSize: 13)),
+                    child:
+                        Text(farm.name, style: const TextStyle(fontSize: 13)),
                   ))
               .toList(),
           onChanged: (value) => setState(() => _selectedFarm = value),
@@ -956,10 +995,78 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     );
   }
 
-  Widget _buildInventoryDisplayField() {
+  Widget _buildCombinedInventoryDisplayField() {
     final pigType = _pigTypeController.text.trim();
     if (pigType.isEmpty) {
-      return _buildInventoryContainer(0);
+      return _buildCombinedInventoryContainer(0, 0);
+    }
+    return StreamBuilder<List<List<InvoiceEntity>>>(
+      stream: Rx.combineLatest4(
+        _invoiceRepo.watchInvoices(type: 0), // Nhập kho
+        _invoiceRepo.watchInvoices(type: 2), // Xuất chợ
+        _invoiceRepo.watchInvoices(type: 3), // Nhập chợ
+        _invoiceRepo.watchInvoices(type: 2), // Xuất chợ (for market)
+        (List<InvoiceEntity> imports,
+                List<InvoiceEntity> exports,
+                List<InvoiceEntity> marketImports,
+                List<InvoiceEntity> marketExports) =>
+            [imports, exports, marketImports, marketExports],
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            !snapshot.hasData) {
+          return const Center(
+              child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2)));
+        }
+        final importSnap = snapshot.data![0];
+        final exportSnap = snapshot.data![1];
+        final marketImportSnap = snapshot.data![2];
+        final marketExportSnap = snapshot.data![3];
+
+        int imported = 0;
+        int exported = 0;
+        int marketImported = 0;
+        int marketExported = 0;
+
+        for (final inv in importSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              imported += item.quantity;
+          }
+        }
+        for (final inv in exportSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              exported += item.quantity;
+          }
+        }
+        for (final inv in marketImportSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              marketImported += item.quantity;
+          }
+        }
+        for (final inv in marketExportSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              marketExported += item.quantity;
+          }
+        }
+
+        final barnInventory = imported - exported;
+        final marketInventory = marketImported - marketExported;
+        return _buildCombinedInventoryContainer(barnInventory, marketInventory);
+      },
+    );
+  }
+
+  Widget _buildInventoryDisplayFieldCompact() {
+    final pigType = _pigTypeController.text.trim();
+    if (pigType.isEmpty) {
+      return _buildInventoryContainerCompact(0);
     }
     return StreamBuilder<List<List<InvoiceEntity>>>(
       stream: Rx.combineLatest2(
@@ -994,12 +1101,186 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
           }
         }
         final availableQty = imported - exported;
-        return _buildInventoryContainer(availableQty);
+        return _buildInventoryContainerCompact(availableQty);
       },
     );
   }
 
-  Widget _buildInventoryContainer(int qty) {
+  Widget _buildMarketInventoryDisplayFieldCompact() {
+    final pigType = _pigTypeController.text.trim();
+    if (pigType.isEmpty) {
+      return _buildInventoryContainerCompact(0);
+    }
+    return StreamBuilder<List<List<InvoiceEntity>>>(
+      stream: Rx.combineLatest2(
+        _invoiceRepo.watchInvoices(type: 3), // Nhập chợ
+        _invoiceRepo.watchInvoices(type: 2), // Xuất chợ
+        (List<InvoiceEntity> marketImports,
+                List<InvoiceEntity> marketExports) =>
+            [marketImports, marketExports],
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            !snapshot.hasData) {
+          return const Center(
+              child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2)));
+        }
+        final marketImportSnap = snapshot.data![0];
+        final marketExportSnap = snapshot.data![1];
+        int marketImported = 0;
+        int marketExported = 0;
+        for (final inv in marketImportSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              marketImported += item.quantity;
+          }
+        }
+        for (final inv in marketExportSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              marketExported += item.quantity;
+          }
+        }
+        final availableQty = marketImported - marketExported;
+        return _buildInventoryContainerCompact(availableQty);
+      },
+    );
+  }
+
+  Widget _buildInventoryDisplayField() {
+    final pigType = _pigTypeController.text.trim();
+    if (pigType.isEmpty) {
+      return _buildInventoryContainer(0, 'Tồn kho');
+    }
+    return StreamBuilder<List<List<InvoiceEntity>>>(
+      stream: Rx.combineLatest2(
+        _invoiceRepo.watchInvoices(type: 0),
+        _invoiceRepo.watchInvoices(type: 2),
+        (List<InvoiceEntity> imports, List<InvoiceEntity> exports) =>
+            [imports, exports],
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            !snapshot.hasData) {
+          return const Center(
+              child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2)));
+        }
+        final importSnap = snapshot.data![0];
+        final exportSnap = snapshot.data![1];
+        int imported = 0;
+        int exported = 0;
+        for (final inv in importSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              imported += item.quantity;
+          }
+        }
+        for (final inv in exportSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              exported += item.quantity;
+          }
+        }
+        final availableQty = imported - exported;
+        return _buildInventoryContainer(availableQty, 'Tồn kho');
+      },
+    );
+  }
+
+  Widget _buildMarketInventoryDisplayField() {
+    final pigType = _pigTypeController.text.trim();
+    if (pigType.isEmpty) {
+      return _buildInventoryContainer(0, 'Tồn chợ');
+    }
+    return StreamBuilder<List<List<InvoiceEntity>>>(
+      stream: Rx.combineLatest2(
+        _invoiceRepo.watchInvoices(type: 3), // Nhập chợ
+        _invoiceRepo.watchInvoices(type: 2), // Xuất chợ
+        (List<InvoiceEntity> marketImports,
+                List<InvoiceEntity> marketExports) =>
+            [marketImports, marketExports],
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            !snapshot.hasData) {
+          return const Center(
+              child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2)));
+        }
+        final marketImportSnap = snapshot.data![0];
+        final marketExportSnap = snapshot.data![1];
+        int marketImported = 0;
+        int marketExported = 0;
+        for (final inv in marketImportSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              marketImported += item.quantity;
+          }
+        }
+        for (final inv in marketExportSnap) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              marketExported += item.quantity;
+          }
+        }
+        final availableQty = marketImported - marketExported;
+        return _buildInventoryContainer(availableQty, 'Tồn chợ');
+      },
+    );
+  }
+
+  Widget _buildCombinedInventoryContainer(int barnQty, int marketQty) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        border: Border.all(color: Colors.green.shade200),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          Expanded(
+            child: Text(
+              '$barnQty',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.green[700],
+              ),
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 24,
+            color: Colors.green.shade300,
+          ),
+          Expanded(
+            child: Text(
+              '$marketQty',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.blue[700],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInventoryContainerCompact(int qty) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
@@ -1007,9 +1288,9 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         border: Border.all(color: Colors.green.shade200),
         borderRadius: BorderRadius.circular(6),
       ),
-      alignment: Alignment.centerLeft,
+      alignment: Alignment.center,
       child: Text(
-        '$qty con',
+        '$qty',
         style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
@@ -1019,10 +1300,43 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     );
   }
 
+  Widget _buildInventoryContainer(int qty, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        border: Border.all(color: Colors.green.shade200),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$qty con',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.green[700],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Widget kết hợp Số lượng + Tồn kho
   Widget _buildQuantityWithInventoryField() {
     final pigType = _pigTypeController.text.trim();
-    
+
     return StreamBuilder<List<List<InvoiceEntity>>>(
       stream: Rx.combineLatest2(
         _invoiceRepo.watchInvoices(type: 0),
@@ -1032,13 +1346,13 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
       ),
       builder: (context, snapshot) {
         int availableQty = 0;
-        
+
         if (snapshot.hasData && pigType.isNotEmpty) {
           final importSnap = snapshot.data![0];
           final exportSnap = snapshot.data![1];
           int imported = 0;
           int exported = 0;
-          
+
           for (final inv in importSnap) {
             for (final item in inv.details) {
               if ((item.pigType ?? '').trim() == pigType)
@@ -1066,25 +1380,31 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.format_list_numbered, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6)),
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                   suffixIcon: Column(
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       InkWell(
                         onTap: () {
-                          final current = int.tryParse(_quantityController.text) ?? 1;
-                          setState(() => _quantityController.text = '${current + 1}');
+                          final current =
+                              int.tryParse(_quantityController.text) ?? 1;
+                          setState(() =>
+                              _quantityController.text = '${current + 1}');
                         },
                         child: const Icon(Icons.keyboard_arrow_up, size: 18),
                       ),
                       InkWell(
                         onTap: () {
-                          final current = int.tryParse(_quantityController.text) ?? 1;
+                          final current =
+                              int.tryParse(_quantityController.text) ?? 1;
                           if (current > 1) {
-                            setState(() => _quantityController.text = '${current - 1}');
+                            setState(() =>
+                                _quantityController.text = '${current - 1}');
                           }
                         },
                         child: const Icon(Icons.keyboard_arrow_down, size: 18),
@@ -1099,7 +1419,8 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
             Expanded(
               flex: 1,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.green.shade50,
                   border: Border.all(color: Colors.green.shade200),
@@ -1270,9 +1591,14 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
 
     // Update invoice info - Chỉ lưu thông tin cơ bản (không tính tiền)
     final farmName = _selectedFarm?.name ?? '';
-    final note = farmName.isNotEmpty
-        ? 'Trại: $farmName${_noteController.text.isNotEmpty ? ' | ${_noteController.text}' : ''}'
-        : _noteController.text;
+    final cage = _cageController.text.trim();
+    final otherNote = _noteController.text.trim();
+
+    List<String> noteParts = [];
+    if (farmName.isNotEmpty) noteParts.add('Trại: $farmName');
+    if (cage.isNotEmpty) noteParts.add('Chuồng: $cage');
+    if (otherNote.isNotEmpty) noteParts.add(otherNote);
+    final note = noteParts.join(' | ');
 
     context.read<WeighingBloc>().add(
           WeighingInvoiceUpdated(
@@ -1300,6 +1626,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     _farmWeightController.clear();
     _transportFeeController.text = '0';
     _paymentAmountController.clear();
+    _cageController.clear();
     setState(() {
       _selectedPartner = null;
       _selectedFarm = null;
@@ -1314,19 +1641,22 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
 
   /// Load invoice data into form for editing
   void _loadInvoiceToForm(InvoiceEntity invoice) {
-    // Extract farm name from note
+    // Extract farm name, cage, and note from invoice note
     String farmName = '';
+    String cage = '';
     String otherNote = '';
-    if (invoice.note != null && invoice.note!.startsWith('Trại: ')) {
+
+    if (invoice.note != null && invoice.note!.isNotEmpty) {
       final parts = invoice.note!.split(' | ');
-      if (parts.isNotEmpty) {
-        farmName = parts[0].replaceFirst('Trại: ', '');
-        if (parts.length > 1) {
-          otherNote = parts.sublist(1).join(' | ');
+      for (final part in parts) {
+        if (part.startsWith('Trại: ')) {
+          farmName = part.replaceFirst('Trại: ', '');
+        } else if (part.startsWith('Chuồng: ')) {
+          cage = part.replaceFirst('Chuồng: ', '');
+        } else {
+          otherNote = otherNote.isEmpty ? part : '$otherNote | $part';
         }
       }
-    } else {
-      otherNote = invoice.note ?? '';
     }
 
     final pigType =
@@ -1372,6 +1702,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
       // Load form fields - Note: farmName will be matched to dropdown later
       _selectedFarm = null; // Reset, user needs to select again
       _noteController.text = otherNote;
+      _cageController.text = cage;
       _pigTypeController.text = pigType;
       _batchNumberController.text = batchNumber;
       _quantityController.text = '${invoice.totalQuantity}';
@@ -1756,34 +2087,28 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                     scrollDirection: Axis.vertical,
                     child: DataTable(
                       showCheckboxColumn: false,
-                      columnSpacing: 12,
+                      columnSpacing: 16,
                       horizontalMargin: 10,
                       headingRowHeight: 40,
                       dataRowMinHeight: 36,
                       dataRowMaxHeight: 44,
                       headingTextStyle: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 12),
-                      dataTextStyle: const TextStyle(fontSize: 12),
+                          fontWeight: FontWeight.bold, fontSize: 14),
+                      dataTextStyle: const TextStyle(fontSize: 13),
                       columns: const [
                         DataColumn(label: Text('STT')),
                         DataColumn(label: Text('Mã phiếu')),
                         DataColumn(label: Text('Thời gian')),
                         DataColumn(label: Text('Tên NCC')),
                         DataColumn(label: Text('Tên Trại')),
+                        DataColumn(label: Text('Chuồng')),
                         DataColumn(label: Text('Loại heo')),
                         DataColumn(label: Text('Số lô')),
                         DataColumn(label: Text('SL')),
                         DataColumn(label: Text('TL Trại')),
                         DataColumn(label: Text('TL Chợ')),
                         DataColumn(label: Text('Chênh lệch')),
-                        DataColumn(label: Text('Đơn giá')),
-                        DataColumn(label: Text('Thành tiền')),
-                        DataColumn(label: Text('Cước xe')),
-                        DataColumn(label: Text('Tổng nhập')),
-                        DataColumn(label: Text('Thanh toán')),
-                        DataColumn(label: Text('Công nợ')),
                         DataColumn(label: Text('Hình thức')),
-                        DataColumn(label: Text('')),
                       ],
                       rows: List.generate(invoices.length, (idx) {
                         final inv = invoices[idx];
@@ -1830,20 +2155,16 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                           remainingDebt = cumulativeDebtByInvoice[inv.id] ?? 0;
                         }
 
-                        // Extract farm name from note
+                        // Extract farm name and cage from note
                         String farmName = '';
+                        String cage = '';
                         if (inv.note != null) {
-                          if (inv.note!.startsWith('Trại: ')) {
-                            final parts = inv.note!.split(' | ');
-                            if (parts.isNotEmpty) {
-                              farmName = parts[0].replaceFirst('Trại: ', '');
-                            }
-                          } else if (inv.note!.contains('[TRẢ NỢ]') ||
-                              inv.note!.contains('[CHIẾT KHẤU]')) {
-                            final match = RegExp(r'Trại: ([^|\[]+)')
-                                .firstMatch(inv.note!);
-                            if (match != null) {
-                              farmName = match.group(1)?.trim() ?? '';
+                          final parts = inv.note!.split(' | ');
+                          for (final part in parts) {
+                            if (part.startsWith('Trại: ')) {
+                              farmName = part.replaceFirst('Trại: ', '');
+                            } else if (part.startsWith('Chuồng: ')) {
+                              cage = part.replaceFirst('Chuồng: ', '');
                             }
                           }
                         }
@@ -1880,7 +2201,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                                 inv.invoiceCode ?? '-',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w500,
-                                  fontSize: 11,
+                                  fontSize: 13,
                                 ),
                               )),
                               DataCell(
@@ -1894,6 +2215,11 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                                 width: 60,
                                 child: Text(farmName,
                                     overflow: TextOverflow.ellipsis),
+                              )),
+                              DataCell(SizedBox(
+                                width: 50,
+                                child:
+                                    Text(cage, overflow: TextOverflow.ellipsis),
                               )),
                               DataCell(Text(pigType)),
                               DataCell(Text(batchNumber)),
@@ -1918,52 +2244,9 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                                     color:
                                         wastage > 0 ? Colors.red : Colors.green,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: 13,
                                   ),
                                 ),
-                              )),
-                              DataCell(Align(
-                                alignment: Alignment.centerRight,
-                                child: Text(
-                                    _currencyFormat.format(inv.pricePerKg)),
-                              )),
-                              DataCell(Align(
-                                alignment: Alignment.centerRight,
-                                child: Text(_currencyFormat.format(subtotal)),
-                              )),
-                              DataCell(Align(
-                                alignment: Alignment.centerRight,
-                                child:
-                                    Text(_currencyFormat.format(transportFee)),
-                              )),
-                              DataCell(Align(
-                                alignment: Alignment.centerRight,
-                                child: Text(
-                                  _currencyFormat.format(totalImport),
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              )),
-                              DataCell(Align(
-                                alignment: Alignment.centerRight,
-                                child: Text(
-                                  _currencyFormat.format(paidAmount),
-                                  style: TextStyle(color: Colors.green[700]),
-                                ),
-                              )),
-                              // Công nợ: để trống nếu là chiết khấu/trả nợ
-                              DataCell(Align(
-                                alignment: Alignment.centerRight,
-                                child: (isDiscount || isDebtPayment)
-                                    ? const Text('-')
-                                    : Text(
-                                        _currencyFormat.format(remainingDebt),
-                                        style: TextStyle(
-                                          color: remainingDebt > 0
-                                              ? Colors.red
-                                              : Colors.green,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
                               )),
                               // Status column - màu theo loại phiếu
                               DataCell(
@@ -1981,7 +2264,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                                   child: Text(
                                     status,
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.bold,
                                       color: isDiscount
                                           ? Colors.orange.shade700
@@ -1992,412 +2275,17 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                                   ),
                                 ),
                               ),
-                              DataCell(Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon:
-                                        const Icon(Icons.visibility, size: 16),
-                                    tooltip: 'Xem',
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    onPressed: () {
-                                      Navigator.of(context)
-                                          .push(MaterialPageRoute(
-                                        builder: (_) => InvoiceDetailScreen(
-                                            invoiceId: inv.id),
-                                      ));
-                                    },
-                                  ),
-                                  const SizedBox(width: 4),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete,
-                                        color: Colors.red, size: 16),
-                                    tooltip: 'Xóa',
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    onPressed: () =>
-                                        _confirmDeleteImportInvoice(
-                                            context, inv),
-                                  ),
-                                ],
-                              )),
                             ]);
                       }),
                     ),
                   ),
                 ),
               ),
-              // Action row below the table
-              _buildActionRowInside(invoices),
             ],
           ),
         );
       },
     );
-  }
-
-  Widget _buildActionRowInside(List<InvoiceEntity> invoices) {
-    // Calculate totals for summary
-    double totalDebt = 0;
-    double totalPaid = 0;
-    double totalDiscount = 0;
-
-    for (final inv in invoices) {
-      final isDebtPayment = inv.note?.contains('[TRẢ NỢ]') ?? false;
-      final isDiscount = inv.note?.contains('[CHIẾT KHẤU]') ?? false;
-
-      if (isDiscount) {
-        // Chiết khấu: cộng vào tổng đã trả và tổng chiết khấu, trừ vào công nợ
-        totalPaid += inv.finalAmount.abs();
-        totalDiscount += inv.finalAmount.abs();
-        totalDebt -= inv.finalAmount.abs();
-      } else if (isDebtPayment) {
-        // Trả nợ: cộng vào tổng đã trả, trừ vào công nợ
-        totalPaid += inv.finalAmount.abs();
-        totalDebt -= inv.finalAmount.abs();
-      } else {
-        // Nhập kho: tính bình thường
-        final transportFee = inv.discount;
-        final subtotal = inv.totalWeight * inv.pricePerKg;
-        final totalImport = subtotal + transportFee;
-        final paidAmount = inv.finalAmount;
-        final remaining = totalImport - paidAmount;
-
-        totalDebt += remaining;
-        totalPaid += paidAmount;
-      }
-    }
-
-    // Action row below the table
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        border: Border(top: BorderSide(color: Colors.blue.shade300, width: 2)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          // Left section: THAO TÁC + inputs
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // THAO TÁC label
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade600,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  '📝 THAO TÁC',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                      color: Colors.white),
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Trả nợ
-              SizedBox(
-                width: 140,
-                child: _buildActionTextField(
-                    'Trả nợ', _debtPaymentController, Colors.green),
-              ),
-              const SizedBox(width: 12),
-              // Chiết khấu
-              SizedBox(
-                width: 140,
-                child: _buildActionTextField(
-                    'C.Khấu', _discountController, Colors.orange),
-              ),
-              const SizedBox(width: 12),
-              // Xác nhận button
-              ElevatedButton.icon(
-                onPressed: _selectedInvoice != null ? _applyDebtPayment : null,
-                icon: const Icon(Icons.check, size: 18),
-                label: const Text('Xác nhận', style: TextStyle(fontSize: 12)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          // Right section: Totals
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Tổng đã trả
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade100,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.green.shade400, width: 1.5),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Tổng đã trả: ',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.green,
-                            fontWeight: FontWeight.w500)),
-                    Text(
-                      _currencyFormat.format(totalPaid),
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: Colors.green.shade700),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Tổng công nợ
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: totalDebt > 0
-                      ? Colors.red.shade100
-                      : Colors.green.shade100,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                      color: totalDebt > 0
-                          ? Colors.red.shade400
-                          : Colors.green.shade400,
-                      width: 1.5),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Tổng công nợ: ',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: totalDebt > 0 ? Colors.red : Colors.green,
-                          fontWeight: FontWeight.w500),
-                    ),
-                    Text(
-                      _currencyFormat.format(totalDebt),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: totalDebt > 0
-                            ? Colors.red.shade700
-                            : Colors.green.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Tổng chiết khấu
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade100,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.orange.shade400, width: 1.5),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Tổng chiết khấu: ',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.orange,
-                            fontWeight: FontWeight.w500)),
-                    Text(
-                      _currencyFormat.format(totalDiscount),
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: Colors.orange.shade700),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionTextField(
-      String label, TextEditingController controller, Color color) {
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color, width: 1.5),
-      ),
-      child: Row(
-        children: [
-          Text('$label: ',
-              style: TextStyle(
-                  fontSize: 11, color: color, fontWeight: FontWeight.w600)),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
-              ],
-              decoration: InputDecoration(
-                isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                border: InputBorder.none,
-                hintText: '0',
-                hintStyle:
-                    TextStyle(fontSize: 12, color: color.withOpacity(0.5)),
-              ),
-              style: TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.bold, color: color),
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _applyDebtPayment() async {
-    if (_selectedInvoice == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('⚠️ Vui lòng chọn phiếu để thao tác!'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    final debtPayment = double.tryParse(_debtPaymentController.text) ?? 0;
-    final discountAmount = double.tryParse(_discountController.text) ?? 0;
-
-    if (debtPayment <= 0 && discountAmount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('⚠️ Vui lòng nhập số tiền trả nợ hoặc chiết khấu!'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    try {
-      // Extract farm name from original invoice
-      String farmName = '';
-      if (_selectedInvoice!.note != null &&
-          _selectedInvoice!.note!.startsWith('Trại: ')) {
-        final parts = _selectedInvoice!.note!.split(' | ');
-        if (parts.isNotEmpty) {
-          farmName = parts[0].replaceFirst('Trại: ', '');
-        }
-      }
-
-      // Create debt payment invoice if debtPayment > 0
-      if (debtPayment > 0) {
-        final debtInvoiceId = 'debt_${DateTime.now().millisecondsSinceEpoch}';
-        final debtNote =
-            '[TRẢ NỢ] Trại: $farmName | Phiếu gốc: ${_selectedInvoice!.id}';
-
-        final debtInvoice = InvoiceEntity(
-          id: debtInvoiceId,
-          partnerId: _selectedInvoice!.partnerId,
-          partnerName: _selectedInvoice!.partnerName,
-          type: 0, // Import type
-          createdDate: DateTime.now(),
-          totalWeight: 0,
-          totalQuantity: 0,
-          pricePerKg: 0,
-          deduction: 0,
-          discount: 0,
-          finalAmount: debtPayment, // Số tiền trả nợ hiển thị ở Thanh toán
-          paidAmount: 0,
-          note: debtNote,
-          details: [],
-        );
-
-        await _invoiceRepo.createInvoice(debtInvoice);
-      }
-
-      // Create discount invoice if discountAmount > 0
-      // Chiết khấu: nhập thẳng số tiền, hiển thị ở Thanh toán, trừ vào công nợ
-      if (discountAmount > 0) {
-        final discountInvoiceId =
-            'discount_${DateTime.now().millisecondsSinceEpoch}';
-        final discountNote =
-            '[CHIẾT KHẤU] Trại: $farmName | Phiếu gốc: ${_selectedInvoice!.id}';
-
-        final discountInvoice = InvoiceEntity(
-          id: discountInvoiceId,
-          partnerId: _selectedInvoice!.partnerId,
-          partnerName: _selectedInvoice!.partnerName,
-          type: 0, // Import type
-          createdDate: DateTime.now(),
-          totalWeight: 0,
-          totalQuantity: 0,
-          pricePerKg: 0,
-          deduction: 0,
-          discount: 0,
-          finalAmount:
-              discountAmount, // Số tiền chiết khấu hiển thị ở Thanh toán
-          paidAmount: 0,
-          note: discountNote,
-          details: [],
-        );
-
-        await _invoiceRepo.createInvoice(discountInvoice);
-      }
-
-      if (mounted) {
-        String message = '✅ Đã tạo phiếu: ';
-        if (debtPayment > 0) {
-          message += 'Trả nợ ${_currencyFormat.format(debtPayment)}';
-        }
-        if (discountAmount > 0) {
-          if (debtPayment > 0) message += ', ';
-          message += 'Chiết khấu ${_currencyFormat.format(discountAmount)}';
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-
-      // Clear inputs
-      _debtPaymentController.clear();
-      _discountController.clear();
-      setState(() => _selectedInvoice = null);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Lỗi: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 }
 

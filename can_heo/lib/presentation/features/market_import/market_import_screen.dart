@@ -187,48 +187,53 @@ class _MarketImportViewState extends State<_MarketImportView> {
               Responsive.init(context);
 
               final padding = Responsive.spacing;
-              // Chiều cao form tùy theo screen size
+              // Chiều cao form tùy theo screen size (đồng bộ với xuất chợ)
               final formHeight = Responsive.screenType == ScreenType.desktop27
-                  ? 450.0
+                  ? 400.0
                   : Responsive.screenType == ScreenType.desktop24
-                      ? 420.0
+                      ? 380.0
                       : Responsive.screenType == ScreenType.laptop15
-                          ? 400.0
-                          : 380.0;
+                          ? 360.0
+                          : 340.0;
 
               return Padding(
                 padding: EdgeInsets.all(padding),
                 child: Column(
                   children: [
-                    // ========== PHẦN 1: Thông tin phiếu - chiều cao cố định, nửa trái ==========
+                    // ========== PHẦN 1: Thông tin phiếu - chiều cao cố định, rộng 60% ==========
                     SizedBox(
                       height: formHeight,
                       child: Row(
                         children: [
-                          // Nửa trái: Form thông tin phiếu
+                          // Bên trái: Form thông tin phiếu - 60%
                           Expanded(
+                            flex: 6,
                             child: _buildInvoiceDetailsSection(context),
                           ),
-                          // Nửa phải: để trống
-                          const Expanded(child: SizedBox()),
+                          const SizedBox(width: 8),
+                          // Bên phải: để trống - 40%
+                          const Expanded(
+                            flex: 4,
+                            child: SizedBox(),
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // ========== PHẦN 2: Phiếu đã lưu (70%) + Công nợ (30%) ==========
+                    // ========== PHẦN 2: Phiếu đã lưu (60%) + Công nợ (40%) ==========
                     Expanded(
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Bên trái: Phiếu đã lưu - 70%
+                          // Bên trái: Phiếu đã lưu - 60%
                           Expanded(
-                            flex: 7,
+                            flex: 6,
                             child: _buildSavedInvoicesGrid(context),
                           ),
                           const SizedBox(width: 8),
-                          // Bên phải: Công nợ - 30%
+                          // Bên phải: Công nợ - 40%
                           Expanded(
-                            flex: 3,
+                            flex: 4,
                             child: _buildDebtSection(context),
                           ),
                         ],
@@ -977,10 +982,11 @@ class _MarketImportViewState extends State<_MarketImportView> {
     }
     return StreamBuilder<List<List<InvoiceEntity>>>(
       stream: Rx.combineLatest2(
-        _invoiceRepo.watchInvoices(type: 0),
-        _invoiceRepo.watchInvoices(type: 2),
-        (List<InvoiceEntity> imports, List<InvoiceEntity> exports) =>
-            [imports, exports],
+        _invoiceRepo.watchInvoices(type: 3), // Nhập chợ
+        _invoiceRepo.watchInvoices(type: 2), // Xuất chợ
+        (List<InvoiceEntity> marketImports,
+                List<InvoiceEntity> marketExports) =>
+            [marketImports, marketExports],
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting ||
@@ -991,23 +997,23 @@ class _MarketImportViewState extends State<_MarketImportView> {
                   height: 24,
                   child: CircularProgressIndicator(strokeWidth: 2)));
         }
-        final importSnap = snapshot.data![0];
-        final exportSnap = snapshot.data![1];
-        int imported = 0;
-        int exported = 0;
-        for (final inv in importSnap) {
+        final marketImportSnap = snapshot.data![0];
+        final marketExportSnap = snapshot.data![1];
+        int marketImported = 0;
+        int marketExported = 0;
+        for (final inv in marketImportSnap) {
           for (final item in inv.details) {
             if ((item.pigType ?? '').trim() == pigType)
-              imported += item.quantity;
+              marketImported += item.quantity;
           }
         }
-        for (final inv in exportSnap) {
+        for (final inv in marketExportSnap) {
           for (final item in inv.details) {
             if ((item.pigType ?? '').trim() == pigType)
-              exported += item.quantity;
+              marketExported += item.quantity;
           }
         }
-        final availableQty = imported - exported;
+        final availableQty = marketImported - marketExported;
         return _buildInventoryContainer(availableQty);
       },
     );
@@ -1131,7 +1137,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                   const Icon(Icons.list_alt, color: Colors.white, size: 16),
                   const SizedBox(width: 6),
                   Text(
-                    '📋 PHIẾU NHẬP CHỢ ĐÃ LƯU HÔM NAY',
+                    '📋 PHIẾU NHẬP CHỢ ĐÃ LƯU',
                     style: TextStyle(
                       fontSize: fontSize,
                       fontWeight: FontWeight.bold,
@@ -1646,15 +1652,25 @@ class _MarketImportViewState extends State<_MarketImportView> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    // Row 2: Tổng số (larger chips)
-                    _buildDebtSummaryChipLarge(
-                        'Tổng nợ', totalDebt, Colors.orange),
-                    const SizedBox(height: 4),
-                    _buildDebtSummaryChipLarge(
-                        'Đã trả', totalPaid, Colors.green),
-                    const SizedBox(height: 4),
-                    _buildDebtSummaryChipLarge('Còn nợ', remaining,
-                        remaining > 0 ? Colors.red : Colors.green),
+                    // Row 2: Tổng số (3 columns)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDebtSummaryChipLarge(
+                              'Tổng nợ', totalDebt, Colors.orange),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: _buildDebtSummaryChipLarge(
+                              'Đã trả', totalPaid, Colors.green),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: _buildDebtSummaryChipLarge('Còn nợ', remaining,
+                              remaining > 0 ? Colors.red : Colors.green),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 12),
                     // Row 3: Thanh toán
                     if (hasPartner) ...[
@@ -1757,7 +1773,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                           SizedBox(
                             height: 32,
                             child: FilledButton(
-                              onPressed: _selectedPaymentMethod == 3
+                              onPressed: _selectedPaymentMethod >= 3
                                   ? () => _saveSupplierPayment(context)
                                   : null,
                               style: FilledButton.styleFrom(
@@ -1772,8 +1788,20 @@ class _MarketImportViewState extends State<_MarketImportView> {
                         ],
                       ),
                       const SizedBox(height: 6),
-                      // Hình thức trả nợ - chỉ có Tiền mặt
-                      _buildPaymentChip('Tiền mặt', 3, Colors.green),
+                      // Hình thức trả nợ - Tiền mặt + Chuyển khoản
+                      Row(
+                        children: [
+                          Expanded(
+                            child:
+                                _buildPaymentChip('Tiền mặt', 3, Colors.green),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildPaymentChip(
+                                'Chuyển khoản', 4, Colors.blue),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 6),
                       // Nhập tiền trả nợ
                       SizedBox(
@@ -1781,7 +1809,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                         child: TextField(
                           controller: _debtPaymentController,
                           keyboardType: TextInputType.number,
-                          enabled: _selectedPaymentMethod == 3,
+                          enabled: _selectedPaymentMethod >= 3,
                           style: const TextStyle(
                               fontSize: 12, fontWeight: FontWeight.bold),
                           decoration: InputDecoration(
@@ -1794,7 +1822,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                             suffixStyle: const TextStyle(fontSize: 10),
                             hintText: 'Trả nợ NCC',
                             hintStyle: const TextStyle(fontSize: 11),
-                            filled: _selectedPaymentMethod != 3,
+                            filled: _selectedPaymentMethod < 3,
                             fillColor: Colors.grey[200],
                           ),
                         ),
@@ -1874,7 +1902,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
   }
 
   Widget _buildPaymentHistoryList(String partnerId) {
-    return FutureBuilder<List<TransactionData>>(
+    return FutureBuilder<List<Transaction>>(
       future: _db.transactionsDao.watchTransactionsByPartner(partnerId).first,
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -1887,48 +1915,154 @@ class _MarketImportViewState extends State<_MarketImportView> {
         final transactions = snapshot.data!
             .where((tx) => tx.type == 1) // Chi - trả tiền cho NCC
             .toList()
-          ..sort((a, b) => b.date.compareTo(a.date));
+          ..sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
 
-        return ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          itemCount: transactions.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final tx = transactions[index];
-            return ListTile(
-              dense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              leading: Icon(
-                tx.paymentMethod == 0 ? Icons.money : Icons.account_balance,
-                size: 18,
-                color: Colors.teal,
+        return Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
               ),
-              title: Text(
-                _currencyFormat.format(tx.amount),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-              subtitle: Text(
-                DateFormat('dd/MM/yyyy HH:mm').format(tx.date),
-                style: const TextStyle(fontSize: 10),
-              ),
-              trailing: tx.note != null && tx.note!.isNotEmpty
-                  ? SizedBox(
-                      width: 80,
-                      child: Text(
-                        tx.note!,
-                        style:
-                            const TextStyle(fontSize: 10, color: Colors.grey),
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      'Ngày',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade700,
                       ),
-                    )
-                  : null,
-            );
-          },
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      'Loại',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade700,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      'Số tiền',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade700,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 4,
+                    child: Text(
+                      'Ghi chú',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade700,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Data rows
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                itemCount: transactions.length,
+                separatorBuilder: (_, __) =>
+                    Divider(height: 1, color: Colors.grey.shade200),
+                itemBuilder: (context, index) {
+                  final tx = transactions[index];
+                  final isEven = index % 2 == 0;
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isEven ? Colors.white : Colors.grey.shade50,
+                    ),
+                    child: Row(
+                      children: [
+                        // Ngày
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            DateFormat('dd/MM HH:mm')
+                                .format(tx.transactionDate),
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                        ),
+                        // Loại
+                        Expanded(
+                          flex: 2,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: tx.paymentMethod == 0
+                                  ? Colors.green.shade100
+                                  : Colors.blue.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              tx.paymentMethod == 0 ? 'T.Mặt' : 'C.Khoản',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: tx.paymentMethod == 0
+                                    ? Colors.green.shade700
+                                    : Colors.blue.shade700,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                        // Số tiền
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            _currencyFormat.format(tx.amount),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              color: Colors.red,
+                            ),
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Ghi chú
+                        Expanded(
+                          flex: 4,
+                          child: Text(
+                            tx.note ?? '',
+                            style: const TextStyle(
+                                fontSize: 10, color: Colors.grey),
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
     );
@@ -1973,7 +2107,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
     final partnerId = _selectedPartner!.id;
 
     // Get amount based on payment method
-    final amount = _selectedPaymentMethod == 3
+    final amount = _selectedPaymentMethod >= 3
         ? (double.tryParse(_debtPaymentController.text) ?? 0)
         : (double.tryParse(_paymentAmountController.text) ?? 0);
 
@@ -1994,18 +2128,28 @@ class _MarketImportViewState extends State<_MarketImportView> {
     try {
       // All payment methods save to transaction history with type = 1 (Chi - trả tiền NCC)
       String note;
+      int actualPaymentMethod; // Payment method to save in DB (0 or 1)
+
       switch (_selectedPaymentMethod) {
         case 0:
-          note = 'Trả NCC tiền mặt';
+          note = 'Thanh toán NCC tiền mặt';
+          actualPaymentMethod = 0;
           break;
         case 1:
-          note = 'Trả NCC chuyển khoản';
+          note = 'Thanh toán NCC chuyển khoản';
+          actualPaymentMethod = 1;
           break;
         case 3:
-          note = 'Trả nợ NCC';
+          note = 'Trả nợ NCC tiền mặt';
+          actualPaymentMethod = 0;
+          break;
+        case 4:
+          note = 'Trả nợ NCC chuyển khoản';
+          actualPaymentMethod = 1;
           break;
         default:
           note = 'Thanh toán NCC';
+          actualPaymentMethod = 0;
       }
 
       await _db.transactionsDao.createTransaction(
@@ -2015,7 +2159,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
           invoiceId: const Value(null),
           amount: Value(amount),
           type: const Value(1), // 1 = Chi (trả tiền cho NCC)
-          paymentMethod: Value(_selectedPaymentMethod),
+          paymentMethod: Value(
+              actualPaymentMethod), // Lưu 0 (tiền mặt) hoặc 1 (chuyển khoản)
           transactionDate: Value(DateTime.now()),
           note: Value(note),
         ),
