@@ -46,6 +46,7 @@ dev_dependencies:
   # --- Code Generation (Sinh code tự động) ---
   build_runner: ^2.4.6
   drift_dev: ^2.13.0
+  msix: ^3.16.9
 
 flutter:
   uses-material-design: true
@@ -63,3 +64,15 @@ flutter:
   #       - asset: assets/fonts/Roboto-Regular.ttf
   #       - asset: assets/fonts/Roboto-Bold.ttf
   #         weight: 700
+
+msix_config:
+  display_name: Can Heo Manager
+  publisher_display_name: Can Heo Team
+  identity_name: com.canheo.manager
+  msix_version: 1.0.0.0
+  logo_path: windows/runner/resources/app_icon.ico
+  capabilities: 'internetClient,removableStorage'
+  install_certificate: false
+  # Tùy chọn thêm để hiển thị logo đẹp hơn
+  publisher: CN=Can Heo Team
+  architecture: x64
