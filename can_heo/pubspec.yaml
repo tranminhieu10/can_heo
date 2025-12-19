@@ -72,7 +72,9 @@ msix_config:
   msix_version: 1.0.0.0
   logo_path: windows/runner/resources/app_icon.ico
   capabilities: 'internetClient,removableStorage'
-  install_certificate: false
-  # Tùy chọn thêm để hiển thị logo đẹp hơn
+  # Tạo và cài đặt chứng chỉ tự động (giảm cảnh báo)
+  install_certificate: true
+  certificate_path: CERTIFICATE.pfx
+  certificate_password: 123456
   publisher: CN=Can Heo Team
   architecture: x64
