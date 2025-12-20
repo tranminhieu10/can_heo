@@ -475,88 +475,137 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView> {
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
     final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
-    return ListView.separated(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      itemCount: invoices.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final invoice = invoices[index];
+      child: DataTable(
+        columnSpacing: 16,
+        headingRowHeight: 48,
+        dataRowMinHeight: 60,
+        dataRowMaxHeight: 80,
+        border: TableBorder.all(color: Colors.grey.shade300, width: 1),
+        headingTextStyle: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+          color: Colors.black87,
+        ),
+        dataTextStyle: const TextStyle(
+          fontSize: 13,
+          color: Colors.black87,
+        ),
+        columns: const [
+          DataColumn(label: Text('Mã phiếu')),
+          DataColumn(label: Text('Khách hàng')),
+          DataColumn(label: Text('Ngày tạo')),
+          DataColumn(label: Text('Loại heo')),
+          DataColumn(label: Text('Số lô')),
+          DataColumn(label: Text('Chuồng')),
+          DataColumn(label: Text('SL')),
+          DataColumn(label: Text('KL (kg)')),
+          DataColumn(label: Text('Đơn giá')),
+          DataColumn(label: Text('Thành tiền')),
+          DataColumn(label: Text('Ghi chú')),
+          DataColumn(label: Text('Thao tác')),
+        ],
+        rows: invoices.map((invoice) {
+          // Extract details from first detail item or aggregate
+          final firstDetail =
+              invoice.details.isNotEmpty ? invoice.details.first : null;
 
-        return Card(
-          elevation: 1,
-          child: InkWell(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => InvoiceDetailScreen(invoiceId: invoice.id),
-                ),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  const Icon(Icons.receipt_long, size: 32),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          invoice.partnerName ?? 'Khách lẻ',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          dateFormat.format(invoice.createdDate),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.black54,
-                          ),
-                        ),
-                      ],
+          final totalQuantity =
+              invoice.details.fold<int>(0, (sum, item) => sum + item.quantity);
+          final totalWeight =
+              invoice.details.fold<double>(0, (sum, item) => sum + item.weight);
+
+          // Extract cage and batch from note
+          String cage = '';
+          String batch = '';
+          String note = invoice.note ?? '';
+
+          // Parse note for Chuồng and Số lô
+          final noteLines = note.split('|');
+          for (final line in noteLines) {
+            final trimmed = line.trim();
+            if (trimmed.startsWith('Chuồng:')) {
+              cage = trimmed.substring(7).trim();
+            } else if (trimmed.startsWith('Số lô:')) {
+              batch = trimmed.substring(6).trim();
+            }
+          }
+
+          // If batch not in note, try from detail
+          if (batch.isEmpty && firstDetail?.batchNumber != null) {
+            batch = firstDetail!.batchNumber!;
+          }
+
+          // Clean note (remove parsed fields)
+          String cleanNote = noteLines
+              .where((line) =>
+                  !line.trim().startsWith('Chuồng:') &&
+                  !line.trim().startsWith('Số lô:') &&
+                  !line.trim().startsWith('Trại:') &&
+                  !line.trim().startsWith('Lý do:'))
+              .join(' | ')
+              .trim();
+
+          return DataRow(
+            cells: [
+              DataCell(Text('INV${invoice.id.toString().padLeft(5, '0')}')),
+              DataCell(Text(invoice.partnerName ?? 'Khách lẻ')),
+              DataCell(Text(dateFormat.format(invoice.createdDate))),
+              DataCell(Text(firstDetail?.pigType ?? '')),
+              DataCell(Text(batch)),
+              DataCell(Text(cage)),
+              DataCell(Text(totalQuantity.toString())),
+              DataCell(Text(totalWeight.toStringAsFixed(1))),
+              DataCell(
+                Text(invoice.pricePerKg > 0
+                    ? currencyFormat.format(invoice.pricePerKg)
+                    : '-'),
+              ),
+              DataCell(Text(currencyFormat.format(invoice.finalAmount))),
+              DataCell(
+                Tooltip(
+                  message:
+                      cleanNote.isNotEmpty ? cleanNote : 'Không có ghi chú',
+                  child: SizedBox(
+                    width: 100,
+                    child: Text(
+                      cleanNote.isNotEmpty ? cleanNote : '-',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        currencyFormat.format(invoice.finalAmount),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            tooltip: 'Xóa phiếu',
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              size: 20,
-                            ),
-                            onPressed: () =>
-                                _confirmAndDelete(context, invoice),
-                          ),
-                          const Icon(
-                            Icons.chevron_right,
-                            color: Colors.grey,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-        );
-      },
+              DataCell(
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Chi tiết',
+                      icon: const Icon(Icons.visibility, size: 18),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => InvoiceDetailScreen(
+                              invoiceId: invoice.id,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Xóa',
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      onPressed: () => _confirmAndDelete(context, invoice),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
     );
   }
 
