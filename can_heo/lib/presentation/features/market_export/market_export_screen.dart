@@ -11,10 +11,7 @@ import '../../../core/services/nhb300_scale_service.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../domain/entities/partner.dart';
 import '../../../domain/entities/pig_type.dart';
-import '../../../domain/entities/farm.dart';
 import '../../../domain/repositories/i_pigtype_repository.dart';
-import '../../../domain/repositories/i_farm_repository.dart';
-import '../../../domain/repositories/i_partner_repository.dart';
 import '../pig_types/pig_types_screen.dart';
 import '../../../domain/entities/invoice.dart';
 import '../../../domain/repositories/i_invoice_repository.dart';
@@ -92,8 +89,6 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
   PartnerEntity? _selectedPartner; // Khách hàng
   final _invoiceRepo = sl<IInvoiceRepository>();
-  final _farmRepo = sl<IFarmRepository>();
-  final _partnerRepo = sl<IPartnerRepository>();
   final _db = sl<AppDatabase>();
 
   // Track which search columns are visible
@@ -112,7 +107,6 @@ class _MarketExportViewState extends State<_MarketExportView> {
   final TextEditingController _invoicePaymentAmountController =
       TextEditingController(); // Số tiền thanh toán cho phiếu xuất mới
   int _selectedPaymentMethod = 0; // 0 = Tiền mặt, 1 = Chuyển khoản, 2 = Nợ
-  int _selectedDebtPaymentMethod = 0; // 0 = Tiền mặt, 1 = Chuyển khoản
 
   // Resizable panel ratio (0.0 to 1.0, default 0.6 = 60% left, 40% right - matches saved invoices/debt section)
   double _panelRatio = 0.6;

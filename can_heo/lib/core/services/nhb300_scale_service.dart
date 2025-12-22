@@ -296,7 +296,8 @@ class NHB300ScaleService implements IScaleService {
   }
 
   /// Giải phóng tài nguyên
-  void dispose() {
+  @override
+  Future<void> dispose() async {
     _isDisposed = true;
     _periodicTimer?.cancel();
     _periodicTimer = null;

@@ -15,6 +15,7 @@ import '../../../domain/repositories/i_invoice_repository.dart';
 import '../../../domain/repositories/i_farm_repository.dart';
 import '../../../data/local/database.dart';
 import '../../../injection_container.dart';
+import '../../common/widgets/scale_connection_status.dart';
 import '../partners/bloc/partner_bloc.dart';
 import '../partners/bloc/partner_event.dart';
 import '../partners/bloc/partner_state.dart';
@@ -168,7 +169,13 @@ class _MarketImportViewState extends State<_MarketImportView> {
         autofocus: true,
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('Phiếu Nhập Chợ'),
+            title: const Row(
+              children: [
+                Text('Phiếu Nhập Chợ'),
+                SizedBox(width: 12),
+                ScaleConnectionStatus(),
+              ],
+            ),
             backgroundColor: Colors.teal.shade600,
             foregroundColor: Colors.white,
             actions: [

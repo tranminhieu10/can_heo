@@ -23,7 +23,6 @@ import '../weighing/bloc/weighing_bloc.dart';
 import '../weighing/bloc/weighing_event.dart';
 import '../weighing/bloc/weighing_state.dart';
 import '../pig_types/pig_types_screen.dart';
-import '../history/invoice_detail_screen.dart';
 
 class ImportBarnScreen extends StatelessWidget {
   const ImportBarnScreen({super.key});
@@ -78,15 +77,8 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
   InvoiceEntity? _selectedInvoice;
   bool _isEditMode = false;
 
-  // Resizable panel ratio (default 1/3 for form)
-  double _panelRatio = 0.33;
-  static const double _minPanelRatio = 0.2;
-  static const double _maxPanelRatio = 0.5;
-
   final FocusNode _scaleInputFocus = FocusNode();
   final NumberFormat _numberFormat = NumberFormat('#,##0.0', 'en_US');
-  final NumberFormat _currencyFormat =
-      NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
   PartnerEntity? _selectedPartner;
   FarmEntity? _selectedFarm;

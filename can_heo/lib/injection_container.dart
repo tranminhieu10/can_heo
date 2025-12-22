@@ -31,9 +31,13 @@ Future<void> init() async {
   sl.registerLazySingleton<AppDatabase>(() => AppDatabase());
 
   // Services
-  // TẠM THỜI dùng DummyScaleService
-  // Khi có plugin native: sl.registerLazySingleton<IScaleService>(() => MethodChannelScaleService());
-  sl.registerLazySingleton<IScaleService>(() => DummyScaleService());
+  // Sử dụng ASIScaleService cho đầu hiển thị ASI 2025
+  final asiScale = ASIScaleService();
+  await asiScale.connect(); // Tự động tìm và kết nối với cổng COM
+  sl.registerLazySingleton<IScaleService>(() => asiScale);
+  
+  // Hoặc nếu muốn dùng dummy (test không có cân):
+  // sl.registerLazySingleton<IScaleService>(() => DummyScaleService());
 
   // Repositories
   sl.registerLazySingleton<IInvoiceRepository>(
