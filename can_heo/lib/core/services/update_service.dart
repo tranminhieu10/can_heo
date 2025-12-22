@@ -13,7 +13,7 @@ import 'package:path_provider/path_provider.dart';
 class UpdateService {
   /// URL tới file version.json trên server
   /// Thay đổi URL này theo hosting của bạn
-  static const String versionUrl = 'https://your-server.com/updates/version.json';
+  static const String versionUrl = 'https://github.com/tranminhieu10/can_heo/releases/download/v1.0.1/can_heo_1.0.1.msix';
   
   /// Version hiện tại của app (lấy từ pubspec.yaml)
   static const String currentVersion = '1.0.0';
