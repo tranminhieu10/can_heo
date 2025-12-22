@@ -40,23 +40,17 @@ class _CompanyFarmViewState extends State<_CompanyFarmView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Text("QUẢN LÝ NHÀ CUNG CẤP & TRẠI"),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-      ),
       body: Row(
         children: [
-          // Cột trái: Danh sách Công ty (NCC)
+          // Cột 1: Danh sách Công ty (NCC)
           Expanded(
             flex: 1,
             child: _buildCompanyList(),
           ),
           const VerticalDivider(width: 1),
-          // Cột phải: Danh sách Trại của Công ty đã chọn
+          // Cột 2: Danh sách Trại của Công ty đã chọn
           Expanded(
-            flex: 2,
+            flex: 1,
             child: _buildFarmList(),
           ),
         ],
@@ -146,7 +140,9 @@ class _CompanyFarmViewState extends State<_CompanyFarmView> {
                         ],
                       ),
                       onTap: () {
-                        setState(() => _selectedCompany = company);
+                        setState(() {
+                          _selectedCompany = company;
+                        });
                       },
                     ),
                   );
@@ -232,6 +228,7 @@ class _CompanyFarmViewState extends State<_CompanyFarmView> {
                 itemCount: farms.length,
                 itemBuilder: (context, index) {
                   final farm = farms[index];
+                  
                   return Card(
                     child: ListTile(
                       leading: CircleAvatar(

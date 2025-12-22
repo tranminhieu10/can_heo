@@ -60,6 +60,7 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
           invoiceCode: row.invoice.invoiceCode,
           partnerId: row.partner?.id,
           partnerName: row.partner?.name ?? 'Khách lẻ',
+          cageId: row.invoice.cageId,
           type: row.invoice.type,
           createdDate: row.invoice.createdDate,
           totalWeight: row.invoice.totalWeight,
@@ -117,6 +118,7 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
       invoiceCode: invoiceRow.invoiceCode,
       partnerId: invoiceRow.partnerId,
       partnerName: partnerName,
+      cageId: invoiceRow.cageId,
       type: invoiceRow.type,
       createdDate: invoiceRow.createdDate,
       totalWeight: invoiceRow.totalWeight,
@@ -138,6 +140,7 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
         id: Value(invoice.id),
         invoiceCode: Value(invoice.invoiceCode),
         partnerId: Value(invoice.partnerId),
+        cageId: Value(invoice.cageId),
         type: Value(invoice.type),
         createdDate: Value(invoice.createdDate),
         totalWeight: Value(invoice.totalWeight),
@@ -204,6 +207,7 @@ class InvoiceRepositoryImpl implements IInvoiceRepository {
         .write(
       InvoicesCompanion(
         partnerId: Value(invoice.partnerId),
+        cageId: Value(invoice.cageId),
         totalWeight: Value(invoice.totalWeight),
         totalQuantity: Value(invoice.totalQuantity),
         pricePerKg: Value(invoice.pricePerKg),

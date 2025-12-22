@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:drift/drift.dart' show Value;
 import 'dart:async';
 import 'package:intl/intl.dart';
+import 'package:rxdart/rxdart.dart';
 
 import '../../../core/services/scale_service.dart';
 import '../../../core/services/nhb300_scale_service.dart';
@@ -1632,6 +1633,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
     );
   }
 
+  // Tồn chợ = Type 3 (Nhập chợ) + Type 1 (Xuất kho) - Type 2 (Xuất chợ) - Type 0 (Nhập kho)
   Widget _buildInventoryDisplayFieldCompact() {
     final pigType = _pigTypeController.text.trim();
     if (pigType.isEmpty) {
@@ -1639,52 +1641,75 @@ class _MarketExportViewState extends State<_MarketExportView> {
     }
 
     return RepaintBoundary(
-      child: StreamBuilder<List<InvoiceEntity>>(
-        stream: _invoiceRepo.watchInvoices(type: 3),
-        builder: (context, marketImportSnap) {
-          if (!marketImportSnap.hasData) {
+      child: StreamBuilder<List<List<InvoiceEntity>>>(
+        stream: Rx.combineLatest4(
+          _invoiceRepo.watchInvoices(type: 0), // Nhập kho (-chợ)
+          _invoiceRepo.watchInvoices(type: 1), // Xuất kho (+chợ)
+          _invoiceRepo.watchInvoices(type: 2), // Xuất chợ (-chợ)
+          _invoiceRepo.watchInvoices(type: 3), // Nhập chợ (+chợ)
+          (a, b, c, d) => [a, b, c, d],
+        ),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
             return _buildInventoryContainerCompact(0, true);
           }
 
-          return StreamBuilder<List<InvoiceEntity>>(
-            stream: _invoiceRepo.watchInvoices(type: 2),
-            builder: (context, marketExportSnap) {
-              if (!marketExportSnap.hasData) {
-                return _buildInventoryContainerCompact(0, true);
+          final importBarn = snapshot.data![0];   // Type 0
+          final exportBarn = snapshot.data![1];   // Type 1
+          final exportMarket = snapshot.data![2]; // Type 2
+          final importMarket = snapshot.data![3]; // Type 3
+
+          int marketInventory = 0;
+
+          // + Nhập chợ (Type 3)
+          for (final inv in importMarket) {
+            for (final item in inv.details) {
+              if ((item.pigType ?? '').trim() == pigType) {
+                marketInventory += item.quantity;
               }
+            }
+          }
 
-              int marketImported = 0;
-              int marketExported = 0;
-
-              for (final inv in marketImportSnap.data!) {
-                for (final item in inv.details) {
-                  if ((item.pigType ?? '').trim() == pigType) {
-                    marketImported += item.quantity;
-                  }
-                }
+          // + Xuất kho (Type 1)
+          for (final inv in exportBarn) {
+            for (final item in inv.details) {
+              if ((item.pigType ?? '').trim() == pigType) {
+                marketInventory += item.quantity;
               }
+            }
+          }
 
-              for (final inv in marketExportSnap.data!) {
-                for (final item in inv.details) {
-                  if ((item.pigType ?? '').trim() == pigType) {
-                    marketExported += item.quantity;
-                  }
-                }
+          // - Xuất chợ (Type 2)
+          for (final inv in exportMarket) {
+            for (final item in inv.details) {
+              if ((item.pigType ?? '').trim() == pigType) {
+                marketInventory -= item.quantity;
               }
+            }
+          }
 
-              final availableQty = marketImported - marketExported;
-              final requestedQty = int.tryParse(_quantityController.text) ?? 0;
-              final isValid = requestedQty <= availableQty;
+          // - Nhập kho (Type 0)
+          for (final inv in importBarn) {
+            for (final item in inv.details) {
+              if ((item.pigType ?? '').trim() == pigType) {
+                marketInventory -= item.quantity;
+              }
+            }
+          }
 
-              return _buildInventoryContainerCompact(availableQty, isValid);
-            },
-          );
+          final requestedQty = int.tryParse(_quantityController.text) ?? 0;
+          final isValid = requestedQty <= marketInventory;
+
+          return _buildInventoryContainerCompact(marketInventory, isValid);
         },
       ),
     );
   }
 
   Widget _buildInventoryContainerCompact(int qty, bool isValid) {
+    // Không cho phép hiển thị số âm
+    final displayQty = qty < 0 ? 0 : qty;
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
@@ -1693,7 +1718,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
         border: Border.all(color: Colors.grey.shade300),
       ),
       child: Text(
-        '$qty con',
+        '$displayQty con',
         style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
@@ -2139,6 +2164,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   // Helper: Build inventory display field
+  // Tồn chợ = Nhập chợ (3) + Xuất kho (1) - Xuất chợ (2) - Nhập kho (0)
   Widget _buildInventoryDisplayField() {
     final pigType = _pigTypeController.text.trim();
 
@@ -2147,52 +2173,75 @@ class _MarketExportViewState extends State<_MarketExportView> {
     }
 
     return RepaintBoundary(
-      child: StreamBuilder<List<InvoiceEntity>>(
-        stream: _invoiceRepo.watchInvoices(type: 3),
-        builder: (context, marketImportSnap) {
-          if (!marketImportSnap.hasData) {
+      child: StreamBuilder<List<List<InvoiceEntity>>>(
+        stream: Rx.combineLatest4(
+          _invoiceRepo.watchInvoices(type: 3), // Nhập chợ từ NCC (+)
+          _invoiceRepo.watchInvoices(type: 1), // Xuất kho ra chợ (+)
+          _invoiceRepo.watchInvoices(type: 2), // Xuất chợ bán cho khách (-)
+          _invoiceRepo.watchInvoices(type: 0), // Nhập kho hàng thừa (-)
+          (a, b, c, d) => [a, b, c, d],
+        ),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
             return _buildInventoryContainer(0, true);
           }
 
-          return StreamBuilder<List<InvoiceEntity>>(
-            stream: _invoiceRepo.watchInvoices(type: 2),
-            builder: (context, marketExportSnap) {
-              if (!marketExportSnap.hasData) {
-                return _buildInventoryContainer(0, true);
+          final importMarket = snapshot.data![0]; // Type 3: Nhập chợ từ NCC (+)
+          final exportBarn = snapshot.data![1];   // Type 1: Xuất kho ra chợ (+)
+          final exportMarket = snapshot.data![2]; // Type 2: Xuất chợ bán (-)
+          final importBarn = snapshot.data![3];   // Type 0: Nhập kho hàng thừa (-)
+
+          int available = 0;
+
+          // + Nhập chợ từ NCC (Type 3)
+          for (final inv in importMarket) {
+            for (final item in inv.details) {
+              if ((item.pigType ?? '').trim() == pigType) {
+                available += item.quantity;
               }
+            }
+          }
 
-              int marketImported = 0;
-              int marketExported = 0;
-
-              for (final inv in marketImportSnap.data!) {
-                for (final item in inv.details) {
-                  if ((item.pigType ?? '').trim() == pigType) {
-                    marketImported += item.quantity;
-                  }
-                }
+          // + Xuất kho ra chợ (Type 1)
+          for (final inv in exportBarn) {
+            for (final item in inv.details) {
+              if ((item.pigType ?? '').trim() == pigType) {
+                available += item.quantity;
               }
+            }
+          }
 
-              for (final inv in marketExportSnap.data!) {
-                for (final item in inv.details) {
-                  if ((item.pigType ?? '').trim() == pigType) {
-                    marketExported += item.quantity;
-                  }
-                }
+          // - Xuất chợ bán cho khách (Type 2)
+          for (final inv in exportMarket) {
+            for (final item in inv.details) {
+              if ((item.pigType ?? '').trim() == pigType) {
+                available -= item.quantity;
               }
+            }
+          }
 
-              final availableQty = marketImported - marketExported;
-              final requestedQty = int.tryParse(_quantityController.text) ?? 0;
-              final isValid = requestedQty <= availableQty;
+          // - Nhập kho hàng thừa (Type 0)
+          for (final inv in importBarn) {
+            for (final item in inv.details) {
+              if ((item.pigType ?? '').trim() == pigType) {
+                available -= item.quantity;
+              }
+            }
+          }
 
-              return _buildInventoryContainer(availableQty, isValid);
-            },
-          );
+          final requestedQty = int.tryParse(_quantityController.text) ?? 0;
+          final isValid = requestedQty <= available;
+
+          return _buildInventoryContainer(available, isValid);
         },
       ),
     );
   }
 
   Widget _buildInventoryContainer(int qty, bool isValid) {
+    // Không cho phép hiển thị số âm
+    final displayQty = qty < 0 ? 0 : qty;
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
@@ -2218,7 +2267,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
           ),
           const SizedBox(height: 2),
           Text(
-            '$qty con',
+            '$displayQty con',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
@@ -2760,31 +2809,50 @@ class _MarketExportViewState extends State<_MarketExportView> {
     final quantity = int.tryParse(_quantityController.text) ?? 1;
     final pigType = _pigTypeController.text.trim();
 
-    // Check inventory
+    // Check inventory - Tồn chợ = Type 3 + Type 1 - Type 2 - Type 0
     try {
-      final importInvoices = await _invoiceRepo.watchInvoices(type: 0).first;
-      final exportInvoices = await _invoiceRepo.watchInvoices(type: 2).first;
+      final importMarket = await _invoiceRepo.watchInvoices(type: 3).first;  // Nhập chợ từ NCC (+)
+      final exportBarn = await _invoiceRepo.watchInvoices(type: 1).first;    // Xuất kho ra chợ (+)
+      final exportMarket = await _invoiceRepo.watchInvoices(type: 2).first;  // Xuất chợ bán (-)
+      final importBarn = await _invoiceRepo.watchInvoices(type: 0).first;    // Nhập kho hàng thừa (-)
 
-      int imported = 0;
-      int exported = 0;
+      int available = 0;
 
-      for (final inv in importInvoices) {
+      // + Nhập chợ từ NCC (Type 3)
+      for (final inv in importMarket) {
         for (final item in inv.details) {
           if ((item.pigType ?? '').trim() == pigType) {
-            imported += item.quantity;
+            available += item.quantity;
           }
         }
       }
 
-      for (final inv in exportInvoices) {
+      // + Xuất kho ra chợ (Type 1)
+      for (final inv in exportBarn) {
         for (final item in inv.details) {
           if ((item.pigType ?? '').trim() == pigType) {
-            exported += item.quantity;
+            available += item.quantity;
           }
         }
       }
 
-      final available = imported - exported;
+      // - Xuất chợ bán (Type 2)
+      for (final inv in exportMarket) {
+        for (final item in inv.details) {
+          if ((item.pigType ?? '').trim() == pigType) {
+            available -= item.quantity;
+          }
+        }
+      }
+
+      // - Nhập kho hàng thừa (Type 0)
+      for (final inv in importBarn) {
+        for (final item in inv.details) {
+          if ((item.pigType ?? '').trim() == pigType) {
+            available -= item.quantity;
+          }
+        }
+      }
 
       if (quantity > available) {
         if (mounted) {

@@ -2,11 +2,19 @@ import 'package:flutter/material.dart';
 
 import 'core/utils/responsive.dart';
 import 'injection_container.dart' as di;
+import 'injection_container.dart';
+import 'domain/repositories/i_user_repository.dart';
+import 'presentation/features/auth/login_screen.dart';
 import 'presentation/features/dashboard/dashboard_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await di.init();
+  
+  // Tạo tài khoản admin mặc định nếu chưa có
+  final userRepo = sl<IUserRepository>();
+  await userRepo.createDefaultAdmin();
+  
   runApp(const MyApp());
 }
 
@@ -31,7 +39,7 @@ class MyApp extends StatelessWidget {
           child: child ?? const SizedBox(),
         );
       },
-      home: const DashboardScreen(),
+      home: const LoginScreen(),
     );
   }
 

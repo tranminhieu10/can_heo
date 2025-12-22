@@ -5,6 +5,7 @@ part of 'weighing_details_dao.dart';
 // ignore_for_file: type=lint
 mixin _$WeighingDetailsDaoMixin on DatabaseAccessor<AppDatabase> {
   $PartnersTable get partners => attachedDatabase.partners;
+  $CagesTable get cages => attachedDatabase.cages;
   $InvoicesTable get invoices => attachedDatabase.invoices;
   $WeighingDetailsTable get weighingDetails => attachedDatabase.weighingDetails;
 }

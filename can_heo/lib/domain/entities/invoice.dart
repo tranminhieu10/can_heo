@@ -50,6 +50,7 @@ class InvoiceEntity extends Equatable {
   final String? invoiceCode; // Mã phiếu theo ngày (VD: 20251212-01)
   final String? partnerId;
   final String? partnerName;
+  final String? cageId; // ID chuồng (cho phiếu nhập kho)
   final int type; // 0 = Nhập kho, 2 = Xuất chợ...
   final DateTime createdDate;
 
@@ -74,6 +75,7 @@ class InvoiceEntity extends Equatable {
     this.invoiceCode,
     this.partnerId,
     this.partnerName,
+    this.cageId,
     required this.type,
     required this.createdDate,
     required this.totalWeight,
@@ -97,6 +99,7 @@ class InvoiceEntity extends Equatable {
     String? invoiceCode,
     String? partnerId,
     String? partnerName,
+    String? cageId,
     int? type,
     DateTime? createdDate,
     double? totalWeight,
@@ -114,6 +117,7 @@ class InvoiceEntity extends Equatable {
       invoiceCode: invoiceCode ?? this.invoiceCode,
       partnerId: partnerId ?? this.partnerId,
       partnerName: partnerName ?? this.partnerName,
+      cageId: cageId ?? this.cageId,
       type: type ?? this.type,
       createdDate: createdDate ?? this.createdDate,
       totalWeight: totalWeight ?? this.totalWeight,
@@ -134,6 +138,7 @@ class InvoiceEntity extends Equatable {
     invoiceCode,
     partnerId,
     partnerName,
+    cageId,
     type,
     createdDate,
     totalWeight,

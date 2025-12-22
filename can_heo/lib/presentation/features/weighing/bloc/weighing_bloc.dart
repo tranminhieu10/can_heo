@@ -187,6 +187,7 @@ class WeighingBloc extends Bloc<WeighingEvent, WeighingState> {
     final updatedInvoice = invoice.copyWith(
       partnerId: event.partnerId ?? invoice.partnerId,
       partnerName: event.partnerName ?? invoice.partnerName,
+      cageId: event.cageId ?? invoice.cageId,
       note: event.note ?? invoice.note,
       pricePerKg: _lastPricePerKg,
       deduction: _lastDeduction,

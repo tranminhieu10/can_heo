@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'partners.dart';
+import 'cages.dart';
 
 @DataClassName('Invoice')
 class Invoices extends Table {
@@ -10,6 +11,9 @@ class Invoices extends Table {
   
   // Liên kết với bảng Partner
   TextColumn get partnerId => text().nullable().references(Partners, #id)();
+  
+  // Liên kết với bảng Cages (cho phiếu nhập kho)
+  TextColumn get cageId => text().nullable().references(Cages, #id)();
   
   // Loại phiếu: Nhập Kho/Xuất Chợ... (Lưu dưới dạng index của Enum)
   IntColumn get type => integer()(); 

@@ -12,6 +12,8 @@ import 'tables/weighing_details.dart';
 import 'tables/transactions.dart';
 import 'tables/pig_types.dart';
 import 'tables/farms.dart';
+import 'tables/cages.dart';
+import 'tables/users.dart';
 
 // Import DAOs
 import 'daos/partners_dao.dart';
@@ -20,25 +22,43 @@ import 'daos/weighing_details_dao.dart';
 import 'daos/transactions_dao.dart';
 import 'daos/pig_types_dao.dart';
 import 'daos/farms_dao.dart';
+import 'daos/cages_dao.dart';
+import 'daos/users_dao.dart';
 
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Partners, Invoices, WeighingDetails, Transactions, PigTypes, Farms],
+  tables: [Partners, Invoices, WeighingDetails, Transactions, PigTypes, Farms, Cages, Users],
   daos: [
     PartnersDao,
     InvoicesDao,
     WeighingDetailsDao,
     TransactionsDao,
     PigTypesDao,
-    FarmsDao
+    FarmsDao,
+    CagesDao,
+    UsersDao
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 7; // added farms table
+  int get schemaVersion => 11;
+
+  /// Xóa toàn bộ dữ liệu trong database
+  Future<void> deleteAllData() async {
+    await transaction(() async {
+      // Xóa tất cả dữ liệu từ các bảng (giữ nguyên cấu trúc bảng)
+      await delete(weighingDetails).go();
+      await delete(invoices).go();
+      await delete(transactions).go();
+      await delete(cages).go();
+      await delete(farms).go();
+      await delete(partners).go();
+      await delete(pigTypes).go();
+    });
+  }
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -97,6 +117,49 @@ class AppDatabase extends _$AppDatabase {
           if (from < 7) {
             try {
               await m.createTable(farms);
+            } catch (_) {}
+          }
+          
+          // Từ version 7 -> 8: Tạo bảng Cages
+          if (from < 8) {
+            try {
+              await m.createTable(cages);
+            } catch (_) {}
+          }
+          
+          // Từ version 8 -> 9: Xóa cột farmId từ bảng Cages
+          if (from < 9) {
+            try {
+              // Drift không hỗ trợ DROP COLUMN trực tiếp, cần tạo bảng mới
+              await customStatement('''
+                CREATE TABLE IF NOT EXISTS cages_new (
+                  id TEXT PRIMARY KEY NOT NULL,
+                  name TEXT NOT NULL,
+                  capacity INTEGER,
+                  note TEXT,
+                  created_at INTEGER NOT NULL
+                )
+              ''');
+              await customStatement('''
+                INSERT INTO cages_new (id, name, capacity, note, created_at)
+                SELECT id, name, capacity, note, created_at FROM cages
+              ''');
+              await customStatement('DROP TABLE cages');
+              await customStatement('ALTER TABLE cages_new RENAME TO cages');
+            } catch (_) {}
+          }
+          
+          // Từ version 9 -> 10: Thêm cột cageId vào bảng Invoices
+          if (from < 10) {
+            try {
+              await m.addColumn(invoices, invoices.cageId);
+            } catch (_) {}
+          }
+          
+          // Từ version 10 -> 11: Tạo bảng Users
+          if (from < 11) {
+            try {
+              await m.createTable(users);
             } catch (_) {}
           }
         },

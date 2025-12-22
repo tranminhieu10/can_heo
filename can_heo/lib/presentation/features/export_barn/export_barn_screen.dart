@@ -5,10 +5,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/utils/responsive.dart';
+import '../../../domain/entities/cage.dart';
 import '../../../domain/entities/partner.dart';
 import '../../../domain/entities/pig_type.dart';
 import '../../../domain/entities/invoice.dart';
 import '../../../domain/entities/farm.dart';
+import '../../../domain/repositories/i_cage_repository.dart';
 import '../../../domain/repositories/i_pigtype_repository.dart';
 import '../../../domain/repositories/i_invoice_repository.dart';
 import '../../../domain/repositories/i_farm_repository.dart';
@@ -69,11 +71,6 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
   InvoiceEntity? _selectedInvoice;
   bool _isEditMode = false;
 
-  // Resizable panel ratio (default 1/3 for form)
-  double _panelRatio = 0.33;
-  static const double _minPanelRatio = 0.2;
-  static const double _maxPanelRatio = 0.5;
-
   final FocusNode _scaleInputFocus = FocusNode();
   final NumberFormat _numberFormat = NumberFormat('#,##0.0', 'en_US');
   final NumberFormat _currencyFormat =
@@ -81,8 +78,10 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
 
   PartnerEntity? _selectedPartner;
   FarmEntity? _selectedFarm;
+  CageEntity? _selectedCage;
   final _invoiceRepo = sl<IInvoiceRepository>();
   final _farmRepo = sl<IFarmRepository>();
+  final _cageRepo = sl<ICageRepository>();
 
   // Scale data - nhập trực tiếp từ người dùng
   double _totalWeight = 0.0;
@@ -167,13 +166,10 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
               builder: (ctx) {
                 Responsive.init(ctx);
 
-                final topSectionHeight = switch (Responsive.screenType) {
-                  ScreenType.tablet => 320.0,
-                  ScreenType.laptop13 => 340.0,
-                  ScreenType.laptop15 => 360.0,
-                  ScreenType.desktop24 => 380.0,
-                  ScreenType.desktop27 => 400.0,
-                };
+                // Responsive layout cho mobile
+                if (Responsive.isMobile || Responsive.isTablet) {
+                  return _buildMobileLayout(context);
+                }
 
                 return Padding(
                   padding: EdgeInsets.all(Responsive.spacing),
@@ -207,6 +203,213 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Mobile layout - single column, scrollable
+  Widget _buildMobileLayout(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(Responsive.spacing),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Form thông tin phiếu
+          _buildMobileInvoiceForm(context),
+          const SizedBox(height: 16),
+          // Danh sách phiếu đã lưu
+          SizedBox(
+            height: 400,
+            child: _buildSavedInvoicesGrid(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Mobile form - stacked fields
+  Widget _buildMobileInvoiceForm(BuildContext context) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isEditMode ? Colors.orange.shade600 : Colors.brown.shade600,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _isEditMode ? Icons.edit : Icons.receipt_long,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _isEditMode ? 'CHỈNH SỬA PHIẾU' : 'THÔNG TIN PHIẾU XUẤT KHO',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  if (_isEditMode)
+                    TextButton(
+                      onPressed: _resetForm,
+                      child: const Text('Tạo mới', style: TextStyle(color: Colors.white, fontSize: 12)),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            // Nhà cung cấp
+            _buildMobileLabel('Nhà cung cấp'),
+            BlocBuilder<PartnerBloc, PartnerState>(
+              builder: (context, state) {
+                final partners = state.partners;
+                return DropdownButtonFormField<PartnerEntity>(
+                  isExpanded: true,
+                  decoration: _mobileInputDecoration('Chọn NCC'),
+                  value: partners.contains(_selectedPartner) ? _selectedPartner : null,
+                  items: partners.map((p) => DropdownMenuItem(
+                    value: p,
+                    child: Text(p.name),
+                  )).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedPartner = value;
+                      _selectedFarm = null;
+                    });
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Trại
+            _buildMobileLabel('Trại'),
+            _buildFarmDropdown(),
+            const SizedBox(height: 12),
+
+            // Loại heo
+            _buildMobileLabel('Loại heo'),
+            _buildPigTypeDropdown(),
+            const SizedBox(height: 12),
+
+            // Row: Số lượng + Trọng lượng
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildMobileLabel('Số lượng'),
+                      _buildQuantityFieldWithButtons(),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildMobileLabel('Trọng lượng (kg)'),
+                      _buildSimpleTextField(
+                        _scaleInputController,
+                        isDecimal: true,
+                        onChanged: (value) {
+                          final weight = double.tryParse(value) ?? 0;
+                          setState(() => _totalWeight = weight);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Chuồng
+            _buildMobileLabel('Chuồng'),
+            _buildCageDropdown(),
+            const SizedBox(height: 12),
+
+            // Lý do xuất
+            _buildMobileLabel('Lý do xuất'),
+            _buildSimpleTextField(_farmNameController),
+            const SizedBox(height: 12),
+
+            // Ghi chú
+            _buildMobileLabel('Ghi chú'),
+            _buildSimpleTextField(_noteController),
+            const SizedBox(height: 16),
+
+            // Tồn kho display
+            _buildMobileLabel('Tồn kho'),
+            _buildInventoryDisplayField(),
+            const SizedBox(height: 16),
+
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _resetForm,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Làm mới'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton.icon(
+                    onPressed: _canSaveInvoice()
+                        ? () => _isEditMode ? _updateInvoice(context) : _saveInvoice(context)
+                        : null,
+                    icon: Icon(_isEditMode ? Icons.edit : Icons.save),
+                    label: Text(_isEditMode ? 'CẬP NHẬT' : 'LƯU PHIẾU'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _canSaveInvoice() ? Colors.brown : Colors.grey,
+                      minimumSize: const Size(0, 48),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: Colors.grey[700],
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _mobileInputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
     );
   }
 
@@ -542,7 +745,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                         ),
                         const SizedBox(width: 4),
                         Expanded(
-                          child: _buildSimpleTextField(_cageController),
+                          child: _buildCageDropdown(),
                         ),
                       ],
                     ),
@@ -751,12 +954,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildCompactTextField(
-            'Chuồng',
-            _cageController,
-            hintText: 'Chuồng',
-            icon: Icons.home,
-          ),
+          child: _buildCageDropdown(),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -878,6 +1076,42 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
     );
   }
 
+  Widget _buildCageDropdown() {
+    return StreamBuilder<List<CageEntity>>(
+      stream: _cageRepo.watchAllCages(),
+      builder: (context, snapshot) {
+        final cages = snapshot.data ?? [];
+
+        return DropdownButtonFormField<CageEntity>(
+          value: _selectedCage != null && cages.any((c) => c.id == _selectedCage!.id) 
+              ? cages.firstWhere((c) => c.id == _selectedCage!.id) 
+              : null,
+          isExpanded: true,
+          decoration: InputDecoration(
+            hintText: cages.isEmpty ? 'Chưa có chuồng' : 'Chọn chuồng',
+            hintStyle: const TextStyle(fontSize: 13),
+            prefixIcon: const Icon(Icons.home, size: 18),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          ),
+          style: const TextStyle(fontSize: 13, color: Colors.black),
+          items: cages
+              .map((cage) => DropdownMenuItem(
+                    value: cage,
+                    child: Text(cage.name, style: const TextStyle(fontSize: 13)),
+                  ))
+              .toList(),
+          onChanged: (value) => setState(() {
+            _selectedCage = value;
+            _cageController.text = value?.name ?? '';
+          }),
+        );
+      },
+    );
+  }
+
   Widget _buildPigTypeDropdown() {
     return StreamBuilder<List<PigTypeEntity>>(
       stream: sl<IPigTypeRepository>().watchPigTypes(),
@@ -911,6 +1145,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
     );
   }
 
+  // Tồn kho = Nhập kho (0) - Xuất kho (1)
   Widget _buildInventoryDisplayField() {
     final pigType = _pigTypeController.text.trim();
     if (pigType.isEmpty) {
@@ -918,8 +1153,8 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
     }
     return StreamBuilder<List<List<InvoiceEntity>>>(
       stream: Rx.combineLatest2(
-        _invoiceRepo.watchInvoices(type: 0), // Nhập kho
-        _invoiceRepo.watchInvoices(type: 2), // Xuất chợ
+        _invoiceRepo.watchInvoices(type: 0), // Nhập kho (hàng thừa từ chợ) (+)
+        _invoiceRepo.watchInvoices(type: 1), // Xuất kho ra chợ (-)
         (List<InvoiceEntity> imports, List<InvoiceEntity> exports) =>
             [imports, exports],
       ),
@@ -932,24 +1167,27 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                   height: 24,
                   child: CircularProgressIndicator(strokeWidth: 2)));
         }
-        final importSnap = snapshot.data![0];
-        final exportSnap = snapshot.data![1];
-        int imported = 0;
-        int exported = 0;
-        for (final inv in importSnap) {
+        final importBarn = snapshot.data![0];  // Type 0: Nhập kho (+)
+        final exportBarn = snapshot.data![1];  // Type 1: Xuất kho (-)
+        int available = 0;
+        
+        // + Nhập kho (Type 0)
+        for (final inv in importBarn) {
           for (final item in inv.details) {
             if ((item.pigType ?? '').trim() == pigType)
-              imported += item.quantity;
+              available += item.quantity;
           }
         }
-        for (final inv in exportSnap) {
+        
+        // - Xuất kho (Type 1)
+        for (final inv in exportBarn) {
           for (final item in inv.details) {
             if ((item.pigType ?? '').trim() == pigType)
-              exported += item.quantity;
+              available -= item.quantity;
           }
         }
-        final availableQty = imported - exported;
-        return _buildInventoryContainer(availableQty);
+        
+        return _buildInventoryContainer(available);
       },
     );
   }
@@ -1103,13 +1341,13 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
       return;
     }
 
-    // Kiểm tra tồn kho
+    // Kiểm tra tồn kho: Tồn kho = Type 0 (Nhập kho) - Type 1 (Xuất kho)
     final quantity = int.tryParse(_quantityController.text) ?? 1;
     final pigType = _pigTypeController.text.trim();
 
     try {
       final importInvoices = await _invoiceRepo.watchInvoices(type: 0).first;
-      final exportInvoices = await _invoiceRepo.watchInvoices(type: 2).first;
+      final exportInvoices = await _invoiceRepo.watchInvoices(type: 1).first;
 
       int imported = 0;
       int exported = 0;
@@ -1170,6 +1408,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
             WeighingInvoiceUpdated(
               partnerId: _selectedPartner!.id,
               partnerName: _selectedPartner!.name,
+              cageId: _selectedCage?.id,
               pricePerKg: 0, // Không tính giá
               deduction: 0,
               discount: 0,
@@ -1204,6 +1443,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
     _cageController.clear();
     setState(() {
       _selectedPartner = null;
+      _selectedCage = null;
       _selectedInvoice = null;
       _isEditMode = false;
       _totalWeight = 0;

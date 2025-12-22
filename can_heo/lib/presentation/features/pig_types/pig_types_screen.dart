@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:rxdart/rxdart.dart';
 
 import '../../../domain/entities/pig_type.dart';
 import '../../../domain/entities/invoice.dart';
@@ -45,48 +46,54 @@ class _PigTypesScreenState extends State<PigTypesScreen> {
             );
           }
 
-          return StreamBuilder<List<InvoiceEntity>>(
-            stream: _invoiceRepo.watchInvoices(type: 0),
-            builder: (context, importSnapshot) {
-              final importInvoices = importSnapshot.data ?? [];
+          // Lấy tất cả 4 loại invoice
+          return StreamBuilder<List<List<InvoiceEntity>>>(
+            stream: Rx.combineLatest4(
+              _invoiceRepo.watchInvoices(type: 0), // Nhập kho (hàng thừa từ chợ về)
+              _invoiceRepo.watchInvoices(type: 1), // Xuất kho (từ kho ra chợ)
+              _invoiceRepo.watchInvoices(type: 2), // Xuất chợ (bán cho khách)
+              _invoiceRepo.watchInvoices(type: 3), // Nhập chợ (từ NCC)
+              (a, b, c, d) => [a, b, c, d],
+            ),
+            builder: (context, invoiceSnapshot) {
+              if (!invoiceSnapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-              return StreamBuilder<List<InvoiceEntity>>(
-                stream: _invoiceRepo.watchInvoices(type: 2),
-                builder: (context, exportSnapshot) {
-                  final exportInvoices = exportSnapshot.data ?? [];
-                  final allInvoices = [...importInvoices, ...exportInvoices];
+              final importBarn = invoiceSnapshot.data![0];   // Type 0
+              final exportBarn = invoiceSnapshot.data![1];   // Type 1
+              final exportMarket = invoiceSnapshot.data![2]; // Type 2
+              final importMarket = invoiceSnapshot.data![3]; // Type 3
 
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        // Header thống kê tổng
-                        _buildSummaryCard(pigTypes, allInvoices),
-                        const SizedBox(height: 20),
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // Header thống kê tổng
+                    _buildSummaryCard(pigTypes, importBarn, exportBarn, exportMarket, importMarket),
+                    const SizedBox(height: 20),
 
-                        // Danh sách chi tiết theo loại heo
-                        const Text(
-                          'Chi tiết theo loại heo',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: pigTypes.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final pigType = pigTypes[index];
-                            return _buildPigTypeCard(pigType, allInvoices);
-                          },
-                        ),
-                      ],
+                    // Danh sách chi tiết theo loại heo
+                    const Text(
+                      'Chi tiết theo loại heo',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
-                  );
-                },
+                    const SizedBox(height: 12),
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: pigTypes.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final pigType = pigTypes[index];
+                        return _buildPigTypeCard(pigType, importBarn, exportBarn, exportMarket, importMarket);
+                      },
+                    ),
+                  ],
+                ),
               );
             },
           );
@@ -97,24 +104,33 @@ class _PigTypesScreenState extends State<PigTypesScreen> {
 
   Widget _buildSummaryCard(
     List<PigTypeEntity> pigTypes,
-    List<InvoiceEntity> allInvoices,
+    List<InvoiceEntity> importBarn,
+    List<InvoiceEntity> exportBarn,
+    List<InvoiceEntity> exportMarket,
+    List<InvoiceEntity> importMarket,
   ) {
-    int totalImportedFromSupplier = 0;
-    int totalReturnedFromMarket = 0;
-    int totalExported = 0;
+    int totalImportMarket = 0;  // Nhập chợ từ NCC (Type 3)
+    int totalExportBarn = 0;    // Xuất kho ra chợ (Type 1)
+    int totalExportMarket = 0;  // Đã bán (Type 2)
+    int totalImportBarn = 0;    // Nhập kho hàng thừa (Type 0)
 
-    for (final inv in allInvoices) {
-      if (inv.type == 0) {
-        // Nhập kho
-        totalImportedFromSupplier += inv.totalQuantity;
-      } else if (inv.type == 2) {
-        // Xuất chợ
-        totalExported += inv.totalQuantity;
-      }
-      // Hoàn hàng từ chợ sẽ được tính trong type = 0 với description khác
+    for (final inv in importMarket) {
+      totalImportMarket += inv.totalQuantity;
+    }
+    for (final inv in exportBarn) {
+      totalExportBarn += inv.totalQuantity;
+    }
+    for (final inv in exportMarket) {
+      totalExportMarket += inv.totalQuantity;
+    }
+    for (final inv in importBarn) {
+      totalImportBarn += inv.totalQuantity;
     }
 
-    final totalInStock = totalImportedFromSupplier - totalExported;
+    // Tồn kho = Type 0 - Type 1
+    final totalInStock = totalImportBarn - totalExportBarn;
+    // Tồn chợ = Type 3 + Type 1 - Type 2 - Type 0
+    final totalInMarket = totalImportMarket + totalExportBarn - totalExportMarket - totalImportBarn;
 
     return Card(
       elevation: 4,
@@ -135,24 +151,24 @@ class _PigTypesScreenState extends State<PigTypesScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildStatItem(
-                  '🏭 Nhập từ Trại',
-                  totalImportedFromSupplier,
+                  '🚚 Nhập chợ',
+                  totalImportMarket,
                   Colors.blue,
                 ),
                 _buildStatItem(
-                  '↩️ Hoàn từ Chợ',
-                  totalReturnedFromMarket,
-                  Colors.green,
-                ),
-                _buildStatItem(
-                  '📤 Đã Bán',
-                  totalExported,
+                  '📤 Đã bán',
+                  totalExportMarket,
                   Colors.red,
                 ),
                 _buildStatItem(
-                  '📦 Tồn Kho',
-                  totalInStock,
+                  '📦 Tồn kho',
+                  totalInStock < 0 ? 0 : totalInStock,
                   Colors.orange,
+                ),
+                _buildStatItem(
+                  '🛒 Tồn chợ',
+                  totalInMarket < 0 ? 0 : totalInMarket,
+                  Colors.green,
                 ),
               ],
             ),
@@ -187,28 +203,38 @@ class _PigTypesScreenState extends State<PigTypesScreen> {
 
   Widget _buildPigTypeCard(
     PigTypeEntity pigType,
-    List<InvoiceEntity> allInvoices,
+    List<InvoiceEntity> importBarn,
+    List<InvoiceEntity> exportBarn,
+    List<InvoiceEntity> exportMarket,
+    List<InvoiceEntity> importMarket,
   ) {
-    int imported = 0;
-    int returned = 0;
-    int exported = 0;
+    int pigImportMarket = 0;  // Nhập chợ từ NCC (Type 3)
+    int pigExportBarn = 0;    // Xuất kho ra chợ (Type 1)
+    int pigExportMarket = 0;  // Đã bán (Type 2)
+    int pigImportBarn = 0;    // Nhập kho hàng thừa (Type 0)
 
-    for (final inv in allInvoices) {
-      final pigTypeInInv =
-          inv.details.isNotEmpty ? inv.details.first.pigType ?? '' : '';
-
-      if (pigTypeInInv != pigType.name) continue;
-
-      if (inv.type == 0) {
-        // Nhập kho
-        imported += inv.totalQuantity;
-      } else if (inv.type == 2) {
-        // Xuất chợ
-        exported += inv.totalQuantity;
+    // Helper để đếm số lượng theo loại heo
+    int countByPigType(List<InvoiceEntity> invoices) {
+      int count = 0;
+      for (final inv in invoices) {
+        for (final detail in inv.details) {
+          if ((detail.pigType ?? '').trim() == pigType.name) {
+            count += detail.quantity;
+          }
+        }
       }
+      return count;
     }
 
-    final inStock = imported - exported;
+    pigImportMarket = countByPigType(importMarket);
+    pigExportBarn = countByPigType(exportBarn);
+    pigExportMarket = countByPigType(exportMarket);
+    pigImportBarn = countByPigType(importBarn);
+
+    // Tồn kho = Type 0 - Type 1
+    final inStock = pigImportBarn - pigExportBarn;
+    // Tồn chợ = Type 3 + Type 1 - Type 2 - Type 0
+    final inMarket = pigImportMarket + pigExportBarn - pigExportMarket - pigImportBarn;
 
     return Card(
       elevation: 2,
@@ -250,13 +276,41 @@ class _PigTypesScreenState extends State<PigTypesScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '${_numberFormat.format(inStock)} con tồn',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: inStock > 0 ? Colors.green : Colors.red,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[100],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${_numberFormat.format(inStock < 0 ? 0 : inStock)} kho',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Colors.orange[800],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.green[100],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${_numberFormat.format(inMarket < 0 ? 0 : inMarket)} chợ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Colors.green[800],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -285,10 +339,10 @@ class _PigTypesScreenState extends State<PigTypesScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildStatColumn('🏭 Nhập', imported, Colors.blue),
-                _buildStatColumn('↩️ Hoàn', returned, Colors.green),
-                _buildStatColumn('📤 Bán', exported, Colors.red),
-                _buildStatColumn('📦 Tồn', inStock, Colors.orange),
+                _buildStatColumn('🚚 Nhập chợ', pigImportMarket, Colors.blue),
+                _buildStatColumn('📤 Đã bán', pigExportMarket, Colors.red),
+                _buildStatColumn('📦 Tồn kho', inStock < 0 ? 0 : inStock, Colors.orange),
+                _buildStatColumn('🛒 Tồn chợ', inMarket < 0 ? 0 : inMarket, Colors.green),
               ],
             ),
           ],

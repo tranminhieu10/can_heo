@@ -1,0 +1,9 @@
+{
+  "version": "1.0.1",
+  "build_number": 2,
+  "download_url": "https://your-server.com/updates/can_heo_1.0.1.msix",
+  "release_notes": "Bản cập nhật 1.0.1:\n- Cải thiện giao diện responsive\n- Thêm chức năng đăng nhập\n- Sửa lỗi tính toán tồn kho\n- Tối ưu hiệu năng",
+  "file_size": 52428800,
+  "release_date": "2024-12-22",
+  "force_update": false
+}

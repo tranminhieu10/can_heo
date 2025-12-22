@@ -433,6 +433,313 @@ class PartnersCompanion extends UpdateCompanion<Partner> {
   }
 }
 
+class $CagesTable extends Cages with TableInfo<$CagesTable, Cage> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CagesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 100),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _capacityMeta =
+      const VerificationMeta('capacity');
+  @override
+  late final GeneratedColumn<int> capacity = GeneratedColumn<int>(
+      'capacity', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+      'note', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns => [id, name, capacity, note, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cages';
+  @override
+  VerificationContext validateIntegrity(Insertable<Cage> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('capacity')) {
+      context.handle(_capacityMeta,
+          capacity.isAcceptableOrUnknown(data['capacity']!, _capacityMeta));
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+          _noteMeta, note.isAcceptableOrUnknown(data['note']!, _noteMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Cage map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Cage(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      capacity: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}capacity']),
+      note: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}note']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $CagesTable createAlias(String alias) {
+    return $CagesTable(attachedDatabase, alias);
+  }
+}
+
+class Cage extends DataClass implements Insertable<Cage> {
+  final String id;
+  final String name;
+  final int? capacity;
+  final String? note;
+  final DateTime createdAt;
+  const Cage(
+      {required this.id,
+      required this.name,
+      this.capacity,
+      this.note,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || capacity != null) {
+      map['capacity'] = Variable<int>(capacity);
+    }
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  CagesCompanion toCompanion(bool nullToAbsent) {
+    return CagesCompanion(
+      id: Value(id),
+      name: Value(name),
+      capacity: capacity == null && nullToAbsent
+          ? const Value.absent()
+          : Value(capacity),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory Cage.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Cage(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      capacity: serializer.fromJson<int?>(json['capacity']),
+      note: serializer.fromJson<String?>(json['note']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'capacity': serializer.toJson<int?>(capacity),
+      'note': serializer.toJson<String?>(note),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  Cage copyWith(
+          {String? id,
+          String? name,
+          Value<int?> capacity = const Value.absent(),
+          Value<String?> note = const Value.absent(),
+          DateTime? createdAt}) =>
+      Cage(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        capacity: capacity.present ? capacity.value : this.capacity,
+        note: note.present ? note.value : this.note,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  Cage copyWithCompanion(CagesCompanion data) {
+    return Cage(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      capacity: data.capacity.present ? data.capacity.value : this.capacity,
+      note: data.note.present ? data.note.value : this.note,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Cage(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('capacity: $capacity, ')
+          ..write('note: $note, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, capacity, note, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Cage &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.capacity == this.capacity &&
+          other.note == this.note &&
+          other.createdAt == this.createdAt);
+}
+
+class CagesCompanion extends UpdateCompanion<Cage> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int?> capacity;
+  final Value<String?> note;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const CagesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.capacity = const Value.absent(),
+    this.note = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CagesCompanion.insert({
+    required String id,
+    required String name,
+    this.capacity = const Value.absent(),
+    this.note = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        name = Value(name);
+  static Insertable<Cage> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? capacity,
+    Expression<String>? note,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (capacity != null) 'capacity': capacity,
+      if (note != null) 'note': note,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CagesCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? name,
+      Value<int?>? capacity,
+      Value<String?>? note,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return CagesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      capacity: capacity ?? this.capacity,
+      note: note ?? this.note,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (capacity.present) {
+      map['capacity'] = Variable<int>(capacity.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CagesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('capacity: $capacity, ')
+          ..write('note: $note, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -458,6 +765,14 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('REFERENCES partners (id)'));
+  static const VerificationMeta _cageIdMeta = const VerificationMeta('cageId');
+  @override
+  late final GeneratedColumn<String> cageId = GeneratedColumn<String>(
+      'cage_id', aliasedName, true,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES cages (id)'));
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
   late final GeneratedColumn<int> type = GeneratedColumn<int>(
@@ -535,6 +850,7 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         id,
         invoiceCode,
         partnerId,
+        cageId,
         type,
         createdDate,
         totalWeight,
@@ -570,6 +886,10 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     if (data.containsKey('partner_id')) {
       context.handle(_partnerIdMeta,
           partnerId.isAcceptableOrUnknown(data['partner_id']!, _partnerIdMeta));
+    }
+    if (data.containsKey('cage_id')) {
+      context.handle(_cageIdMeta,
+          cageId.isAcceptableOrUnknown(data['cage_id']!, _cageIdMeta));
     }
     if (data.containsKey('type')) {
       context.handle(
@@ -642,6 +962,8 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
           .read(DriftSqlType.string, data['${effectivePrefix}invoice_code']),
       partnerId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}partner_id']),
+      cageId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cage_id']),
       type: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}type'])!,
       createdDate: attachedDatabase.typeMapping
@@ -675,6 +997,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   final String id;
   final String? invoiceCode;
   final String? partnerId;
+  final String? cageId;
   final int type;
   final DateTime createdDate;
   final double totalWeight;
@@ -689,6 +1012,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       {required this.id,
       this.invoiceCode,
       this.partnerId,
+      this.cageId,
       required this.type,
       required this.createdDate,
       required this.totalWeight,
@@ -708,6 +1032,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     }
     if (!nullToAbsent || partnerId != null) {
       map['partner_id'] = Variable<String>(partnerId);
+    }
+    if (!nullToAbsent || cageId != null) {
+      map['cage_id'] = Variable<String>(cageId);
     }
     map['type'] = Variable<int>(type);
     map['created_date'] = Variable<DateTime>(createdDate);
@@ -733,6 +1060,8 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       partnerId: partnerId == null && nullToAbsent
           ? const Value.absent()
           : Value(partnerId),
+      cageId:
+          cageId == null && nullToAbsent ? const Value.absent() : Value(cageId),
       type: Value(type),
       createdDate: Value(createdDate),
       totalWeight: Value(totalWeight),
@@ -753,6 +1082,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       id: serializer.fromJson<String>(json['id']),
       invoiceCode: serializer.fromJson<String?>(json['invoiceCode']),
       partnerId: serializer.fromJson<String?>(json['partnerId']),
+      cageId: serializer.fromJson<String?>(json['cageId']),
       type: serializer.fromJson<int>(json['type']),
       createdDate: serializer.fromJson<DateTime>(json['createdDate']),
       totalWeight: serializer.fromJson<double>(json['totalWeight']),
@@ -772,6 +1102,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'id': serializer.toJson<String>(id),
       'invoiceCode': serializer.toJson<String?>(invoiceCode),
       'partnerId': serializer.toJson<String?>(partnerId),
+      'cageId': serializer.toJson<String?>(cageId),
       'type': serializer.toJson<int>(type),
       'createdDate': serializer.toJson<DateTime>(createdDate),
       'totalWeight': serializer.toJson<double>(totalWeight),
@@ -789,6 +1120,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           {String? id,
           Value<String?> invoiceCode = const Value.absent(),
           Value<String?> partnerId = const Value.absent(),
+          Value<String?> cageId = const Value.absent(),
           int? type,
           DateTime? createdDate,
           double? totalWeight,
@@ -803,6 +1135,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
         id: id ?? this.id,
         invoiceCode: invoiceCode.present ? invoiceCode.value : this.invoiceCode,
         partnerId: partnerId.present ? partnerId.value : this.partnerId,
+        cageId: cageId.present ? cageId.value : this.cageId,
         type: type ?? this.type,
         createdDate: createdDate ?? this.createdDate,
         totalWeight: totalWeight ?? this.totalWeight,
@@ -820,6 +1153,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       invoiceCode:
           data.invoiceCode.present ? data.invoiceCode.value : this.invoiceCode,
       partnerId: data.partnerId.present ? data.partnerId.value : this.partnerId,
+      cageId: data.cageId.present ? data.cageId.value : this.cageId,
       type: data.type.present ? data.type.value : this.type,
       createdDate:
           data.createdDate.present ? data.createdDate.value : this.createdDate,
@@ -846,6 +1180,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('id: $id, ')
           ..write('invoiceCode: $invoiceCode, ')
           ..write('partnerId: $partnerId, ')
+          ..write('cageId: $cageId, ')
           ..write('type: $type, ')
           ..write('createdDate: $createdDate, ')
           ..write('totalWeight: $totalWeight, ')
@@ -865,6 +1200,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       id,
       invoiceCode,
       partnerId,
+      cageId,
       type,
       createdDate,
       totalWeight,
@@ -882,6 +1218,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.id == this.id &&
           other.invoiceCode == this.invoiceCode &&
           other.partnerId == this.partnerId &&
+          other.cageId == this.cageId &&
           other.type == this.type &&
           other.createdDate == this.createdDate &&
           other.totalWeight == this.totalWeight &&
@@ -898,6 +1235,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String> id;
   final Value<String?> invoiceCode;
   final Value<String?> partnerId;
+  final Value<String?> cageId;
   final Value<int> type;
   final Value<DateTime> createdDate;
   final Value<double> totalWeight;
@@ -913,6 +1251,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.id = const Value.absent(),
     this.invoiceCode = const Value.absent(),
     this.partnerId = const Value.absent(),
+    this.cageId = const Value.absent(),
     this.type = const Value.absent(),
     this.createdDate = const Value.absent(),
     this.totalWeight = const Value.absent(),
@@ -929,6 +1268,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     required String id,
     this.invoiceCode = const Value.absent(),
     this.partnerId = const Value.absent(),
+    this.cageId = const Value.absent(),
     required int type,
     required DateTime createdDate,
     this.totalWeight = const Value.absent(),
@@ -947,6 +1287,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<String>? id,
     Expression<String>? invoiceCode,
     Expression<String>? partnerId,
+    Expression<String>? cageId,
     Expression<int>? type,
     Expression<DateTime>? createdDate,
     Expression<double>? totalWeight,
@@ -963,6 +1304,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       if (id != null) 'id': id,
       if (invoiceCode != null) 'invoice_code': invoiceCode,
       if (partnerId != null) 'partner_id': partnerId,
+      if (cageId != null) 'cage_id': cageId,
       if (type != null) 'type': type,
       if (createdDate != null) 'created_date': createdDate,
       if (totalWeight != null) 'total_weight': totalWeight,
@@ -981,6 +1323,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       {Value<String>? id,
       Value<String?>? invoiceCode,
       Value<String?>? partnerId,
+      Value<String?>? cageId,
       Value<int>? type,
       Value<DateTime>? createdDate,
       Value<double>? totalWeight,
@@ -996,6 +1339,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       id: id ?? this.id,
       invoiceCode: invoiceCode ?? this.invoiceCode,
       partnerId: partnerId ?? this.partnerId,
+      cageId: cageId ?? this.cageId,
       type: type ?? this.type,
       createdDate: createdDate ?? this.createdDate,
       totalWeight: totalWeight ?? this.totalWeight,
@@ -1021,6 +1365,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     }
     if (partnerId.present) {
       map['partner_id'] = Variable<String>(partnerId.value);
+    }
+    if (cageId.present) {
+      map['cage_id'] = Variable<String>(cageId.value);
     }
     if (type.present) {
       map['type'] = Variable<int>(type.value);
@@ -1064,6 +1411,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('id: $id, ')
           ..write('invoiceCode: $invoiceCode, ')
           ..write('partnerId: $partnerId, ')
+          ..write('cageId: $cageId, ')
           ..write('type: $type, ')
           ..write('createdDate: $createdDate, ')
           ..write('totalWeight: $totalWeight, ')
@@ -2650,16 +2998,459 @@ class FarmsCompanion extends UpdateCompanion<Farm> {
   }
 }
 
+class $UsersTable extends Users with TableInfo<$UsersTable, User> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $UsersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _usernameMeta =
+      const VerificationMeta('username');
+  @override
+  late final GeneratedColumn<String> username = GeneratedColumn<String>(
+      'username', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 50),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _passwordMeta =
+      const VerificationMeta('password');
+  @override
+  late final GeneratedColumn<String> password = GeneratedColumn<String>(
+      'password', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 100),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _displayNameMeta =
+      const VerificationMeta('displayName');
+  @override
+  late final GeneratedColumn<String> displayName = GeneratedColumn<String>(
+      'display_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isAdminMeta =
+      const VerificationMeta('isAdmin');
+  @override
+  late final GeneratedColumn<bool> isAdmin = GeneratedColumn<bool>(
+      'is_admin', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_admin" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _isActiveMeta =
+      const VerificationMeta('isActive');
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+      'is_active', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_active" IN (0, 1))'),
+      defaultValue: const Constant(true));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _lastLoginMeta =
+      const VerificationMeta('lastLogin');
+  @override
+  late final GeneratedColumn<DateTime> lastLogin = GeneratedColumn<DateTime>(
+      'last_login', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        username,
+        password,
+        displayName,
+        isAdmin,
+        isActive,
+        createdAt,
+        lastLogin
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'users';
+  @override
+  VerificationContext validateIntegrity(Insertable<User> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('username')) {
+      context.handle(_usernameMeta,
+          username.isAcceptableOrUnknown(data['username']!, _usernameMeta));
+    } else if (isInserting) {
+      context.missing(_usernameMeta);
+    }
+    if (data.containsKey('password')) {
+      context.handle(_passwordMeta,
+          password.isAcceptableOrUnknown(data['password']!, _passwordMeta));
+    } else if (isInserting) {
+      context.missing(_passwordMeta);
+    }
+    if (data.containsKey('display_name')) {
+      context.handle(
+          _displayNameMeta,
+          displayName.isAcceptableOrUnknown(
+              data['display_name']!, _displayNameMeta));
+    }
+    if (data.containsKey('is_admin')) {
+      context.handle(_isAdminMeta,
+          isAdmin.isAcceptableOrUnknown(data['is_admin']!, _isAdminMeta));
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(_isActiveMeta,
+          isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('last_login')) {
+      context.handle(_lastLoginMeta,
+          lastLogin.isAcceptableOrUnknown(data['last_login']!, _lastLoginMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  User map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return User(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      username: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}username'])!,
+      password: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}password'])!,
+      displayName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}display_name']),
+      isAdmin: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_admin'])!,
+      isActive: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_active'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      lastLogin: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}last_login']),
+    );
+  }
+
+  @override
+  $UsersTable createAlias(String alias) {
+    return $UsersTable(attachedDatabase, alias);
+  }
+}
+
+class User extends DataClass implements Insertable<User> {
+  final String id;
+  final String username;
+  final String password;
+  final String? displayName;
+  final bool isAdmin;
+  final bool isActive;
+  final DateTime createdAt;
+  final DateTime? lastLogin;
+  const User(
+      {required this.id,
+      required this.username,
+      required this.password,
+      this.displayName,
+      required this.isAdmin,
+      required this.isActive,
+      required this.createdAt,
+      this.lastLogin});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['username'] = Variable<String>(username);
+    map['password'] = Variable<String>(password);
+    if (!nullToAbsent || displayName != null) {
+      map['display_name'] = Variable<String>(displayName);
+    }
+    map['is_admin'] = Variable<bool>(isAdmin);
+    map['is_active'] = Variable<bool>(isActive);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || lastLogin != null) {
+      map['last_login'] = Variable<DateTime>(lastLogin);
+    }
+    return map;
+  }
+
+  UsersCompanion toCompanion(bool nullToAbsent) {
+    return UsersCompanion(
+      id: Value(id),
+      username: Value(username),
+      password: Value(password),
+      displayName: displayName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(displayName),
+      isAdmin: Value(isAdmin),
+      isActive: Value(isActive),
+      createdAt: Value(createdAt),
+      lastLogin: lastLogin == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastLogin),
+    );
+  }
+
+  factory User.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return User(
+      id: serializer.fromJson<String>(json['id']),
+      username: serializer.fromJson<String>(json['username']),
+      password: serializer.fromJson<String>(json['password']),
+      displayName: serializer.fromJson<String?>(json['displayName']),
+      isAdmin: serializer.fromJson<bool>(json['isAdmin']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      lastLogin: serializer.fromJson<DateTime?>(json['lastLogin']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'username': serializer.toJson<String>(username),
+      'password': serializer.toJson<String>(password),
+      'displayName': serializer.toJson<String?>(displayName),
+      'isAdmin': serializer.toJson<bool>(isAdmin),
+      'isActive': serializer.toJson<bool>(isActive),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'lastLogin': serializer.toJson<DateTime?>(lastLogin),
+    };
+  }
+
+  User copyWith(
+          {String? id,
+          String? username,
+          String? password,
+          Value<String?> displayName = const Value.absent(),
+          bool? isAdmin,
+          bool? isActive,
+          DateTime? createdAt,
+          Value<DateTime?> lastLogin = const Value.absent()}) =>
+      User(
+        id: id ?? this.id,
+        username: username ?? this.username,
+        password: password ?? this.password,
+        displayName: displayName.present ? displayName.value : this.displayName,
+        isAdmin: isAdmin ?? this.isAdmin,
+        isActive: isActive ?? this.isActive,
+        createdAt: createdAt ?? this.createdAt,
+        lastLogin: lastLogin.present ? lastLogin.value : this.lastLogin,
+      );
+  User copyWithCompanion(UsersCompanion data) {
+    return User(
+      id: data.id.present ? data.id.value : this.id,
+      username: data.username.present ? data.username.value : this.username,
+      password: data.password.present ? data.password.value : this.password,
+      displayName:
+          data.displayName.present ? data.displayName.value : this.displayName,
+      isAdmin: data.isAdmin.present ? data.isAdmin.value : this.isAdmin,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastLogin: data.lastLogin.present ? data.lastLogin.value : this.lastLogin,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('User(')
+          ..write('id: $id, ')
+          ..write('username: $username, ')
+          ..write('password: $password, ')
+          ..write('displayName: $displayName, ')
+          ..write('isAdmin: $isAdmin, ')
+          ..write('isActive: $isActive, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastLogin: $lastLogin')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, username, password, displayName, isAdmin,
+      isActive, createdAt, lastLogin);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is User &&
+          other.id == this.id &&
+          other.username == this.username &&
+          other.password == this.password &&
+          other.displayName == this.displayName &&
+          other.isAdmin == this.isAdmin &&
+          other.isActive == this.isActive &&
+          other.createdAt == this.createdAt &&
+          other.lastLogin == this.lastLogin);
+}
+
+class UsersCompanion extends UpdateCompanion<User> {
+  final Value<String> id;
+  final Value<String> username;
+  final Value<String> password;
+  final Value<String?> displayName;
+  final Value<bool> isAdmin;
+  final Value<bool> isActive;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> lastLogin;
+  final Value<int> rowid;
+  const UsersCompanion({
+    this.id = const Value.absent(),
+    this.username = const Value.absent(),
+    this.password = const Value.absent(),
+    this.displayName = const Value.absent(),
+    this.isAdmin = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.lastLogin = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  UsersCompanion.insert({
+    required String id,
+    required String username,
+    required String password,
+    this.displayName = const Value.absent(),
+    this.isAdmin = const Value.absent(),
+    this.isActive = const Value.absent(),
+    required DateTime createdAt,
+    this.lastLogin = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        username = Value(username),
+        password = Value(password),
+        createdAt = Value(createdAt);
+  static Insertable<User> custom({
+    Expression<String>? id,
+    Expression<String>? username,
+    Expression<String>? password,
+    Expression<String>? displayName,
+    Expression<bool>? isAdmin,
+    Expression<bool>? isActive,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? lastLogin,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (username != null) 'username': username,
+      if (password != null) 'password': password,
+      if (displayName != null) 'display_name': displayName,
+      if (isAdmin != null) 'is_admin': isAdmin,
+      if (isActive != null) 'is_active': isActive,
+      if (createdAt != null) 'created_at': createdAt,
+      if (lastLogin != null) 'last_login': lastLogin,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  UsersCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? username,
+      Value<String>? password,
+      Value<String?>? displayName,
+      Value<bool>? isAdmin,
+      Value<bool>? isActive,
+      Value<DateTime>? createdAt,
+      Value<DateTime?>? lastLogin,
+      Value<int>? rowid}) {
+    return UsersCompanion(
+      id: id ?? this.id,
+      username: username ?? this.username,
+      password: password ?? this.password,
+      displayName: displayName ?? this.displayName,
+      isAdmin: isAdmin ?? this.isAdmin,
+      isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
+      lastLogin: lastLogin ?? this.lastLogin,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (username.present) {
+      map['username'] = Variable<String>(username.value);
+    }
+    if (password.present) {
+      map['password'] = Variable<String>(password.value);
+    }
+    if (displayName.present) {
+      map['display_name'] = Variable<String>(displayName.value);
+    }
+    if (isAdmin.present) {
+      map['is_admin'] = Variable<bool>(isAdmin.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (lastLogin.present) {
+      map['last_login'] = Variable<DateTime>(lastLogin.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UsersCompanion(')
+          ..write('id: $id, ')
+          ..write('username: $username, ')
+          ..write('password: $password, ')
+          ..write('displayName: $displayName, ')
+          ..write('isAdmin: $isAdmin, ')
+          ..write('isActive: $isActive, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastLogin: $lastLogin, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $PartnersTable partners = $PartnersTable(this);
+  late final $CagesTable cages = $CagesTable(this);
   late final $InvoicesTable invoices = $InvoicesTable(this);
   late final $WeighingDetailsTable weighingDetails =
       $WeighingDetailsTable(this);
   late final $TransactionsTable transactions = $TransactionsTable(this);
   late final $PigTypesTable pigTypes = $PigTypesTable(this);
   late final $FarmsTable farms = $FarmsTable(this);
+  late final $UsersTable users = $UsersTable(this);
   late final PartnersDao partnersDao = PartnersDao(this as AppDatabase);
   late final InvoicesDao invoicesDao = InvoicesDao(this as AppDatabase);
   late final WeighingDetailsDao weighingDetailsDao =
@@ -2668,12 +3459,22 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       TransactionsDao(this as AppDatabase);
   late final PigTypesDao pigTypesDao = PigTypesDao(this as AppDatabase);
   late final FarmsDao farmsDao = FarmsDao(this as AppDatabase);
+  late final CagesDao cagesDao = CagesDao(this as AppDatabase);
+  late final UsersDao usersDao = UsersDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [partners, invoices, weighingDetails, transactions, pigTypes, farms];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+        partners,
+        cages,
+        invoices,
+        weighingDetails,
+        transactions,
+        pigTypes,
+        farms,
+        users
+      ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
         [
@@ -3056,10 +3857,258 @@ typedef $$PartnersTableProcessedTableManager = ProcessedTableManager<
     (Partner, $$PartnersTableReferences),
     Partner,
     PrefetchHooks Function({bool invoicesRefs, bool transactionsRefs})>;
+typedef $$CagesTableCreateCompanionBuilder = CagesCompanion Function({
+  required String id,
+  required String name,
+  Value<int?> capacity,
+  Value<String?> note,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$CagesTableUpdateCompanionBuilder = CagesCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<int?> capacity,
+  Value<String?> note,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+final class $$CagesTableReferences
+    extends BaseReferences<_$AppDatabase, $CagesTable, Cage> {
+  $$CagesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$InvoicesTable, List<Invoice>> _invoicesRefsTable(
+          _$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.invoices,
+          aliasName: $_aliasNameGenerator(db.cages.id, db.invoices.cageId));
+
+  $$InvoicesTableProcessedTableManager get invoicesRefs {
+    final manager = $$InvoicesTableTableManager($_db, $_db.invoices)
+        .filter((f) => f.cageId.id($_item.id));
+
+    final cache = $_typedResult.readTableOrNull(_invoicesRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
+class $$CagesTableFilterComposer extends Composer<_$AppDatabase, $CagesTable> {
+  $$CagesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get capacity => $composableBuilder(
+      column: $table.capacity, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get note => $composableBuilder(
+      column: $table.note, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> invoicesRefs(
+      Expression<bool> Function($$InvoicesTableFilterComposer f) f) {
+    final $$InvoicesTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.invoices,
+        getReferencedColumn: (t) => t.cageId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$InvoicesTableFilterComposer(
+              $db: $db,
+              $table: $db.invoices,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+}
+
+class $$CagesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CagesTable> {
+  $$CagesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get capacity => $composableBuilder(
+      column: $table.capacity, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get note => $composableBuilder(
+      column: $table.note, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CagesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CagesTable> {
+  $$CagesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get capacity =>
+      $composableBuilder(column: $table.capacity, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  Expression<T> invoicesRefs<T extends Object>(
+      Expression<T> Function($$InvoicesTableAnnotationComposer a) f) {
+    final $$InvoicesTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.invoices,
+        getReferencedColumn: (t) => t.cageId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$InvoicesTableAnnotationComposer(
+              $db: $db,
+              $table: $db.invoices,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+}
+
+class $$CagesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CagesTable,
+    Cage,
+    $$CagesTableFilterComposer,
+    $$CagesTableOrderingComposer,
+    $$CagesTableAnnotationComposer,
+    $$CagesTableCreateCompanionBuilder,
+    $$CagesTableUpdateCompanionBuilder,
+    (Cage, $$CagesTableReferences),
+    Cage,
+    PrefetchHooks Function({bool invoicesRefs})> {
+  $$CagesTableTableManager(_$AppDatabase db, $CagesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CagesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CagesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CagesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<int?> capacity = const Value.absent(),
+            Value<String?> note = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CagesCompanion(
+            id: id,
+            name: name,
+            capacity: capacity,
+            note: note,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String name,
+            Value<int?> capacity = const Value.absent(),
+            Value<String?> note = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CagesCompanion.insert(
+            id: id,
+            name: name,
+            capacity: capacity,
+            note: note,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) =>
+                  (e.readTable(table), $$CagesTableReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: ({invoicesRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (invoicesRefs) db.invoices],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (invoicesRefs)
+                    await $_getPrefetchedData(
+                        currentTable: table,
+                        referencedTable:
+                            $$CagesTableReferences._invoicesRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$CagesTableReferences(db, table, p0).invoicesRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.cageId == item.id),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$CagesTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $CagesTable,
+    Cage,
+    $$CagesTableFilterComposer,
+    $$CagesTableOrderingComposer,
+    $$CagesTableAnnotationComposer,
+    $$CagesTableCreateCompanionBuilder,
+    $$CagesTableUpdateCompanionBuilder,
+    (Cage, $$CagesTableReferences),
+    Cage,
+    PrefetchHooks Function({bool invoicesRefs})>;
 typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   required String id,
   Value<String?> invoiceCode,
   Value<String?> partnerId,
+  Value<String?> cageId,
   required int type,
   required DateTime createdDate,
   Value<double> totalWeight,
@@ -3076,6 +4125,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<String> id,
   Value<String?> invoiceCode,
   Value<String?> partnerId,
+  Value<String?> cageId,
   Value<int> type,
   Value<DateTime> createdDate,
   Value<double> totalWeight,
@@ -3101,6 +4151,19 @@ final class $$InvoicesTableReferences
     final manager = $$PartnersTableTableManager($_db, $_db.partners)
         .filter((f) => f.id($_item.partnerId!));
     final item = $_typedResult.readTableOrNull(_partnerIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $CagesTable _cageIdTable(_$AppDatabase db) => db.cages
+      .createAlias($_aliasNameGenerator(db.invoices.cageId, db.cages.id));
+
+  $$CagesTableProcessedTableManager? get cageId {
+    if ($_item.cageId == null) return null;
+    final manager = $$CagesTableTableManager($_db, $_db.cages)
+        .filter((f) => f.id($_item.cageId!));
+    final item = $_typedResult.readTableOrNull(_cageIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: [item]));
@@ -3196,6 +4259,26 @@ class $$InvoicesTableFilterComposer
             $$PartnersTableFilterComposer(
               $db: $db,
               $table: $db.partners,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$CagesTableFilterComposer get cageId {
+    final $$CagesTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.cageId,
+        referencedTable: $db.cages,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$CagesTableFilterComposer(
+              $db: $db,
+              $table: $db.cages,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -3312,6 +4395,26 @@ class $$InvoicesTableOrderingComposer
             ));
     return composer;
   }
+
+  $$CagesTableOrderingComposer get cageId {
+    final $$CagesTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.cageId,
+        referencedTable: $db.cages,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$CagesTableOrderingComposer(
+              $db: $db,
+              $table: $db.cages,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$InvoicesTableAnnotationComposer
@@ -3379,6 +4482,26 @@ class $$InvoicesTableAnnotationComposer
     return composer;
   }
 
+  $$CagesTableAnnotationComposer get cageId {
+    final $$CagesTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.cageId,
+        referencedTable: $db.cages,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$CagesTableAnnotationComposer(
+              $db: $db,
+              $table: $db.cages,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
   Expression<T> weighingDetailsRefs<T extends Object>(
       Expression<T> Function($$WeighingDetailsTableAnnotationComposer a) f) {
     final $$WeighingDetailsTableAnnotationComposer composer = $composerBuilder(
@@ -3434,7 +4557,10 @@ class $$InvoicesTableTableManager extends RootTableManager<
     (Invoice, $$InvoicesTableReferences),
     Invoice,
     PrefetchHooks Function(
-        {bool partnerId, bool weighingDetailsRefs, bool transactionsRefs})> {
+        {bool partnerId,
+        bool cageId,
+        bool weighingDetailsRefs,
+        bool transactionsRefs})> {
   $$InvoicesTableTableManager(_$AppDatabase db, $InvoicesTable table)
       : super(TableManagerState(
           db: db,
@@ -3449,6 +4575,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<String> id = const Value.absent(),
             Value<String?> invoiceCode = const Value.absent(),
             Value<String?> partnerId = const Value.absent(),
+            Value<String?> cageId = const Value.absent(),
             Value<int> type = const Value.absent(),
             Value<DateTime> createdDate = const Value.absent(),
             Value<double> totalWeight = const Value.absent(),
@@ -3465,6 +4592,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             id: id,
             invoiceCode: invoiceCode,
             partnerId: partnerId,
+            cageId: cageId,
             type: type,
             createdDate: createdDate,
             totalWeight: totalWeight,
@@ -3481,6 +4609,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             required String id,
             Value<String?> invoiceCode = const Value.absent(),
             Value<String?> partnerId = const Value.absent(),
+            Value<String?> cageId = const Value.absent(),
             required int type,
             required DateTime createdDate,
             Value<double> totalWeight = const Value.absent(),
@@ -3497,6 +4626,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             id: id,
             invoiceCode: invoiceCode,
             partnerId: partnerId,
+            cageId: cageId,
             type: type,
             createdDate: createdDate,
             totalWeight: totalWeight,
@@ -3515,6 +4645,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
               .toList(),
           prefetchHooksCallback: (
               {partnerId = false,
+              cageId = false,
               weighingDetailsRefs = false,
               transactionsRefs = false}) {
             return PrefetchHooks(
@@ -3544,6 +4675,15 @@ class $$InvoicesTableTableManager extends RootTableManager<
                         $$InvoicesTableReferences._partnerIdTable(db),
                     referencedColumn:
                         $$InvoicesTableReferences._partnerIdTable(db).id,
+                  ) as T;
+                }
+                if (cageId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.cageId,
+                    referencedTable: $$InvoicesTableReferences._cageIdTable(db),
+                    referencedColumn:
+                        $$InvoicesTableReferences._cageIdTable(db).id,
                   ) as T;
                 }
 
@@ -3594,7 +4734,10 @@ typedef $$InvoicesTableProcessedTableManager = ProcessedTableManager<
     (Invoice, $$InvoicesTableReferences),
     Invoice,
     PrefetchHooks Function(
-        {bool partnerId, bool weighingDetailsRefs, bool transactionsRefs})>;
+        {bool partnerId,
+        bool cageId,
+        bool weighingDetailsRefs,
+        bool transactionsRefs})>;
 typedef $$WeighingDetailsTableCreateCompanionBuilder = WeighingDetailsCompanion
     Function({
   required String id,
@@ -4673,12 +5816,223 @@ typedef $$FarmsTableProcessedTableManager = ProcessedTableManager<
     (Farm, BaseReferences<_$AppDatabase, $FarmsTable, Farm>),
     Farm,
     PrefetchHooks Function()>;
+typedef $$UsersTableCreateCompanionBuilder = UsersCompanion Function({
+  required String id,
+  required String username,
+  required String password,
+  Value<String?> displayName,
+  Value<bool> isAdmin,
+  Value<bool> isActive,
+  required DateTime createdAt,
+  Value<DateTime?> lastLogin,
+  Value<int> rowid,
+});
+typedef $$UsersTableUpdateCompanionBuilder = UsersCompanion Function({
+  Value<String> id,
+  Value<String> username,
+  Value<String> password,
+  Value<String?> displayName,
+  Value<bool> isAdmin,
+  Value<bool> isActive,
+  Value<DateTime> createdAt,
+  Value<DateTime?> lastLogin,
+  Value<int> rowid,
+});
+
+class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
+  $$UsersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get username => $composableBuilder(
+      column: $table.username, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get password => $composableBuilder(
+      column: $table.password, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get displayName => $composableBuilder(
+      column: $table.displayName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isAdmin => $composableBuilder(
+      column: $table.isAdmin, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+      column: $table.isActive, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastLogin => $composableBuilder(
+      column: $table.lastLogin, builder: (column) => ColumnFilters(column));
+}
+
+class $$UsersTableOrderingComposer
+    extends Composer<_$AppDatabase, $UsersTable> {
+  $$UsersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get username => $composableBuilder(
+      column: $table.username, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get password => $composableBuilder(
+      column: $table.password, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get displayName => $composableBuilder(
+      column: $table.displayName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isAdmin => $composableBuilder(
+      column: $table.isAdmin, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+      column: $table.isActive, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastLogin => $composableBuilder(
+      column: $table.lastLogin, builder: (column) => ColumnOrderings(column));
+}
+
+class $$UsersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $UsersTable> {
+  $$UsersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get username =>
+      $composableBuilder(column: $table.username, builder: (column) => column);
+
+  GeneratedColumn<String> get password =>
+      $composableBuilder(column: $table.password, builder: (column) => column);
+
+  GeneratedColumn<String> get displayName => $composableBuilder(
+      column: $table.displayName, builder: (column) => column);
+
+  GeneratedColumn<bool> get isAdmin =>
+      $composableBuilder(column: $table.isAdmin, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastLogin =>
+      $composableBuilder(column: $table.lastLogin, builder: (column) => column);
+}
+
+class $$UsersTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $UsersTable,
+    User,
+    $$UsersTableFilterComposer,
+    $$UsersTableOrderingComposer,
+    $$UsersTableAnnotationComposer,
+    $$UsersTableCreateCompanionBuilder,
+    $$UsersTableUpdateCompanionBuilder,
+    (User, BaseReferences<_$AppDatabase, $UsersTable, User>),
+    User,
+    PrefetchHooks Function()> {
+  $$UsersTableTableManager(_$AppDatabase db, $UsersTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$UsersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$UsersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$UsersTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> username = const Value.absent(),
+            Value<String> password = const Value.absent(),
+            Value<String?> displayName = const Value.absent(),
+            Value<bool> isAdmin = const Value.absent(),
+            Value<bool> isActive = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime?> lastLogin = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              UsersCompanion(
+            id: id,
+            username: username,
+            password: password,
+            displayName: displayName,
+            isAdmin: isAdmin,
+            isActive: isActive,
+            createdAt: createdAt,
+            lastLogin: lastLogin,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String username,
+            required String password,
+            Value<String?> displayName = const Value.absent(),
+            Value<bool> isAdmin = const Value.absent(),
+            Value<bool> isActive = const Value.absent(),
+            required DateTime createdAt,
+            Value<DateTime?> lastLogin = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              UsersCompanion.insert(
+            id: id,
+            username: username,
+            password: password,
+            displayName: displayName,
+            isAdmin: isAdmin,
+            isActive: isActive,
+            createdAt: createdAt,
+            lastLogin: lastLogin,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$UsersTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $UsersTable,
+    User,
+    $$UsersTableFilterComposer,
+    $$UsersTableOrderingComposer,
+    $$UsersTableAnnotationComposer,
+    $$UsersTableCreateCompanionBuilder,
+    $$UsersTableUpdateCompanionBuilder,
+    (User, BaseReferences<_$AppDatabase, $UsersTable, User>),
+    User,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$PartnersTableTableManager get partners =>
       $$PartnersTableTableManager(_db, _db.partners);
+  $$CagesTableTableManager get cages =>
+      $$CagesTableTableManager(_db, _db.cages);
   $$InvoicesTableTableManager get invoices =>
       $$InvoicesTableTableManager(_db, _db.invoices);
   $$WeighingDetailsTableTableManager get weighingDetails =>
@@ -4689,4 +6043,6 @@ class $AppDatabaseManager {
       $$PigTypesTableTableManager(_db, _db.pigTypes);
   $$FarmsTableTableManager get farms =>
       $$FarmsTableTableManager(_db, _db.farms);
+  $$UsersTableTableManager get users =>
+      $$UsersTableTableManager(_db, _db.users);
 }

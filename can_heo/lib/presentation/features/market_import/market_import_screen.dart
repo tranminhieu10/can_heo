@@ -527,9 +527,9 @@ class _MarketImportViewState extends State<_MarketImportView> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  // Row 2: Loại heo + Tồn kho + Số lượng
+                  // Row 2: Loại heo + Tồn chợ + Số lượng
                   _buildRowLabels(
-                      ['Loại heo', 'Tồn kho', 'Số lượng'], fontSize),
+                      ['Loại heo', 'Tồn chợ', 'Số lượng'], fontSize),
                   Expanded(
                     child: Row(
                       children: [
@@ -975,18 +975,19 @@ class _MarketImportViewState extends State<_MarketImportView> {
     );
   }
 
+  // Tồn chợ = Nhập chợ (3) + Xuất kho (1) - Xuất chợ (2) - Nhập kho (0)
   Widget _buildInventoryDisplayField() {
     final pigType = _pigTypeController.text.trim();
     if (pigType.isEmpty) {
       return _buildInventoryContainer(0);
     }
     return StreamBuilder<List<List<InvoiceEntity>>>(
-      stream: Rx.combineLatest2(
-        _invoiceRepo.watchInvoices(type: 3), // Nhập chợ
-        _invoiceRepo.watchInvoices(type: 2), // Xuất chợ
-        (List<InvoiceEntity> marketImports,
-                List<InvoiceEntity> marketExports) =>
-            [marketImports, marketExports],
+      stream: Rx.combineLatest4(
+        _invoiceRepo.watchInvoices(type: 3), // Nhập chợ từ NCC (+)
+        _invoiceRepo.watchInvoices(type: 1), // Xuất kho ra chợ (+)
+        _invoiceRepo.watchInvoices(type: 2), // Xuất chợ bán (-)
+        _invoiceRepo.watchInvoices(type: 0), // Nhập kho hàng thừa (-)
+        (a, b, c, d) => [a, b, c, d],
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting ||
@@ -997,24 +998,46 @@ class _MarketImportViewState extends State<_MarketImportView> {
                   height: 24,
                   child: CircularProgressIndicator(strokeWidth: 2)));
         }
-        final marketImportSnap = snapshot.data![0];
-        final marketExportSnap = snapshot.data![1];
-        int marketImported = 0;
-        int marketExported = 0;
-        for (final inv in marketImportSnap) {
+        final importMarket = snapshot.data![0]; // Type 3: Nhập chợ từ NCC (+)
+        final exportBarn = snapshot.data![1];   // Type 1: Xuất kho ra chợ (+)
+        final exportMarket = snapshot.data![2]; // Type 2: Xuất chợ bán (-)
+        final importBarn = snapshot.data![3];   // Type 0: Nhập kho hàng thừa (-)
+        
+        int available = 0;
+        
+        // + Nhập chợ từ NCC (Type 3)
+        for (final inv in importMarket) {
           for (final item in inv.details) {
             if ((item.pigType ?? '').trim() == pigType)
-              marketImported += item.quantity;
+              available += item.quantity;
           }
         }
-        for (final inv in marketExportSnap) {
+        
+        // + Xuất kho ra chợ (Type 1)
+        for (final inv in exportBarn) {
           for (final item in inv.details) {
             if ((item.pigType ?? '').trim() == pigType)
-              marketExported += item.quantity;
+              available += item.quantity;
           }
         }
-        final availableQty = marketImported - marketExported;
-        return _buildInventoryContainer(availableQty);
+        
+        // - Xuất chợ bán (Type 2)
+        for (final inv in exportMarket) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              available -= item.quantity;
+          }
+        }
+        
+        // - Nhập kho hàng thừa (Type 0)
+        for (final inv in importBarn) {
+          for (final item in inv.details) {
+            if ((item.pigType ?? '').trim() == pigType)
+              available -= item.quantity;
+          }
+        }
+        
+        return _buildInventoryContainer(available);
       },
     );
   }

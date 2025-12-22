@@ -9,6 +9,7 @@ import 'bloc/partner_bloc.dart';
 import 'bloc/partner_event.dart';
 import 'bloc/partner_state.dart';
 import 'company_farm_screen.dart';
+import 'warehouse_cage_screen.dart';
 
 class PartnersScreen extends StatelessWidget {
   const PartnersScreen({super.key});
@@ -28,53 +29,58 @@ class _PartnersView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         backgroundColor: Colors.grey[100],
         appBar: AppBar(
-          title: const Text("QUẢN LÝ ĐỐI TÁC"),
+          title: const Text("QUẢN LÝ ĐỐI TÁC & KHO"),
           elevation: 0,
           backgroundColor: Colors.white,
-          actions: [
-            // Nút quản lý Công ty & Trại
-            IconButton(
-              icon: const Icon(Icons.business, color: Colors.orange),
-              tooltip: 'Quản lý Công ty & Trại',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CompanyFarmScreen()),
-                );
-              },
-            ),
-          ],
           bottom: TabBar(
             labelColor: Colors.blue,
             unselectedLabelColor: Colors.grey,
             indicatorColor: Colors.blue,
             onTap: (index) {
-              context.read<PartnerBloc>().add(LoadPartners(index == 1));
+              if (index == 0) {
+                context.read<PartnerBloc>().add(const LoadPartners(false)); // Khách hàng
+              } else if (index == 1) {
+                context.read<PartnerBloc>().add(const LoadPartners(true)); // NCC
+              }
+              // Tab 2 (Chuồng kho) không cần load partners
             },
             tabs: const [
-              Tab(icon: Icon(Icons.people), text: "KHÁCH HÀNG (LÁI)"),
-              Tab(icon: Icon(Icons.store), text: "NHÀ CUNG CẤP"),
+              Tab(icon: Icon(Icons.people), text: "KHÁCH HÀNG"),
+              Tab(icon: Icon(Icons.business), text: "NCC & TRẠI"),
+              Tab(icon: Icon(Icons.warehouse), text: "CHUỒNG KHO"),
             ],
           ),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          heroTag: 'partners_screen_fab',
-          onPressed: () => _showAddPartnerDialog(context),
-          label: const Text("THÊM MỚI"),
-          icon: const Icon(Icons.add),
-          backgroundColor: Colors.blue,
+        body: TabBarView(
+          children: [
+            _buildPartnerTab(context, false), // Khách hàng
+            const CompanyFarmScreen(), // NCC & Trại
+            const WarehouseCageScreen(), // Chuồng Kho
+          ],
         ),
-        body: const _PartnerList(),
       ),
     );
   }
 
-  void _showAddPartnerDialog(BuildContext context) {
-    final isSupplier = context.read<PartnerBloc>().state.isSupplierFilter;
+  Widget _buildPartnerTab(BuildContext context, bool isSupplier) {
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: isSupplier ? 'supplier_fab' : 'customer_fab',
+        onPressed: () => _showAddPartnerDialog(context, isSupplier),
+        label: const Text("THÊM MỚI"),
+        icon: const Icon(Icons.add),
+        backgroundColor: Colors.blue,
+      ),
+      body: const _PartnerList(),
+    );
+  }
+
+  void _showAddPartnerDialog(BuildContext context, bool isSupplier) {
     showDialog(
       context: context,
       builder: (_) => BlocProvider.value(
@@ -101,7 +107,7 @@ class _PartnerList extends StatelessWidget {
         if (state.partners.isEmpty) {
           return Center(
             child: Text(
-              state.isSupplierFilter ? "Chưa có Trại heo nào" : "Chưa có Khách hàng nào",
+              state.isSupplierFilter ? "Chưa có Nhà cung cấp nào" : "Chưa có Khách hàng nào",
               style: const TextStyle(color: Colors.grey),
             ),
           );
@@ -200,7 +206,7 @@ class _AddPartnerDialogState extends State<_AddPartnerDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.isSupplier ? "Thêm Trại Heo Mới" : "Thêm Khách Hàng Mới"),
+      title: Text(widget.isSupplier ? "Thêm Nhà Cung Cấp Mới" : "Thêm Khách Hàng Mới"),
       content: Form(
         key: _formKey,
         child: Column(
