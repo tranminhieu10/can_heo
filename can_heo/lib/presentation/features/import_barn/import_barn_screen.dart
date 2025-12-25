@@ -23,6 +23,8 @@ import '../weighing/bloc/weighing_bloc.dart';
 import '../weighing/bloc/weighing_event.dart';
 import '../weighing/bloc/weighing_state.dart';
 import '../pig_types/pig_types_screen.dart';
+import 'widgets/weighing_session_widget.dart';
+import '../../../domain/entities/additional_cost.dart';
 
 class ImportBarnScreen extends StatelessWidget {
   const ImportBarnScreen({super.key});
@@ -93,6 +95,9 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
   // Scale data - nhập trực tiếp từ người dùng
   double _totalMarketWeight = 0.0; // TL Chợ - nhập trực tiếp
   int _totalQuantity = 0;
+  
+  // Weighing session control
+  bool _showWeighingSession = false;
 
   @override
   void initState() {
@@ -190,6 +195,21 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
             body: Builder(
               builder: (ctx) {
                 Responsive.init(ctx);
+
+                // Hiển thị WeighingSessionWidget nếu đang trong phiên cân
+                if (_showWeighingSession) {
+                  return WeighingSessionWidget(
+                    partnerName: _selectedPartner?.name ?? 'Nhà cung cấp',
+                    onSave: (weighingItems, additionalCosts) {
+                      _saveWeighingSession(context, weighingItems, additionalCosts);
+                    },
+                    onCancel: () {
+                      setState(() {
+                        _showWeighingSession = false;
+                      });
+                    },
+                  );
+                }
 
                 return Padding(
                   padding: EdgeInsets.all(Responsive.spacing),
@@ -1587,6 +1607,24 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          // Nút mở phiên cân
+          ElevatedButton.icon(
+            onPressed: _selectedPartner != null
+                ? () {
+                    setState(() {
+                      _showWeighingSession = true;
+                    });
+                  }
+                : null,
+            icon: const Icon(Icons.scale, size: 18),
+            label: const Text('Bắt đầu cân', style: TextStyle(fontSize: 12)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+          ),
+          const SizedBox(width: 8),
           IconButton(
             onPressed: _resetForm,
             icon: const Icon(Icons.refresh, size: 20),
@@ -2444,6 +2482,105 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         );
       },
     );
+  }
+  
+  /// Lưu phiên cân với nhiều lần cân và chi phí khác
+  void _saveWeighingSession(
+    BuildContext context,
+    List<WeighingItemEntity> weighingItems,
+    List<AdditionalCost> additionalCosts,
+  ) {
+    if (weighingItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Chưa có lần cân nào!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (_selectedPartner == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Vui lòng chọn nhà cung cấp!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Tính tổng từ các lần cân
+    final totalWeight = weighingItems.fold<double>(0.0, (sum, item) => sum + item.weight);
+    final totalQuantity = weighingItems.fold<int>(0, (sum, item) => sum + item.quantity);
+    final totalAdditionalCost = additionalCosts.fold<double>(0.0, (sum, cost) => sum + cost.amount);
+
+    // Tạo note tổng hợp
+    List<String> noteParts = [];
+    
+    // Thêm thông tin trại và chuồng
+    if (_selectedFarm != null) {
+      noteParts.add('Trại: ${_selectedFarm!.name}');
+    }
+    if (_selectedCage != null) {
+      noteParts.add('Chuồng: ${_selectedCage!.name}');
+    }
+    
+    // Thêm thông tin chi phí khác
+    if (additionalCosts.isNotEmpty) {
+      final costSummary = additionalCosts.map((cost) {
+        if (cost.quantity != null && cost.weight != null) {
+          return '${cost.label}: ${cost.quantity} con, ${_numberFormat.format(cost.weight)} kg = ${_numberFormat.format(cost.amount)}đ';
+        } else {
+          return '${cost.label}: ${_numberFormat.format(cost.amount)}đ';
+        }
+      }).join('; ');
+      noteParts.add('Chi phí: $costSummary');
+    }
+    
+    // Thêm ghi chú khác
+    if (_noteController.text.isNotEmpty) {
+      noteParts.add(_noteController.text);
+    }
+    
+    final note = noteParts.join(' | ');
+
+    // Reset weighing bloc và thêm từng item
+    context.read<WeighingBloc>().add(const WeighingStarted(0));
+    
+    for (final item in weighingItems) {
+      context.read<WeighingBloc>().add(
+        WeighingItemAdded(
+          weight: item.weight,
+          quantity: item.quantity,
+          batchNumber: item.batchNumber,
+          pigType: item.pigType,
+        ),
+      );
+    }
+
+    // Cập nhật thông tin phiếu
+    // finalAmount = tổng chi phí khác (được lưu tạm vào finalAmount)
+    context.read<WeighingBloc>().add(
+      WeighingInvoiceUpdated(
+        partnerId: _selectedPartner!.id,
+        partnerName: _selectedPartner!.name,
+        cageId: _selectedCage?.id,
+        pricePerKg: 0, // Không tính giá tại đây
+        deduction: 0,
+        discount: totalAdditionalCost, // Lưu tổng chi phí khác vào discount
+        note: note,
+        finalAmount: totalAdditionalCost, // Tổng chi phí
+      ),
+    );
+
+    // Lưu
+    context.read<WeighingBloc>().add(const WeighingSaved());
+    
+    // Đóng phiên cân
+    setState(() {
+      _showWeighingSession = false;
+    });
   }
 }
 

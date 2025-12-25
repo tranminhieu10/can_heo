@@ -11,7 +11,7 @@ import '../export_barn/export_barn_screen.dart';
 import '../history/invoice_history_screen.dart';
 import '../partners/partners_screen.dart';
 import '../pig_types/pig_types_screen.dart';
-import '../finance/finance_screen.dart';
+import '../market_report/market_report_screen.dart';
 import '../settings/settings_screen.dart';
 import 'widgets/overview_screen.dart';
 
@@ -32,16 +32,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.outbox_outlined, Icons.outbox, 'Xuất Kho'),
     _NavItem(Icons.storefront_outlined, Icons.storefront, 'Xuất Chợ'),
     _NavItem(Icons.shopping_basket_outlined, Icons.shopping_basket, 'Nhập Chợ'),
-    _NavItem(Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Tài chính'),
     _NavItem(Icons.people_outline, Icons.people, 'Đối tác'),
     _NavItem(Icons.pets_outlined, Icons.pets, 'Loại heo'),
     _NavItem(Icons.history_outlined, Icons.history, 'Lịch sử'),
+    _NavItem(Icons.assessment_outlined, Icons.assessment, 'Báo cáo chợ'),
     _NavItem(Icons.usb_outlined, Icons.usb, 'Test Cân'),
     _NavItem(Icons.settings_outlined, Icons.settings, 'Cài đặt'),
   ];
 
-  // Bottom nav chỉ hiện 5 items chính, còn lại trong drawer
-  static const List<int> _bottomNavIndexes = [0, 3, 4, 5, 10]; // Tổng quan, Xuất Chợ, Nhập Chợ, Tài chính, Cài đặt
+  // Bottom nav chỉ hiện 4 items chính, còn lại trong drawer
+  static const List<int> _bottomNavIndexes = [0, 3, 4, 10]; // Tổng quan, Xuất Chợ, Nhập Chợ, Cài đặt
 
   @override
   Widget build(BuildContext context) {
@@ -246,8 +246,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return 'Xuất';
       case 'Nhập Chợ':
         return 'Nhập';
-      case 'Tài chính':
-        return 'Tài chính';
       case 'Cài đặt':
         return 'Cài đặt';
       default:
@@ -268,13 +266,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 4:
         return const MarketImportScreen();
       case 5:
-        return const FinanceScreen();
-      case 6:
         return const PartnersScreen();
-      case 7:
+      case 6:
         return const PigTypesScreen();
-      case 8:
+      case 7:
         return const InvoiceHistoryScreen(invoiceType: 2);
+      case 8:
+        return const MarketReportScreen();
       case 9:
         return const ScaleTestScreen();
       case 10:

@@ -20,6 +20,8 @@ import '../partners/bloc/partner_bloc.dart';
 import '../partners/bloc/partner_event.dart';
 import '../partners/bloc/partner_state.dart';
 import '../pig_types/pig_types_screen.dart';
+import 'widgets/weighing_session_widget.dart';
+import '../../../domain/entities/additional_cost.dart';
 
 /// Màn hình Nhập Chợ - Nhập hàng thừa từ chợ về kho (hàng trả về)
 /// Type = 3 (Nhập chợ / Return to Barn)
@@ -102,6 +104,19 @@ class _MarketImportViewState extends State<_MarketImportView> {
   int _selectedPaymentMethod =
       0; // 0 = Tiền mặt, 1 = Chuyển khoản, 2 = Nợ, 3 = Trả nợ
 
+  // Weighing session control
+  bool _showWeighingSession = false;
+
+  // Discount click tracking
+  int _discountClickCount = 0;
+  double _manualDiscount = 0;
+
+  // Daily summary controllers
+  final TextEditingController _dailyTransportFeeController =
+      TextEditingController(text: '0'); // Cước xe ngày
+  final TextEditingController _dailyRejectController =
+      TextEditingController(text: '0'); // Thải loại (lợn hôi, lợn chết)
+
   @override
   void initState() {
     super.initState();
@@ -119,6 +134,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
     _priceController.dispose();
     _quantityController.dispose();
     _farmNameController.dispose();
+    _dailyTransportFeeController.dispose();
+    _dailyRejectController.dispose();
     _batchNumberController.dispose();
     _deductionController.dispose();
     _discountController.dispose();
@@ -151,9 +168,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
   double get _debtAmount =>
       (_totalImport - _paymentAmount).clamp(0, double.infinity);
   double get _autoDiscount => _subtotal - (_subtotal / 1000).floor() * 1000;
-  double get _discount =>
-      double.tryParse(_discountController.text.replaceAll(',', '')) ??
-      _autoDiscount;
+  double get _discount => _manualDiscount > 0 ? _manualDiscount : _autoDiscount;
   double get _totalAmount => (_subtotal - _discount).clamp(0, double.infinity);
 
   @override
@@ -192,6 +207,24 @@ class _MarketImportViewState extends State<_MarketImportView> {
           body: LayoutBuilder(
             builder: (context, constraints) {
               Responsive.init(context);
+
+              // Hiển thị WeighingSessionWidget nếu đang trong phiên cân
+              if (_showWeighingSession) {
+                return WeighingSessionWidget(
+                  partnerName: _selectedPartner?.name ?? 'Nhà cung cấp',
+                  selectedFarmId: _selectedFarm?.id,
+                  selectedFarmName: _selectedFarm?.name,
+                  onSave: (weighingItems, additionalCosts) {
+                    _saveWeighingSession(
+                        context, weighingItems, additionalCosts);
+                  },
+                  onCancel: () {
+                    setState(() {
+                      _showWeighingSession = false;
+                    });
+                  },
+                );
+              }
 
               final padding = Responsive.spacing;
               // Chiều cao form tùy theo screen size (đồng bộ với xuất chợ)
@@ -582,7 +615,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
                         // Hao (read-only calculated: TL Trại - TL Chợ)
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 10),
                             alignment: Alignment.centerLeft,
                             decoration: BoxDecoration(
                               color: _haoWeight > 0
@@ -610,146 +644,78 @@ class _MarketImportViewState extends State<_MarketImportView> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  // Row 4: Đơn giá + Thành tiền + Cước xe
+                  // Row 4: Đơn giá + Thành tiền + Ghi chú
                   _buildRowLabels(
-                      ['Đơn giá (đ/kg)', 'Thành tiền', 'Cước xe'], fontSize),
+                      ['Đơn giá (đ/kg)', 'Thành tiền', 'Ghi chú'], fontSize),
                   Expanded(
                     child: Row(
                       children: [
-                        // Đơn giá
+                        // Đơn giá với gợi ý
                         Expanded(
-                          child: _buildCompactTextField(
-                            controller: _priceController,
-                            fontSize: fontSize,
-                            keyboardType: TextInputType.number,
-                            onChanged: (_) => setState(() {}),
-                          ),
+                          child: _buildPriceAutocomplete(fontSize: fontSize),
                         ),
                         const SizedBox(width: 4),
-                        // Thành tiền (read-only: TL Chợ * Đơn giá)
+                        // Thành tiền (clickable: giảm theo click)
                         Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            alignment: Alignment.centerLeft,
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.grey.shade300),
-                            ),
-                            child: Text(
-                              _currencyFormat.format(_subtotal),
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: Colors.orange.shade700,
+                          child: GestureDetector(
+                            onTap: _handleDiscountClick,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.orange.shade400,
+                                  width: 1,
+                                ),
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        // Cước xe
-                        Expanded(
-                          child: _buildCompactTextField(
-                            controller: _transportFeeController,
-                            fontSize: fontSize,
-                            keyboardType: TextInputType.number,
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  // Row 5: Tổng tiền | Thanh toán | Công nợ
-                  _buildRowLabels(
-                      ['Tổng tiền', 'Thanh toán', 'Công nợ'], fontSize),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        // Tổng tiền (read-only: Thành tiền + Cước xe)
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            alignment: Alignment.centerLeft,
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.blue.shade300),
-                            ),
-                            child: Text(
-                              _currencyFormat.format(_totalImport),
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: Colors.blue.shade700,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _currencyFormat.format(_totalAmount),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: Colors.orange.shade700,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (_discountClickCount > 0) ...[
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade600,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '$_discountClickCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(width: 2),
+                                  Icon(
+                                    Icons.touch_app,
+                                    size: 12,
+                                    color: Colors.orange.shade600,
+                                  ),
+                                ],
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),
                         const SizedBox(width: 4),
-                        // Thanh toán
+                        // Ghi chú
                         Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            alignment: Alignment.centerLeft,
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.green.shade300),
-                            ),
-                            child: Text(
-                              _currencyFormat.format(_paymentAmount),
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: Colors.green.shade700,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        // Công nợ (read-only: Tổng tiền - Thanh toán)
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            alignment: Alignment.centerLeft,
-                            decoration: BoxDecoration(
-                              color: _debtAmount > 0
-                                  ? Colors.red.shade50
-                                  : Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                  color: _debtAmount > 0
-                                      ? Colors.red.shade300
-                                      : Colors.grey.shade300),
-                            ),
-                            child: Text(
-                              _currencyFormat.format(_debtAmount),
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: _debtAmount > 0
-                                    ? Colors.red.shade700
-                                    : Colors.grey.shade600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  // Row 6: Ghi chú (full width)
-                  _buildRowLabels(['Ghi chú', '', ''], fontSize),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
                           child: _buildCompactTextField(
                             controller: _noteController,
                             fontSize: fontSize,
@@ -838,19 +804,123 @@ class _MarketImportViewState extends State<_MarketImportView> {
     );
   }
 
+  Widget _buildPriceAutocomplete({required double fontSize}) {
+    return StreamBuilder<List<InvoiceEntity>>(
+      stream: _invoiceRepo.watchInvoices(type: 3), // Lấy tất cả phiếu nhập chợ
+      builder: (context, snapshot) {
+        // Lấy danh sách đơn giá unique và sắp xếp giảm dần
+        final invoices = snapshot.data ?? [];
+        final priceSet = <double>{};
+        for (final inv in invoices) {
+          if (inv.pricePerKg > 0) {
+            priceSet.add(inv.pricePerKg);
+          }
+        }
+        final priceList = priceSet.toList()..sort((a, b) => b.compareTo(a));
+
+        return Autocomplete<double>(
+          displayStringForOption: (price) =>
+              NumberFormat('#,###').format(price),
+          optionsBuilder: (textEditingValue) {
+            if (textEditingValue.text.isEmpty) {
+              return priceList.take(10); // Hiển thị 10 giá gần nhất
+            }
+            final inputValue =
+                double.tryParse(textEditingValue.text.replaceAll(',', '')) ?? 0;
+            // Lọc các giá gần với giá trị nhập vào
+            return priceList.where((price) {
+              return price.toString().contains(textEditingValue.text) ||
+                  NumberFormat('#,###')
+                      .format(price)
+                      .contains(textEditingValue.text);
+            }).take(10);
+          },
+          onSelected: (price) {
+            setState(() {
+              _priceController.text = price.toStringAsFixed(0);
+            });
+          },
+          fieldViewBuilder:
+              (context, textController, focusNode, onFieldSubmitted) {
+            // Sync với _priceController
+            if (_priceController.text.isNotEmpty &&
+                textController.text != _priceController.text) {
+              textController.text = _priceController.text;
+            }
+            return TextField(
+              controller: textController,
+              focusNode: focusNode,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                suffixIcon: priceList.isNotEmpty
+                    ? const Icon(Icons.arrow_drop_down, size: 18)
+                    : null,
+              ),
+              onChanged: (value) {
+                _priceController.text = value;
+                setState(() {});
+              },
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) {
+            return Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 200,
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    itemBuilder: (context, index) {
+                      final price = options.elementAt(index);
+                      return ListTile(
+                        dense: true,
+                        visualDensity: VisualDensity.compact,
+                        title: Text(
+                          '${NumberFormat('#,###').format(price)} đ/kg',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        onTap: () => onSelected(price),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildFarmDropdown({required double fontSize}) {
     if (_selectedPartner == null) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey.shade400),
           borderRadius: BorderRadius.circular(6),
           color: Colors.grey.shade100,
         ),
-        child: Text(
+        child: const Text(
           'Chọn Nhà CC trước',
-          style: TextStyle(fontSize: fontSize, color: Colors.grey),
+          style: TextStyle(fontSize: 13, color: Colors.grey),
         ),
       );
     }
@@ -862,7 +932,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
         if (farms.isEmpty) {
           return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             alignment: Alignment.centerLeft,
             decoration: BoxDecoration(
               border: Border.all(color: Colors.orange.shade400),
@@ -871,8 +941,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
             ),
             child: Text(
               'Chưa có trại',
-              style:
-                  TextStyle(fontSize: fontSize, color: Colors.orange.shade700),
+              style: TextStyle(fontSize: 13, color: Colors.orange.shade700),
             ),
           );
         }
@@ -887,12 +956,12 @@ class _MarketImportViewState extends State<_MarketImportView> {
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           ),
-          style: TextStyle(fontSize: fontSize, color: Colors.black),
-          hint: Text('Chọn trại', style: TextStyle(fontSize: fontSize)),
+          style: const TextStyle(fontSize: 13, color: Colors.black),
+          hint: const Text('Chọn trại', style: TextStyle(fontSize: 13)),
           items: farms.map((farm) {
             return DropdownMenuItem<FarmEntity>(
               value: farm,
-              child: Text(farm.name, style: TextStyle(fontSize: fontSize)),
+              child: Text(farm.name, style: const TextStyle(fontSize: 13)),
             );
           }).toList(),
           onChanged: (farm) {
@@ -1006,12 +1075,12 @@ class _MarketImportViewState extends State<_MarketImportView> {
                   child: CircularProgressIndicator(strokeWidth: 2)));
         }
         final importMarket = snapshot.data![0]; // Type 3: Nhập chợ từ NCC (+)
-        final exportBarn = snapshot.data![1];   // Type 1: Xuất kho ra chợ (+)
+        final exportBarn = snapshot.data![1]; // Type 1: Xuất kho ra chợ (+)
         final exportMarket = snapshot.data![2]; // Type 2: Xuất chợ bán (-)
-        final importBarn = snapshot.data![3];   // Type 0: Nhập kho hàng thừa (-)
-        
+        final importBarn = snapshot.data![3]; // Type 0: Nhập kho hàng thừa (-)
+
         int available = 0;
-        
+
         // + Nhập chợ từ NCC (Type 3)
         for (final inv in importMarket) {
           for (final item in inv.details) {
@@ -1019,7 +1088,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
               available += item.quantity;
           }
         }
-        
+
         // + Xuất kho ra chợ (Type 1)
         for (final inv in exportBarn) {
           for (final item in inv.details) {
@@ -1027,7 +1096,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
               available += item.quantity;
           }
         }
-        
+
         // - Xuất chợ bán (Type 2)
         for (final inv in exportMarket) {
           for (final item in inv.details) {
@@ -1035,7 +1104,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
               available -= item.quantity;
           }
         }
-        
+
         // - Nhập kho hàng thừa (Type 0)
         for (final inv in importBarn) {
           for (final item in inv.details) {
@@ -1043,7 +1112,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
               available -= item.quantity;
           }
         }
-        
+
         return _buildInventoryContainer(available);
       },
     );
@@ -1051,7 +1120,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
   Widget _buildInventoryContainer(int qty) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: qty > 0 ? Colors.green.shade50 : Colors.grey.shade100,
         border: Border.all(
@@ -1072,6 +1141,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
   Widget _buildQuantityField() {
     return Container(
+      height: 38,
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey.shade400),
         borderRadius: BorderRadius.circular(6),
@@ -1089,7 +1159,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
               }
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
                 color: Colors.grey.shade200,
                 borderRadius: const BorderRadius.only(
@@ -1127,7 +1197,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
               });
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
                 color: Colors.grey.shade200,
                 borderRadius: const BorderRadius.only(
@@ -1200,7 +1270,14 @@ class _MarketImportViewState extends State<_MarketImportView> {
                     );
                   }
 
-                  return _buildInvoiceDataGrid(invoices, fontSize);
+                  return Column(
+                    children: [
+                      Expanded(
+                          child: _buildInvoiceDataGrid(invoices, fontSize)),
+                      const SizedBox(height: 8),
+                      _buildDailySummary(invoices, fontSize),
+                    ],
+                  );
                 },
               ),
             ),
@@ -1271,19 +1348,11 @@ class _MarketImportViewState extends State<_MarketImportView> {
                       style: headerStyle, textAlign: TextAlign.right)),
               Expanded(
                   flex: 3,
-                  child: Text('Cước xe',
+                  child: Text('Chiết khấu',
                       style: headerStyle, textAlign: TextAlign.right)),
               Expanded(
                   flex: 3,
-                  child: Text('Tổng nhập',
-                      style: headerStyle, textAlign: TextAlign.right)),
-              Expanded(
-                  flex: 3,
-                  child: Text('T.Toán',
-                      style: headerStyle, textAlign: TextAlign.right)),
-              Expanded(
-                  flex: 3,
-                  child: Text('Công nợ',
+                  child: Text('Tổng tiền',
                       style: headerStyle, textAlign: TextAlign.right)),
               const SizedBox(width: 50),
             ],
@@ -1326,13 +1395,9 @@ class _MarketImportViewState extends State<_MarketImportView> {
                   .clamp(0, double.infinity); // Hao = TL Trại - TL Chợ
               double subtotal = marketWeight *
                   inv.pricePerKg; // Thành tiền = TL Chợ × Đơn giá
-              double transportFee =
-                  inv.discount; // Cước xe (lưu trong discount)
-              double totalImport =
-                  subtotal + transportFee; // Tổng nhập = Thành tiền + Cước xe
-              double paid = inv.paidAmount; // Thanh toán
-              double debt =
-                  (totalImport - paid).clamp(0, double.infinity); // Công nợ
+              double discount = inv.discount; // Chiết khấu (số tiền giảm)
+              double totalAmount =
+                  subtotal - discount; // Tổng tiền = Thành tiền - Chiết khấu
 
               // Parse note format: "Trại: xxx | ..."
               if (inv.note != null && inv.note!.isNotEmpty) {
@@ -1406,24 +1471,18 @@ class _MarketImportViewState extends State<_MarketImportView> {
                             style: cellStyle, textAlign: TextAlign.right)),
                     Expanded(
                         flex: 3,
-                        child: Text(_formatShortCurrency(transportFee),
-                            style: cellStyle, textAlign: TextAlign.right)),
-                    Expanded(
-                        flex: 3,
-                        child: Text(_formatShortCurrency(totalImport),
-                            style:
-                                cellStyle.copyWith(fontWeight: FontWeight.bold),
-                            textAlign: TextAlign.right)),
-                    Expanded(
-                        flex: 3,
-                        child: Text(_formatShortCurrency(paid),
-                            style: cellStyle.copyWith(color: Colors.green),
-                            textAlign: TextAlign.right)),
-                    Expanded(
-                        flex: 3,
-                        child: Text(_formatShortCurrency(debt),
+                        child: Text(_formatShortCurrency(discount),
                             style: cellStyle.copyWith(
-                                color: debt > 0 ? Colors.red : Colors.black),
+                                color: discount > 0
+                                    ? Colors.orange
+                                    : Colors.black),
+                            textAlign: TextAlign.right)),
+                    Expanded(
+                        flex: 3,
+                        child: Text(_formatShortCurrency(totalAmount),
+                            style: cellStyle.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade700),
                             textAlign: TextAlign.right)),
                     SizedBox(
                       width: 50,
@@ -1456,9 +1515,6 @@ class _MarketImportViewState extends State<_MarketImportView> {
             },
           ),
         ),
-
-        // Footer - Totals
-        _buildInvoiceTotalsRow(invoices, fontSize),
       ],
     );
   }
@@ -1514,19 +1570,281 @@ class _MarketImportViewState extends State<_MarketImportView> {
     return true;
   }
 
+  Widget _buildDailySummary(List<InvoiceEntity> invoices, double fontSize) {
+    // Lọc invoices theo NCC đã chọn (nếu có)
+    final partnerInvoices = _selectedPartner != null
+        ? invoices.where((inv) => inv.partnerId == _selectedPartner!.id).toList()
+        : <InvoiceEntity>[];
+    
+    // Tính tổng các chỉ số của NCC đã chọn
+    int totalQuantity = 0;
+    double totalWeight = 0;
+    double invoiceTotal = 0; // Tổng từ các phiếu = Thành tiền - Chiết khấu
+
+    for (final inv in partnerInvoices) {
+      totalQuantity += inv.totalQuantity;
+      totalWeight += inv.totalWeight; // TL Chợ
+      final subtotal = inv.totalWeight * inv.pricePerKg; // Thành tiền
+      final discount = inv.discount; // Chiết khấu
+      invoiceTotal += subtotal - discount; // Tổng phiếu = Thành tiền - Chiết khấu
+    }
+
+    // Lấy giá trị cước xe ngày và thải loại từ controller
+    // Cước xe: chi phí phải cộng thêm cho NCC
+    // Thải loại: giảm trừ do lợn hôi, lợn chết
+    final dailyTransportFee = double.tryParse(
+            _dailyTransportFeeController.text.replaceAll(',', '')) ??
+        0;
+    final dailyReject =
+        double.tryParse(_dailyRejectController.text.replaceAll(',', '')) ?? 0;
+
+    // Tổng tiền = Tổng phiếu - Thải loại + Cước xe
+    final totalAmount = invoiceTotal - dailyReject + dailyTransportFee;
+
+    // Đơn giá bình quân = Tổng tiền / Tổng khối lượng (thay đổi khi nhập cước xe và thải loại)
+    final averagePrice = totalWeight > 0 ? totalAmount / totalWeight : 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.blue.shade700, Colors.blue.shade500],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.shade200,
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Row 1: Stats
+          Row(
+            children: [
+              // Icon
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child:
+                    const Icon(Icons.summarize, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              // Title với tên NCC
+              Expanded(
+                flex: 0,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'TỔNG KẾT NCC:',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      _selectedPartner?.name ?? 'Chưa chọn NCC',
+                      style: TextStyle(
+                        color: _selectedPartner != null ? Colors.white : Colors.yellow,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Stats
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildSummaryStatItem(
+                      icon: Icons.receipt_long,
+                      label: 'Số phiếu',
+                      value: '${partnerInvoices.length}',
+                    ),
+                    _buildSummaryStatItem(
+                      icon: Icons.pets,
+                      label: 'Tổng SL',
+                      value: '$totalQuantity con',
+                    ),
+                    _buildSummaryStatItem(
+                      icon: Icons.scale,
+                      label: 'Tổng KL',
+                      value: '${_numberFormat.format(totalWeight)} kg',
+                    ),
+                    _buildSummaryStatItem(
+                      icon: Icons.attach_money,
+                      label: 'BQ Đơn giá',
+                      value: '${NumberFormat('#,###').format(averagePrice)}',
+                    ),
+                    _buildSummaryStatItem(
+                      icon: Icons.payments,
+                      label: 'Tổng tiền',
+                      value: NumberFormat('#,###').format(totalAmount),
+                      highlight: true,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Row 2: Input fields + Net amount
+          Row(
+            children: [
+              const SizedBox(width: 40), // Offset for icon
+              // Cước xe input
+              Expanded(
+                child: _buildDailySummaryInput(
+                  label: 'Cước xe',
+                  controller: _dailyTransportFeeController,
+                  icon: Icons.local_shipping,
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Thải loại input
+              Expanded(
+                child: _buildDailySummaryInput(
+                  label: 'Thải loại',
+                  controller: _dailyRejectController,
+                  icon: Icons.delete_outline,
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Nút Chốt NCC
+              ElevatedButton.icon(
+                onPressed: partnerInvoices.isNotEmpty && _selectedPartner != null
+                    ? () => _saveDailySummary(
+                          context,
+                          invoices: partnerInvoices,
+                          totalQuantity: totalQuantity,
+                          totalWeight: totalWeight,
+                          totalAmount: totalAmount,
+                          transportFee: dailyTransportFee,
+                          rejectAmount: dailyReject,
+                          partnerName: _selectedPartner!.name,
+                        )
+                    : null,
+                icon: const Icon(Icons.check_circle, size: 18),
+                label: Text(_selectedPartner != null ? 'Chốt ${_selectedPartner!.name}' : 'Chốt NCC'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple.shade600,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  disabledBackgroundColor: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailySummaryInput({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.white30),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white70, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            '$label:',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: 4),
+                hintText: '0',
+                hintStyle: TextStyle(color: Colors.white38),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryStatItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool highlight = false,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: highlight ? 14 : 13,
+            fontWeight: highlight ? FontWeight.bold : FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildInvoiceTotalsRow(List<InvoiceEntity> invoices, double fontSize) {
     // Tính theo cách lưu mới:
     // - totalWeight = TL Chợ
     // - deduction = TL Trại (lưu trong truckCost DB)
-    // - discount = Cước xe
+    // - discount = Chiết khấu
     double totalMarketWeight = 0;
     double totalFarmWeight = 0;
     double totalHao = 0;
     double totalSubtotal = 0;
-    double totalTransportFee = 0;
-    double totalImport = 0;
-    double totalPaid = 0;
-    double totalDebt = 0;
+    double totalDiscount = 0;
+    double totalAmount = 0;
     int totalQuantity = 0;
 
     for (final inv in invoices) {
@@ -1534,18 +1852,15 @@ class _MarketImportViewState extends State<_MarketImportView> {
       final farmWeight = inv.deduction; // TL Trại
       final hao = (farmWeight - marketWeight).clamp(0.0, double.infinity);
       final subtotal = marketWeight * inv.pricePerKg; // Thành tiền
-      final transportFee = inv.discount; // Cước xe
-      final import_ = subtotal + transportFee; // Tổng nhập
-      final debt = (import_ - inv.paidAmount).clamp(0.0, double.infinity);
+      final discount = inv.discount; // Chiết khấu
+      final amount = subtotal - discount; // Tổng tiền = Thành tiền - Chiết khấu
 
       totalMarketWeight += marketWeight;
       totalFarmWeight += farmWeight;
       totalHao += hao;
       totalSubtotal += subtotal;
-      totalTransportFee += transportFee;
-      totalImport += import_;
-      totalPaid += inv.paidAmount;
-      totalDebt += debt;
+      totalDiscount += discount;
+      totalAmount += amount;
       totalQuantity += inv.totalQuantity;
     }
 
@@ -1592,23 +1907,13 @@ class _MarketImportViewState extends State<_MarketImportView> {
                   style: cellStyle, textAlign: TextAlign.right)),
           Expanded(
               flex: 3,
-              child: Text(_formatShortCurrency(totalTransportFee),
-                  style: cellStyle, textAlign: TextAlign.right)),
-          Expanded(
-              flex: 3,
-              child: Text(_formatShortCurrency(totalImport),
-                  style: cellStyle.copyWith(color: Colors.teal.shade800),
+              child: Text(_formatShortCurrency(totalDiscount),
+                  style: cellStyle.copyWith(color: Colors.orange),
                   textAlign: TextAlign.right)),
           Expanded(
               flex: 3,
-              child: Text(_formatShortCurrency(totalPaid),
-                  style: cellStyle.copyWith(color: Colors.green),
-                  textAlign: TextAlign.right)),
-          Expanded(
-              flex: 3,
-              child: Text(_formatShortCurrency(totalDebt),
-                  style: cellStyle.copyWith(
-                      color: totalDebt > 0 ? Colors.red : Colors.black),
+              child: Text(_formatShortCurrency(totalAmount),
+                  style: cellStyle.copyWith(color: Colors.green.shade700),
                   textAlign: TextAlign.right)),
           const SizedBox(width: 50),
         ],
@@ -2435,6 +2740,155 @@ class _MarketImportViewState extends State<_MarketImportView> {
   }
 
   // ==================== ACTIONS ====================
+  void _handleDiscountClick() {
+    setState(() {
+      _discountClickCount++;
+
+      // Làm tròn xuống hàng chục nghìn (VD: 1,234,567 → giảm 4,567 để còn 1,230,000)
+      final lamTronChucNghin = _subtotal % 10000;
+      // Làm tròn xuống hàng trăm nghìn (VD: 1,234,567 → giảm 34,567 để còn 1,200,000)
+      final lamTronTramNghin = _subtotal % 100000;
+
+      switch (_discountClickCount) {
+        case 1:
+          // Trừ hàng nghìn (1,234,567 → 1,230,000)
+          _manualDiscount = lamTronChucNghin;
+          break;
+        case 2:
+          // Trừ hàng chục nghìn (1,234,567 → 1,200,000)
+          _manualDiscount = lamTronTramNghin;
+          break;
+        case 3:
+          // Trừ thêm 100k (1,234,567 → 1,100,000)
+          _manualDiscount = lamTronTramNghin + 100000;
+          break;
+        case 4:
+          // Trừ thêm 200k (1,234,567 → 1,000,000)
+          _manualDiscount = lamTronTramNghin + 200000;
+          break;
+        default:
+          // Reset về 0
+          _discountClickCount = 0;
+          _manualDiscount = 0;
+      }
+    });
+  }
+
+  void _saveDailySummary(
+    BuildContext context, {
+    required List<InvoiceEntity> invoices,
+    required int totalQuantity,
+    required double totalWeight,
+    required double totalAmount,
+    required double transportFee,
+    required double rejectAmount,
+    required String partnerName,
+  }) async {
+    // Hiển thị dialog xác nhận
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.purple.shade600),
+            const SizedBox(width: 8),
+            Text('Chốt NCC: $partnerName'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('NCC: $partnerName', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Số phiếu: ${invoices.length}'),
+            Text('Tổng SL: $totalQuantity con'),
+            Text('Tổng KL: ${_numberFormat.format(totalWeight)} kg'),
+            const Divider(),
+            Text('Tổng tiền: ${NumberFormat('#,###').format(totalAmount)} đ'),
+            Text('Cước xe: ${NumberFormat('#,###').format(transportFee)} đ',
+                style: const TextStyle(color: Colors.blue)),
+            Text('Thải loại: ${NumberFormat('#,###').format(rejectAmount)} đ',
+                style: const TextStyle(color: Colors.red)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple.shade600,
+            ),
+            child: const Text('Xác nhận'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      // Lưu thông tin tổng kết NCC vào database
+      final today = DateTime.now();
+      final dateStr = DateFormat('yyyy-MM-dd').format(today);
+      
+      // Tạo note tổng kết với tên NCC
+      final summaryNote = 'CHỐT NCC $partnerName - $dateStr | '
+          'Số phiếu: ${invoices.length} | '
+          'SL: $totalQuantity con | '
+          'KL: ${_numberFormat.format(totalWeight)}kg | '
+          'Tổng tiền: ${NumberFormat('#,###').format(totalAmount)} | '
+          'Cước xe: ${NumberFormat('#,###').format(transportFee)} | '
+          'Thải loại: ${NumberFormat('#,###').format(rejectAmount)}';
+
+      // Lưu transaction thanh toán cho NCC
+      // Lấy partnerId từ _selectedPartner (đã kiểm tra không null)
+      final partnerId = _selectedPartner!.id;
+      
+      await _db.transactionsDao.createTransaction(
+        TransactionsCompanion(
+          id: Value('ncc_${partnerId}_${today.millisecondsSinceEpoch}'),
+          partnerId: Value(partnerId),
+          invoiceId: const Value(null),
+          amount: Value(totalAmount),
+          type: const Value(1), // 1 = Chi (trả tiền cho NCC)
+          paymentMethod: const Value(0), // 0 = Tiền mặt
+          transactionDate: Value(today),
+          note: Value(summaryNote),
+        ),
+      );
+
+      // Reset các ô nhập cước xe và thải loại
+      setState(() {
+        _dailyTransportFeeController.text = '0';
+        _dailyRejectController.text = '0';
+      });
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '✅ Đã chốt $partnerName! Tổng tiền: ${NumberFormat('#,###').format(totalAmount)}đ'),
+            backgroundColor: Colors.purple.shade600,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Lỗi khi chốt: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _saveInvoice(BuildContext context) async {
     if (_marketWeight <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2468,8 +2922,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
     // Create invoice với đầy đủ thông tin
     // - totalWeight = TL Chợ (trọng lượng sau cân tại chợ)
     // - deduction = TL Trại (trọng lượng gốc từ trại, lưu vào truckCost trong DB)
-    // - discount = Cước xe
-    // - finalAmount = Thành tiền (TL Chợ × Đơn giá + Cước xe)
+    // - discount = Chiết khấu (số tiền giảm)
+    // - finalAmount = Tổng tiền (TL Chợ × Đơn giá - Chiết khấu)
     final invoice = InvoiceEntity(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       invoiceCode: invoiceCode,
@@ -2480,9 +2934,10 @@ class _MarketImportViewState extends State<_MarketImportView> {
       totalQuantity: quantity,
       pricePerKg: _pricePerKg, // Đơn giá
       deduction: _farmWeight, // TL Trại (lưu vào truckCost trong DB)
-      discount: _transportFee, // Cước xe
-      finalAmount: _totalImport, // Thành tiền + Cước xe
-      paidAmount: _paymentAmount, // Số tiền thanh toán
+      discount: _discount, // Chiết khấu (số tiền giảm)
+      finalAmount: _totalAmount, // Tổng tiền = Thành tiền - Chiết khấu
+      paidAmount:
+          _totalAmount, // Thanh toán = Tổng tiền (mặc định thanh toán đủ)
       note: fullNote,
       createdDate: DateTime.now(),
     );
@@ -2520,20 +2975,24 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
   void _resetForm() {
     setState(() {
-      _scaleInputController.clear();
-      _farmWeightController.clear();
-      _pigTypeController.clear();
-      _noteController.clear();
-      _priceController.clear();
-      _quantityController.text = '1';
+      // Chỉ reset các trường cần nhập lại cho phiếu mới
+      _scaleInputController.clear(); // TL Chợ
+      _farmWeightController.clear(); // TL Trại
+      _noteController.clear(); // Ghi chú
+      _quantityController.text = '1'; // Số lượng reset về 1
       _deductionController.text = '0';
       _discountController.text = '0';
       _transportFeeController.text = '0';
       _paymentAmountController.text = '0';
-      _batchNumberController.clear();
-      _selectedPartner = null;
-      _selectedFarm = null;
-      _selectedPaymentMethod = 0;
+      _discountClickCount = 0;
+      _manualDiscount = 0;
+      
+      // GIỮ NGUYÊN các trường sau để tiện nhập phiếu tiếp theo:
+      // - _selectedPartner (NCC)
+      // - _selectedFarm (Trại)
+      // - _batchNumberController (Lô)
+      // - _pigTypeController (Loại heo)
+      // - _priceController (Đơn giá)
     });
     _scaleInputFocus.requestFocus();
   }
@@ -2545,9 +3004,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
           inv.deduction.toString(); // TL Trại (lưu trong deduction/truckCost)
       _priceController.text = inv.pricePerKg.toStringAsFixed(0);
       _quantityController.text = inv.totalQuantity.toString();
-      _transportFeeController.text =
-          inv.discount.toStringAsFixed(0); // Cước xe (lưu trong discount)
-      _paymentAmountController.text = inv.paidAmount.toStringAsFixed(0);
+      _manualDiscount = inv.discount; // Chiết khấu
       _noteController.text = inv.note ?? '';
       // Load loại heo từ details nếu có
       if (inv.details.isNotEmpty) {
@@ -2555,6 +3012,134 @@ class _MarketImportViewState extends State<_MarketImportView> {
         _batchNumberController.text = inv.details.first.batchNumber ?? '';
       }
     });
+  }
+
+  /// Lưu phiên cân với nhiều lần cân và chi phí khác
+  void _saveWeighingSession(
+    BuildContext context,
+    List<WeighingItemEntity> weighingItems,
+    List<AdditionalCost> additionalCosts,
+  ) async {
+    if (weighingItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Chưa có lần cân nào!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (_selectedPartner == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Vui lòng chọn nhà cung cấp!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Tính tổng từ các lần cân
+    final totalWeight =
+        weighingItems.fold<double>(0.0, (sum, item) => sum + item.weight);
+    final totalQuantity =
+        weighingItems.fold<int>(0, (sum, item) => sum + item.quantity);
+
+    // Tính tổng thành tiền và đơn giá bình quân
+    double totalAmount = 0;
+    for (final item in weighingItems) {
+      // Parse price từ batchNumber: "batch|pigType|price"
+      final parts = (item.batchNumber ?? '||0').split('|');
+      final price = double.tryParse(parts.length > 2 ? parts[2] : '0') ?? 0;
+      totalAmount += item.weight * price;
+    }
+    final averagePrice = totalWeight > 0 ? totalAmount / totalWeight : 0;
+
+    final totalAdditionalCost =
+        additionalCosts.fold<double>(0.0, (sum, cost) => sum + cost.amount);
+    final finalAmount = totalAmount + totalAdditionalCost;
+
+    // Tạo note tổng hợp
+    List<String> noteParts = [];
+
+    // Thêm thông tin trại
+    if (_selectedFarm != null) {
+      noteParts.add('Trại: ${_selectedFarm!.name}');
+    }
+
+    // Thêm thông tin chi phí khác
+    if (additionalCosts.isNotEmpty) {
+      final costSummary = additionalCosts.map((cost) {
+        if (cost.quantity != null && cost.weight != null) {
+          return '${cost.label}: ${cost.quantity} con, ${_numberFormat.format(cost.weight)} kg = ${_numberFormat.format(cost.amount)}đ';
+        } else {
+          return '${cost.label}: ${_numberFormat.format(cost.amount)}đ';
+        }
+      }).join('; ');
+      noteParts.add('Chi phí: $costSummary');
+    }
+
+    final note = noteParts.join(' | ');
+
+    // Tạo invoice mới
+    try {
+      // Generate invoice code
+      final invoiceCode = await _invoiceRepo.generateInvoiceCode(3);
+      final invoiceId = DateTime.now().millisecondsSinceEpoch.toString();
+
+      final invoice = InvoiceEntity(
+        id: invoiceId,
+        invoiceCode: invoiceCode,
+        type: 3, // Nhập chợ
+        partnerId: _selectedPartner!.id,
+        partnerName: _selectedPartner!.name,
+        totalWeight: totalWeight,
+        totalQuantity: totalQuantity,
+        pricePerKg: averagePrice.toDouble(), // Đơn giá bình quân
+        deduction: 0,
+        discount: totalAdditionalCost, // Lưu tổng chi phí vào discount
+        finalAmount: finalAmount, // Tổng thành tiền + chi phí
+        paidAmount: 0,
+        note: note,
+        createdDate: DateTime.now(),
+      );
+
+      await _invoiceRepo.createInvoice(invoice);
+
+      // Lưu chi tiết các lần cân
+      for (final item in weighingItems) {
+        await _invoiceRepo.addWeighingItem(invoiceId, item);
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '✅ Đã lưu phiếu nhập chợ!\nTổng: ${_numberFormat.format(totalWeight)}kg - $totalQuantity con\nĐơn giá BQ: ${NumberFormat('#,###').format(averagePrice)}đ/kg',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
+      // Đóng phiên cân và reset
+      setState(() {
+        _showWeighingSession = false;
+        _selectedFarm = null;
+      });
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Lỗi khi lưu: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
   }
 
   void _deleteInvoice(BuildContext context, InvoiceEntity inv) async {

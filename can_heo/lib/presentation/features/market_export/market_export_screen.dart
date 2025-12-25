@@ -113,6 +113,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
   static const double _minPanelRatio = 0.25;
   static const double _maxPanelRatio = 0.75;
 
+  int _discountClickCount = 0;
+
   // NHB300 Scale Service
   final NHB300ScaleService _nhb300Service = NHB300ScaleService();
   StreamSubscription<double>? _weightSubscription;
@@ -186,7 +188,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
   double get _discount =>
       double.tryParse(_discountController.text.replaceAll(',', '')) ?? 0;
   double get _totalAmount =>
-      ((_pricePerKg - _discount) * _netWeight).clamp(0, double.infinity);
+      ((_pricePerKg * _netWeight) - _discount).clamp(0, double.infinity);
 
   @override
   Widget build(BuildContext context) {
@@ -467,9 +469,35 @@ class _MarketExportViewState extends State<_MarketExportView> {
       _lockedWeight = 0;
       _isWeightLocked = false;
       _selectedPaymentMethod = 0;
+      _discountClickCount = 0;
     });
     context.read<WeighingBloc>().add(const WeighingStarted(2));
     _scaleInputFocus.requestFocus();
+  }
+
+  void _onDiscountButtonClick() {
+    setState(() {
+      _discountClickCount = (_discountClickCount + 1) % 4;
+
+      final preDiscountAmount = _pricePerKg * _netWeight;
+      num discount = 0;
+
+      switch (_discountClickCount) {
+        case 1: // Trừ hàng nghìn
+          discount = preDiscountAmount % 10000;
+          break;
+        case 2: // Trừ hàng chục nghìn
+          discount = preDiscountAmount % 100000;
+          break;
+        case 3: // Trừ hàng trăm nghìn
+          discount = preDiscountAmount % 1000000;
+          break;
+        case 0: // Về 0
+          discount = 0;
+          break;
+      }
+      _discountController.text = discount.toInt().toString();
+    });
   }
 
   void _lockWeight(BuildContext context) {
@@ -1053,8 +1081,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
                   const SizedBox(height: 2),
                   Expanded(child: _buildFormRow3()),
                   const SizedBox(height: 4),
-                  // Row 4: Đơn giá + Chiết khấu + Thành tiền
-                  _buildRowLabels(['Đơn giá', 'Chiết khấu', 'Thành tiền']),
+                  // Row 4: Đơn giá + Giảm giá + Thành tiền
+                  _buildRowLabels(['Đơn giá', 'Giảm giá', 'Thành tiền']),
                   const SizedBox(height: 2),
                   Expanded(child: _buildFormRow4()),
                   const SizedBox(height: 4),
@@ -1386,7 +1414,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
           ),
         ),
         const SizedBox(width: 8),
-        // Chiết khấu
+        // Giảm giá
         Expanded(
           child: TextField(
             controller: _discountController,
@@ -1394,14 +1422,19 @@ class _MarketExportViewState extends State<_MarketExportView> {
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
-              hintText: 'Chiết khấu',
+              hintText: 'Giảm giá',
               hintStyle: const TextStyle(fontSize: 13),
               isDense: true,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-              suffixText: 'đ/kg',
+              suffixText: 'đ',
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.sync),
+                onPressed: _onDiscountButtonClick,
+                tooltip: 'Tự động trừ (1k > 10k > 100k > 0)',
+              ),
             ),
             style: const TextStyle(fontSize: 13),
           ),

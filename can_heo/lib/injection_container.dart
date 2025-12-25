@@ -23,6 +23,7 @@ import 'presentation/features/history/bloc/invoice_history_bloc.dart';
 import 'presentation/features/history/bloc_detail/invoice_detail_cubit.dart';
 import 'presentation/features/partners/bloc/partner_bloc.dart';
 import 'presentation/features/finance/bloc/finance_bloc.dart';
+import 'presentation/features/market_report/bloc/market_report_bloc.dart';
 
 final sl = GetIt.instance;
 
@@ -89,5 +90,9 @@ Future<void> init() async {
 
   sl.registerFactory(
     () => FinanceBloc(sl<ITransactionRepository>()),
+  );
+
+  sl.registerFactory(
+    () => MarketReportBloc(invoiceRepository: sl<IInvoiceRepository>()),
   );
 }
