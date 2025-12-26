@@ -26,6 +26,11 @@ class WeighingDetailsDao extends DatabaseAccessor<AppDatabase> with _$WeighingDe
     return (delete(weighingDetails)..where((tbl) => tbl.id.equals(id))).go();
   }
   
+  // Xóa tất cả chi tiết của 1 phiếu
+  Future<int> deleteByInvoiceId(String invoiceId) {
+    return (delete(weighingDetails)..where((tbl) => tbl.invoiceId.equals(invoiceId))).go();
+  }
+  
   // Tính tổng
   Future<Map<String, double>> getInvoiceTotals(String invoiceId) async {
     final weightQuery = selectOnly(weighingDetails)

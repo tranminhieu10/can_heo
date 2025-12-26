@@ -82,6 +82,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
       TextEditingController();
 
   final FocusNode _scaleInputFocus = FocusNode();
+  final FocusNode _keyboardFocus = FocusNode(); // Focus cho keyboard shortcuts
   final NumberFormat _numberFormat = NumberFormat('#,##0.0', 'en_US');
   final NumberFormat _currencyFormat =
       NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
@@ -96,7 +97,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
   final Set<String> _activeSearchColumns = {};
 
   // Panel ratio for resizable layout (default 1/3 for form)
-  double _panelRatio = 0.33;
+  final double _panelRatio = 0.33;
   static const double _minPanelRatio = 0.2;
   static const double _maxPanelRatio = 0.5;
 
@@ -111,11 +112,20 @@ class _MarketImportViewState extends State<_MarketImportView> {
   int _discountClickCount = 0;
   double _manualDiscount = 0;
 
+  // Editing invoice ID (null = creating new, non-null = editing existing)
+  String? _editingInvoiceId;
+
   // Daily summary controllers
   final TextEditingController _dailyTransportFeeController =
       TextEditingController(text: '0'); // Cước xe ngày
   final TextEditingController _dailyRejectController =
       TextEditingController(text: '0'); // Thải loại (lợn hôi, lợn chết)
+  final TextEditingController _dailyOtherCostController =
+      TextEditingController(text: '0'); // Chi phí khác (nước, ...)
+  final TextEditingController _dailyOtherCostNoteController =
+      TextEditingController(); // Ghi chú chi phí khác
+  final TextEditingController _dailyRejectNoteController =
+      TextEditingController(); // Ghi chú thải loại
 
   @override
   void initState() {
@@ -136,6 +146,9 @@ class _MarketImportViewState extends State<_MarketImportView> {
     _farmNameController.dispose();
     _dailyTransportFeeController.dispose();
     _dailyRejectController.dispose();
+    _dailyOtherCostController.dispose();
+    _dailyOtherCostNoteController.dispose();
+    _dailyRejectNoteController.dispose();
     _batchNumberController.dispose();
     _deductionController.dispose();
     _discountController.dispose();
@@ -145,6 +158,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
     _searchPartnerController.dispose();
     _searchQuantityController.dispose();
     _scaleInputFocus.dispose();
+    _keyboardFocus.dispose();
     super.dispose();
   }
 
@@ -173,38 +187,42 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
   @override
   Widget build(BuildContext context) {
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.f4): () =>
-            _saveInvoice(context),
-        const SingleActivator(LogicalKeyboardKey.f1): () =>
-            _scaleInputFocus.requestFocus(),
+    return KeyboardListener(
+      focusNode: _keyboardFocus,
+      autofocus: true,
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.f4) {
+            _saveInvoice(context);
+          } else if (event.logicalKey == LogicalKeyboardKey.f1) {
+            _scaleInputFocus.requestFocus();
+          }
+        }
       },
-      child: Focus(
-        autofocus: true,
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Row(
-              children: [
-                Text('Phiếu Nhập Chợ'),
-                SizedBox(width: 12),
-                ScaleConnectionStatus(),
-              ],
-            ),
-            backgroundColor: Colors.teal.shade600,
-            foregroundColor: Colors.white,
-            actions: [
-              IconButton(
-                tooltip: 'Quản lý Loại heo',
-                icon: const Icon(Icons.pets_outlined),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const PigTypesScreen()),
-                ),
-              ),
-              _buildSaveButton(context),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Row(
+            children: [
+              Text('Phiếu Nhập Chợ'),
+              SizedBox(width: 12),
+              ScaleConnectionStatus(),
             ],
           ),
-          body: LayoutBuilder(
+          backgroundColor: Colors.teal.shade600,
+          foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              tooltip: 'Quản lý Loại heo',
+              icon: const Icon(Icons.pets_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PigTypesScreen()),
+              ),
+            ),
+            _buildSaveButton(context),
+            _buildBatchCloseButton(context),
+          ],
+        ),
+        body: LayoutBuilder(
             builder: (context, constraints) {
               Responsive.init(context);
 
@@ -285,8 +303,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
             },
           ),
         ),
-      ),
-    );
+      );
   }
 
   // ==================== SCALE SECTION ====================
@@ -521,20 +538,6 @@ class _MarketImportViewState extends State<_MarketImportView> {
                       color: Colors.white,
                     ),
                   ),
-                  const Spacer(),
-                  // Save button in header
-                  ElevatedButton.icon(
-                    onPressed: () => _saveInvoice(context),
-                    icon: const Icon(Icons.save, size: 16),
-                    label: const Text('Lưu (F4)'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.teal.shade600,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
-                      minimumSize: const Size(0, 28),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -558,10 +561,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                         ),
                         const SizedBox(width: 4),
                         Expanded(
-                          child: _buildCompactTextField(
-                            controller: _batchNumberController,
-                            fontSize: fontSize,
-                          ),
+                          child: _buildBatchNumberAutocomplete(fontSize: fontSize),
                         ),
                       ],
                     ),
@@ -804,6 +804,112 @@ class _MarketImportViewState extends State<_MarketImportView> {
     );
   }
 
+  Widget _buildBatchNumberAutocomplete({required double fontSize}) {
+    return StreamBuilder<List<InvoiceEntity>>(
+      stream: _invoiceRepo.watchInvoices(type: 3), // Lấy tất cả phiếu nhập chợ
+      builder: (context, snapshot) {
+        // Lấy danh sách mã lô unique từ các invoice details
+        final invoices = snapshot.data ?? [];
+        final batchSet = <String>{};
+        for (final inv in invoices) {
+          for (final detail in inv.details) {
+            final batch = detail.batchNumber;
+            if (batch != null && batch.isNotEmpty) {
+              batchSet.add(batch);
+            }
+          }
+        }
+        // Sắp xếp theo thứ tự giảm dần (mới nhất trước)
+        final batchList = batchSet.toList()..sort((a, b) => b.compareTo(a));
+
+        return Autocomplete<String>(
+          optionsBuilder: (textEditingValue) {
+            if (textEditingValue.text.isEmpty) {
+              return batchList.take(10); // Hiển thị 10 lô gần nhất
+            }
+            // Lọc theo text nhập vào
+            return batchList.where((batch) {
+              return batch.toLowerCase().contains(
+                  textEditingValue.text.toLowerCase());
+            }).take(10);
+          },
+          onSelected: (batch) {
+            setState(() {
+              _batchNumberController.text = batch;
+            });
+          },
+          fieldViewBuilder:
+              (context, textController, focusNode, onFieldSubmitted) {
+            // Sync với _batchNumberController
+            if (_batchNumberController.text.isNotEmpty &&
+                textController.text != _batchNumberController.text) {
+              textController.text = _batchNumberController.text;
+            }
+            return TextField(
+              controller: textController,
+              focusNode: focusNode,
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                hintText: 'Nhập hoặc chọn lô',
+                hintStyle: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                suffixIcon: batchList.isNotEmpty
+                    ? Icon(Icons.arrow_drop_down, size: 18, color: Colors.grey.shade600)
+                    : null,
+              ),
+              onChanged: (value) {
+                _batchNumberController.text = value;
+                setState(() {});
+              },
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) {
+            return Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 200,
+                  constraints: const BoxConstraints(maxHeight: 250),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    itemBuilder: (context, index) {
+                      final batch = options.elementAt(index);
+                      return ListTile(
+                        dense: true,
+                        visualDensity: VisualDensity.compact,
+                        leading: Icon(Icons.inventory_2, 
+                            size: 16, color: Colors.purple.shade400),
+                        title: Text(
+                          batch,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        onTap: () => onSelected(batch),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildPriceAutocomplete({required double fontSize}) {
     return StreamBuilder<List<InvoiceEntity>>(
       stream: _invoiceRepo.watchInvoices(type: 3), // Lấy tất cả phiếu nhập chợ
@@ -947,7 +1053,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
         }
 
         return DropdownButtonFormField<FarmEntity>(
-          value: _selectedFarm,
+          initialValue: _selectedFarm,
           isExpanded: true,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.home_work, size: 18),
@@ -979,7 +1085,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
       builder: (context, state) {
         final partners = state.partners;
         return DropdownButtonFormField<PartnerEntity>(
-          value: _selectedPartner,
+          initialValue: _selectedPartner,
           isExpanded: true,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.person, size: 18),
@@ -1084,32 +1190,36 @@ class _MarketImportViewState extends State<_MarketImportView> {
         // + Nhập chợ từ NCC (Type 3)
         for (final inv in importMarket) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available += item.quantity;
+            }
           }
         }
 
         // + Xuất kho ra chợ (Type 1)
         for (final inv in exportBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available += item.quantity;
+            }
           }
         }
 
         // - Xuất chợ bán (Type 2)
         for (final inv in exportMarket) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available -= item.quantity;
+            }
           }
         }
 
         // - Nhập kho hàng thừa (Type 0)
         for (final inv in importBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available -= item.quantity;
+            }
           }
         }
 
@@ -1288,12 +1398,12 @@ class _MarketImportViewState extends State<_MarketImportView> {
   }
 
   Widget _buildInvoiceDataGrid(List<InvoiceEntity> invoices, double fontSize) {
-    final headerStyle = const TextStyle(
+    const headerStyle = TextStyle(
       fontSize: 12,
       fontWeight: FontWeight.bold,
       color: Colors.white,
     );
-    final cellStyle = const TextStyle(fontSize: 12);
+    const cellStyle = TextStyle(fontSize: 12);
     final dateFormat = DateFormat('HH:mm');
 
     return Column(
@@ -1305,7 +1415,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
             color: Colors.teal.shade400,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
           ),
-          child: Row(
+          child: const Row(
             children: [
               Expanded(
                   flex: 1,
@@ -1354,7 +1464,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                   flex: 3,
                   child: Text('Tổng tiền',
                       style: headerStyle, textAlign: TextAlign.right)),
-              const SizedBox(width: 50),
+              SizedBox(width: 50),
             ],
           ),
         ),
@@ -1571,37 +1681,53 @@ class _MarketImportViewState extends State<_MarketImportView> {
   }
 
   Widget _buildDailySummary(List<InvoiceEntity> invoices, double fontSize) {
-    // Lọc invoices theo NCC đã chọn (nếu có)
-    final partnerInvoices = _selectedPartner != null
-        ? invoices.where((inv) => inv.partnerId == _selectedPartner!.id).toList()
+    // Lấy mã lô hiện tại từ controller
+    final currentBatch = _batchNumberController.text.trim();
+    
+    // Lọc invoices theo Mã Lô (batchNumber) - lấy từ invoice details
+    final batchInvoices = currentBatch.isNotEmpty
+        ? invoices.where((inv) {
+            if (inv.details.isEmpty) return false;
+            final invBatch = inv.details.first.batchNumber ?? '';
+            return invBatch == currentBatch;
+          }).toList()
         : <InvoiceEntity>[];
     
-    // Tính tổng các chỉ số của NCC đã chọn
+    // Tính tổng các chỉ số của Lô đã chọn
     int totalQuantity = 0;
     double totalWeight = 0;
-    double invoiceTotal = 0; // Tổng từ các phiếu = Thành tiền - Chiết khấu
+    double invoiceTotal = 0; // Tổng thành tiền các phiếu (sau chiết khấu)
+    String? partnerName; // Tên NCC của lô (lấy từ invoice đầu tiên)
+    String? partnerId; // ID NCC của lô
 
-    for (final inv in partnerInvoices) {
+    for (final inv in batchInvoices) {
       totalQuantity += inv.totalQuantity;
       totalWeight += inv.totalWeight; // TL Chợ
       final subtotal = inv.totalWeight * inv.pricePerKg; // Thành tiền
       final discount = inv.discount; // Chiết khấu
       invoiceTotal += subtotal - discount; // Tổng phiếu = Thành tiền - Chiết khấu
+      // Lấy tên NCC từ invoice đầu tiên
+      partnerName ??= inv.partnerName;
+      partnerId ??= inv.partnerId;
     }
 
-    // Lấy giá trị cước xe ngày và thải loại từ controller
-    // Cước xe: chi phí phải cộng thêm cho NCC
-    // Thải loại: giảm trừ do lợn hôi, lợn chết
+    // Lấy giá trị từ các controller
+    // Chi phí khác: nước, phí dịch vụ, etc. (cộng thêm)
+    final dailyOtherCost = double.tryParse(
+            _dailyOtherCostController.text.replaceAll(',', '')) ??
+        0;
+    // Cước xe: chi phí vận chuyển (cộng thêm)
     final dailyTransportFee = double.tryParse(
             _dailyTransportFeeController.text.replaceAll(',', '')) ??
         0;
+    // Thải loại: heo chết, heo hôi, heo tật (trừ đi)
     final dailyReject =
         double.tryParse(_dailyRejectController.text.replaceAll(',', '')) ?? 0;
 
-    // Tổng tiền = Tổng phiếu - Thải loại + Cước xe
-    final totalAmount = invoiceTotal - dailyReject + dailyTransportFee;
+    // Tổng tiền phải trả NCC = Tổng thành tiền + Chi phí khác + Cước xe - Thải loại
+    final totalAmount = invoiceTotal + dailyOtherCost + dailyTransportFee - dailyReject;
 
-    // Đơn giá bình quân = Tổng tiền / Tổng khối lượng (thay đổi khi nhập cước xe và thải loại)
+    // BQ Đơn giá = Tổng tiền / Tổng KL
     final averagePrice = totalWeight > 0 ? totalAmount / totalWeight : 0;
 
     return Container(
@@ -1637,26 +1763,26 @@ class _MarketImportViewState extends State<_MarketImportView> {
                     const Icon(Icons.summarize, color: Colors.white, size: 20),
               ),
               const SizedBox(width: 12),
-              // Title với tên NCC
+              // Title với mã Lô và tên NCC
               Expanded(
                 flex: 0,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'TỔNG KẾT NCC:',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
+                    Text(
+                      'TỔNG KẾT LÔ: ${currentBatch.isNotEmpty ? currentBatch : "---"}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      _selectedPartner?.name ?? 'Chưa chọn NCC',
+                      partnerName ?? 'Chưa có phiếu',
                       style: TextStyle(
-                        color: _selectedPartner != null ? Colors.white : Colors.yellow,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        color: partnerName != null ? Colors.white70 : Colors.yellow,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -1671,7 +1797,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                     _buildSummaryStatItem(
                       icon: Icons.receipt_long,
                       label: 'Số phiếu',
-                      value: '${partnerInvoices.length}',
+                      value: '${batchInvoices.length}',
                     ),
                     _buildSummaryStatItem(
                       icon: Icons.pets,
@@ -1686,7 +1812,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                     _buildSummaryStatItem(
                       icon: Icons.attach_money,
                       label: 'BQ Đơn giá',
-                      value: '${NumberFormat('#,###').format(averagePrice)}',
+                      value: NumberFormat('#,###').format(averagePrice),
                     ),
                     _buildSummaryStatItem(
                       icon: Icons.payments,
@@ -1700,53 +1826,122 @@ class _MarketImportViewState extends State<_MarketImportView> {
             ],
           ),
           const SizedBox(height: 8),
-          // Row 2: Input fields + Net amount
+          // Row 2: Chi phí khác + Cước xe + Thải loại
           Row(
-            children: [
+            children: [ 
               const SizedBox(width: 40), // Offset for icon
+              // Chi phí khác input (nước, ...)
+              Expanded(
+                child: _buildDailySummaryInputWithNote(
+                  label: 'Chi phí khác',
+                  controller: _dailyOtherCostController,
+                  noteController: _dailyOtherCostNoteController,
+                  icon: Icons.receipt_long,
+                  noteHint: 'nước, phí...',
+                  isAddition: true,
+                ),
+              ),
+              const SizedBox(width: 8),
               // Cước xe input
               Expanded(
                 child: _buildDailySummaryInput(
                   label: 'Cước xe',
                   controller: _dailyTransportFeeController,
                   icon: Icons.local_shipping,
+                  isAddition: true,
                 ),
               ),
-              const SizedBox(width: 12),
-              // Thải loại input
+              const SizedBox(width: 8),
+              // Thải loại input (heo chết, heo hôi, heo tật)
               Expanded(
-                child: _buildDailySummaryInput(
+                child: _buildDailySummaryInputWithNote(
                   label: 'Thải loại',
                   controller: _dailyRejectController,
+                  noteController: _dailyRejectNoteController,
                   icon: Icons.delete_outline,
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Nút Chốt NCC
-              ElevatedButton.icon(
-                onPressed: partnerInvoices.isNotEmpty && _selectedPartner != null
-                    ? () => _saveDailySummary(
-                          context,
-                          invoices: partnerInvoices,
-                          totalQuantity: totalQuantity,
-                          totalWeight: totalWeight,
-                          totalAmount: totalAmount,
-                          transportFee: dailyTransportFee,
-                          rejectAmount: dailyReject,
-                          partnerName: _selectedPartner!.name,
-                        )
-                    : null,
-                icon: const Icon(Icons.check_circle, size: 18),
-                label: Text(_selectedPartner != null ? 'Chốt ${_selectedPartner!.name}' : 'Chốt NCC'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple.shade600,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  disabledBackgroundColor: Colors.grey,
+                  noteHint: 'chết, hôi, tật...',
+                  isAddition: false,
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailySummaryInputWithNote({
+    required String label,
+    required TextEditingController controller,
+    required TextEditingController noteController,
+    required IconData icon,
+    required String noteHint,
+    required bool isAddition,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: isAddition 
+            ? Colors.green.withOpacity(0.15) 
+            : Colors.red.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isAddition ? Colors.green.shade300 : Colors.red.shade300,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: Colors.white70, size: 14),
+              const SizedBox(width: 4),
+              Text(
+                '${isAddition ? '+' : '-'} $label:',
+                style: TextStyle(
+                  color: isAddition ? Colors.green.shade100 : Colors.red.shade100,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            ],
+          ),
+          // Note field
+          TextField(
+            controller: noteController,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 10,
+            ),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              hintText: noteHint,
+              hintStyle: TextStyle(
+                color: Colors.white.withOpacity(0.4),
+                fontSize: 10,
+              ),
+            ),
           ),
         ],
       ),
@@ -1757,23 +1952,29 @@ class _MarketImportViewState extends State<_MarketImportView> {
     required String label,
     required TextEditingController controller,
     required IconData icon,
+    bool isAddition = true,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: isAddition 
+            ? Colors.green.withOpacity(0.15) 
+            : Colors.red.withOpacity(0.15),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.white30),
+        border: Border.all(
+          color: isAddition ? Colors.green.shade300 : Colors.red.shade300,
+        ),
       ),
       child: Row(
         children: [
           Icon(icon, color: Colors.white70, size: 16),
           const SizedBox(width: 6),
           Text(
-            '$label:',
-            style: const TextStyle(
-              color: Colors.white70,
+            '${isAddition ? '+' : '-'} $label:',
+            style: TextStyle(
+              color: isAddition ? Colors.green.shade100 : Colors.red.shade100,
               fontSize: 11,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(width: 6),
@@ -1864,8 +2065,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
       totalQuantity += inv.totalQuantity;
     }
 
-    final cellStyle =
-        const TextStyle(fontSize: 12, fontWeight: FontWeight.bold);
+    const cellStyle =
+        TextStyle(fontSize: 12, fontWeight: FontWeight.bold);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -1875,14 +2076,14 @@ class _MarketImportViewState extends State<_MarketImportView> {
       ),
       child: Row(
         children: [
-          Expanded(flex: 1, child: Text('', style: cellStyle)),
-          Expanded(flex: 2, child: Text('', style: cellStyle)),
+          const Expanded(flex: 1, child: Text('', style: cellStyle)),
+          const Expanded(flex: 2, child: Text('', style: cellStyle)),
           Expanded(
               flex: 4,
               child: Text('TỔNG: ${invoices.length} phiếu', style: cellStyle)),
-          Expanded(flex: 3, child: Text('', style: cellStyle)),
-          Expanded(flex: 2, child: Text('', style: cellStyle)),
-          Expanded(flex: 3, child: Text('', style: cellStyle)),
+          const Expanded(flex: 3, child: Text('', style: cellStyle)),
+          const Expanded(flex: 2, child: Text('', style: cellStyle)),
+          const Expanded(flex: 3, child: Text('', style: cellStyle)),
           Expanded(
               flex: 2,
               child: Text('$totalQuantity',
@@ -1900,7 +2101,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
               child: Text(_numberFormat.format(totalHao),
                   style: cellStyle.copyWith(color: Colors.red),
                   textAlign: TextAlign.right)),
-          Expanded(flex: 3, child: Text('', style: cellStyle)),
+          const Expanded(flex: 3, child: Text('', style: cellStyle)),
           Expanded(
               flex: 3,
               child: Text(_formatShortCurrency(totalSubtotal),
@@ -2027,22 +2228,6 @@ class _MarketImportViewState extends State<_MarketImportView> {
                                   color: Colors.white),
                             ),
                           ),
-                          const Spacer(),
-                          SizedBox(
-                            height: 32,
-                            child: FilledButton(
-                              onPressed: _selectedPaymentMethod < 2
-                                  ? () => _saveSupplierPayment(context)
-                                  : null,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 12),
-                              ),
-                              child: const Text('Xác nhận',
-                                  style: TextStyle(fontSize: 11)),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -2102,22 +2287,6 @@ class _MarketImportViewState extends State<_MarketImportView> {
                                   fontWeight: FontWeight.bold,
                                   fontSize: 11,
                                   color: Colors.white),
-                            ),
-                          ),
-                          const Spacer(),
-                          SizedBox(
-                            height: 32,
-                            child: FilledButton(
-                              onPressed: _selectedPaymentMethod >= 3
-                                  ? () => _saveSupplierPayment(context)
-                                  : null,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Colors.purple,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 12),
-                              ),
-                              child: const Text('Xác nhận',
-                                  style: TextStyle(fontSize: 11)),
                             ),
                           ),
                         ],
@@ -2464,26 +2633,40 @@ class _MarketImportViewState extends State<_MarketImportView> {
       // All payment methods save to transaction history with type = 1 (Chi - trả tiền NCC)
       String note;
       int actualPaymentMethod; // Payment method to save in DB (0 or 1)
+      
+      // Lấy mã lô từ controller (nếu có)
+      final batchNumber = _batchNumberController.text.trim();
+      final batchSuffix = batchNumber.isNotEmpty ? ' Lô $batchNumber' : '';
 
       switch (_selectedPaymentMethod) {
         case 0:
-          note = 'Thanh toán NCC tiền mặt';
+          note = batchNumber.isNotEmpty 
+              ? 'Thanh toán$batchSuffix tiền mặt'
+              : 'Thanh toán NCC tiền mặt';
           actualPaymentMethod = 0;
           break;
         case 1:
-          note = 'Thanh toán NCC chuyển khoản';
+          note = batchNumber.isNotEmpty 
+              ? 'Thanh toán$batchSuffix chuyển khoản'
+              : 'Thanh toán NCC chuyển khoản';
           actualPaymentMethod = 1;
           break;
         case 3:
-          note = 'Trả nợ NCC tiền mặt';
+          note = batchNumber.isNotEmpty 
+              ? 'Trả nợ$batchSuffix tiền mặt'
+              : 'Trả nợ NCC tiền mặt';
           actualPaymentMethod = 0;
           break;
         case 4:
-          note = 'Trả nợ NCC chuyển khoản';
+          note = batchNumber.isNotEmpty 
+              ? 'Trả nợ$batchSuffix chuyển khoản'
+              : 'Trả nợ NCC chuyển khoản';
           actualPaymentMethod = 1;
           break;
         default:
-          note = 'Thanh toán NCC';
+          note = batchNumber.isNotEmpty 
+              ? 'Thanh toán$batchSuffix'
+              : 'Thanh toán NCC';
           actualPaymentMethod = 0;
       }
 
@@ -2739,6 +2922,284 @@ class _MarketImportViewState extends State<_MarketImportView> {
     );
   }
 
+  // ==================== BATCH CLOSE BUTTON ====================
+  Widget _buildBatchCloseButton(BuildContext context) {
+    final currentBatch = _batchNumberController.text.trim();
+    final hasBatch = currentBatch.isNotEmpty;
+    
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ElevatedButton.icon(
+        onPressed: hasBatch ? () => _showBatchCloseDialog(context) : null,
+        icon: const Icon(Icons.check_circle, size: 18),
+        label: Text(hasBatch ? 'Chốt Lô $currentBatch' : 'Chốt Lô'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.purple.shade600,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: Colors.grey.shade400,
+        ),
+      ),
+    );
+  }
+
+  void _showBatchCloseDialog(BuildContext context) async {
+    final currentBatch = _batchNumberController.text.trim();
+    if (currentBatch.isEmpty) return;
+
+    // Lấy danh sách invoices theo lô
+    final invoices = await _invoiceRepo.watchInvoices(type: 3).first;
+    final batchInvoices = invoices.where((inv) {
+      if (inv.details.isEmpty) return false;
+      final invBatch = inv.details.first.batchNumber ?? '';
+      return invBatch == currentBatch;
+    }).toList();
+
+    if (batchInvoices.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚠️ Không tìm thấy phiếu nào trong Lô $currentBatch'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Tính tổng
+    int totalQuantity = 0;
+    double totalWeight = 0;
+    double invoiceTotal = 0;
+    String? partnerName;
+    String? partnerId;
+
+    for (final inv in batchInvoices) {
+      totalQuantity += inv.totalQuantity;
+      totalWeight += inv.totalWeight;
+      final subtotal = inv.totalWeight * inv.pricePerKg;
+      final discount = inv.discount;
+      invoiceTotal += subtotal - discount;
+      partnerName ??= inv.partnerName;
+      partnerId ??= inv.partnerId;
+    }
+
+    // Lấy chi phí từ controllers
+    final dailyOtherCost = double.tryParse(
+            _dailyOtherCostController.text.replaceAll(',', '')) ?? 0;
+    final dailyTransportFee = double.tryParse(
+            _dailyTransportFeeController.text.replaceAll(',', '')) ?? 0;
+    final dailyReject = double.tryParse(
+            _dailyRejectController.text.replaceAll(',', '')) ?? 0;
+
+    // Tổng tiền
+    final totalAmount = invoiceTotal + dailyOtherCost + dailyTransportFee - dailyReject;
+    final averagePrice = totalWeight > 0 ? totalAmount / totalWeight : 0;
+
+    // Lấy số tiền thanh toán từ controller công nợ (tùy theo phương thức đang chọn)
+    // Method 0, 1 = Thanh toán -> _paymentAmountController
+    // Method 3, 4 = Trả nợ -> _debtPaymentController
+    double paidAmount = 0;
+    if (_selectedPaymentMethod < 2) {
+      paidAmount = double.tryParse(
+              _paymentAmountController.text.replaceAll(',', '').replaceAll('.', '')) ?? 0;
+    } else if (_selectedPaymentMethod >= 3) {
+      paidAmount = double.tryParse(
+              _debtPaymentController.text.replaceAll(',', '').replaceAll('.', '')) ?? 0;
+    }
+    final remainingDebt = totalAmount - paidAmount;
+
+    if (!context.mounted) return;
+
+    // Hiển thị dialog xác nhận
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.purple.shade600),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Chốt Lô: $currentBatch')),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Mã Lô: $currentBatch', 
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    if (partnerName != null && partnerName.isNotEmpty)
+                      Text('NCC: $partnerName', 
+                          style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildDialogRow('Số phiếu:', '${batchInvoices.length}'),
+              _buildDialogRow('Tổng SL:', '$totalQuantity con'),
+              _buildDialogRow('Tổng KL:', '${_numberFormat.format(totalWeight)} kg'),
+              const Divider(height: 20),
+              _buildDialogRow('Tổng thành tiền:', 
+                  '${NumberFormat('#,###').format(invoiceTotal)} đ'),
+              if (dailyOtherCost > 0) ...[
+                _buildDialogRow(
+                  '+ Chi phí khác${_dailyOtherCostNoteController.text.isNotEmpty ? ' (${_dailyOtherCostNoteController.text})' : ''}:',
+                  '${NumberFormat('#,###').format(dailyOtherCost)} đ',
+                  color: Colors.green,
+                ),
+              ],
+              if (dailyTransportFee > 0) ...[
+                _buildDialogRow('+ Cước xe:',
+                    '${NumberFormat('#,###').format(dailyTransportFee)} đ',
+                    color: Colors.blue),
+              ],
+              if (dailyReject > 0) ...[
+                _buildDialogRow(
+                  '- Thải loại${_dailyRejectNoteController.text.isNotEmpty ? ' (${_dailyRejectNoteController.text})' : ''}:',
+                  '${NumberFormat('#,###').format(dailyReject)} đ',
+                  color: Colors.red,
+                ),
+              ],
+              const Divider(height: 20),
+              _buildDialogRow('TỔNG TIỀN:', 
+                  '${NumberFormat('#,###').format(totalAmount)} đ',
+                  isBold: true, color: Colors.purple),
+              const SizedBox(height: 8),
+              _buildDialogRow('BQ Đơn giá:', 
+                  '${NumberFormat('#,###').format(averagePrice)} đ/kg',
+                  color: Colors.orange),
+              const Divider(height: 20),
+              _buildDialogRow('Thanh toán:', 
+                  '${NumberFormat('#,###').format(paidAmount)} đ',
+                  color: Colors.green.shade700),
+              _buildDialogRow(
+                remainingDebt > 0 ? 'Còn nợ:' : 'Hoàn thành:',
+                remainingDebt > 0 
+                    ? '${NumberFormat('#,###').format(remainingDebt)} đ'
+                    : '✓ Đã thanh toán đủ',
+                isBold: true,
+                color: remainingDebt > 0 ? Colors.red : Colors.green,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple.shade600,
+            ),
+            child: const Text('Xác nhận Chốt Lô'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      final today = DateTime.now();
+      final dateStr = DateFormat('yyyy-MM-dd').format(today);
+
+      // Tạo note chi tiết
+      final noteBuilder = StringBuffer();
+      noteBuilder.write('CHỐT LÔ $currentBatch');
+      if (partnerName != null && partnerName.isNotEmpty) {
+        noteBuilder.write(' - NCC: $partnerName');
+      }
+      noteBuilder.write(' - $dateStr');
+      noteBuilder.write(' | Phiếu: ${batchInvoices.length}');
+      noteBuilder.write(' | SL: $totalQuantity con');
+      noteBuilder.write(' | KL: ${_numberFormat.format(totalWeight)}kg');
+      noteBuilder.write(' | Tiền: ${NumberFormat('#,###').format(totalAmount)}');
+      if (paidAmount > 0) {
+        noteBuilder.write(' | TT: ${NumberFormat('#,###').format(paidAmount)}');
+      }
+      if (remainingDebt > 0) {
+        noteBuilder.write(' | Nợ: ${NumberFormat('#,###').format(remainingDebt)}');
+      }
+
+      // Lưu transaction nếu có thanh toán
+      if (paidAmount > 0 && partnerId != null) {
+        await _db.transactionsDao.createTransaction(
+          TransactionsCompanion(
+            id: Value('batch_${currentBatch}_${today.millisecondsSinceEpoch}'),
+            partnerId: Value(partnerId),
+            invoiceId: const Value(null),
+            amount: Value(paidAmount),
+            type: const Value(1),
+            paymentMethod: const Value(0),
+            transactionDate: Value(today),
+            note: Value('Thanh toán Lô $currentBatch | ${noteBuilder.toString()}'),
+          ),
+        );
+      }
+
+      // Nếu còn nợ, ghi nhận khoản nợ
+      if (remainingDebt > 0 && partnerId != null) {
+        await _db.transactionsDao.createTransaction(
+          TransactionsCompanion(
+            id: Value('debt_${currentBatch}_${today.millisecondsSinceEpoch}'),
+            partnerId: Value(partnerId),
+            invoiceId: const Value(null),
+            amount: Value(remainingDebt),
+            type: const Value(0), // 0 = Thu (ghi nợ)
+            paymentMethod: const Value(0),
+            transactionDate: Value(today),
+            note: Value('Lô $currentBatch nợ | ${noteBuilder.toString()}'),
+          ),
+        );
+      }
+
+      // Reset controllers
+      setState(() {
+        _dailyOtherCostController.text = '0';
+        _dailyOtherCostNoteController.clear();
+        _dailyTransportFeeController.text = '0';
+        _dailyRejectController.text = '0';
+        _dailyRejectNoteController.clear();
+        _paymentAmountController.text = '0';
+        _batchNumberController.clear();
+      });
+
+      if (context.mounted) {
+        final message = remainingDebt > 0
+            ? '✅ Đã chốt Lô $currentBatch! TT: ${NumberFormat('#,###').format(paidAmount)}đ | Nợ: ${NumberFormat('#,###').format(remainingDebt)}đ'
+            : '✅ Đã chốt Lô $currentBatch! Thanh toán đủ: ${NumberFormat('#,###').format(paidAmount)}đ';
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.purple.shade600,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Lỗi khi chốt lô: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   // ==================== ACTIONS ====================
   void _handleDiscountClick() {
     setState(() {
@@ -2774,16 +3235,32 @@ class _MarketImportViewState extends State<_MarketImportView> {
     });
   }
 
-  void _saveDailySummary(
+  void _saveBatchSummary(
     BuildContext context, {
+    required String batchNumber,
     required List<InvoiceEntity> invoices,
     required int totalQuantity,
     required double totalWeight,
     required double totalAmount,
+    required double otherCost,
+    required String otherCostNote,
     required double transportFee,
     required double rejectAmount,
+    required String rejectNote,
     required String partnerName,
+    String? partnerId,
   }) async {
+    // Tính tổng thành tiền các phiếu (trước khi cộng/trừ chi phí)
+    double invoiceTotal = 0;
+    for (final inv in invoices) {
+      final subtotal = inv.totalWeight * inv.pricePerKg;
+      final discount = inv.discount;
+      invoiceTotal += subtotal - discount;
+    }
+    
+    // BQ Đơn giá = Tổng tiền / Tổng KL
+    final averagePrice = totalWeight > 0 ? totalAmount / totalWeight : 0;
+    
     // Hiển thị dialog xác nhận
     final confirmed = await showDialog<bool>(
       context: context,
@@ -2792,25 +3269,71 @@ class _MarketImportViewState extends State<_MarketImportView> {
           children: [
             Icon(Icons.check_circle, color: Colors.purple.shade600),
             const SizedBox(width: 8),
-            Text('Chốt NCC: $partnerName'),
+            Expanded(child: Text('Chốt Lô: $batchNumber')),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('NCC: $partnerName', style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text('Số phiếu: ${invoices.length}'),
-            Text('Tổng SL: $totalQuantity con'),
-            Text('Tổng KL: ${_numberFormat.format(totalWeight)} kg'),
-            const Divider(),
-            Text('Tổng tiền: ${NumberFormat('#,###').format(totalAmount)} đ'),
-            Text('Cước xe: ${NumberFormat('#,###').format(transportFee)} đ',
-                style: const TextStyle(color: Colors.blue)),
-            Text('Thải loại: ${NumberFormat('#,###').format(rejectAmount)} đ',
-                style: const TextStyle(color: Colors.red)),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Mã Lô: $batchNumber', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    if (partnerName.isNotEmpty)
+                      Text('NCC: $partnerName', style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildDialogRow('Số phiếu:', '${invoices.length}'),
+              _buildDialogRow('Tổng SL:', '$totalQuantity con'),
+              _buildDialogRow('Tổng KL:', '${_numberFormat.format(totalWeight)} kg'),
+              const Divider(height: 20),
+              _buildDialogRow('Tổng thành tiền:', '${NumberFormat('#,###').format(invoiceTotal)} đ'),
+              if (otherCost > 0) ...[
+                _buildDialogRow(
+                  '+ Chi phí khác${otherCostNote.isNotEmpty ? ' ($otherCostNote)' : ''}:',
+                  '${NumberFormat('#,###').format(otherCost)} đ',
+                  color: Colors.green,
+                ),
+              ],
+              if (transportFee > 0) ...[
+                _buildDialogRow(
+                  '+ Cước xe:',
+                  '${NumberFormat('#,###').format(transportFee)} đ',
+                  color: Colors.blue,
+                ),
+              ],
+              if (rejectAmount > 0) ...[
+                _buildDialogRow(
+                  '- Thải loại${rejectNote.isNotEmpty ? ' ($rejectNote)' : ''}:',
+                  '${NumberFormat('#,###').format(rejectAmount)} đ',
+                  color: Colors.red,
+                ),
+              ],
+              const Divider(height: 20),
+              _buildDialogRow(
+                'TỔNG TIỀN TRẢ NCC:',
+                '${NumberFormat('#,###').format(totalAmount)} đ',
+                isBold: true,
+                color: Colors.purple,
+              ),
+              const SizedBox(height: 8),
+              _buildDialogRow(
+                'BQ Đơn giá:',
+                '${NumberFormat('#,###').format(averagePrice)} đ/kg',
+                color: Colors.orange,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -2822,7 +3345,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.purple.shade600,
             ),
-            child: const Text('Xác nhận'),
+            child: const Text('Xác nhận Chốt Lô'),
           ),
         ],
       ),
@@ -2831,47 +3354,63 @@ class _MarketImportViewState extends State<_MarketImportView> {
     if (confirmed != true) return;
 
     try {
-      // Lưu thông tin tổng kết NCC vào database
+      // Lưu thông tin tổng kết LÔ vào database
       final today = DateTime.now();
       final dateStr = DateFormat('yyyy-MM-dd').format(today);
       
-      // Tạo note tổng kết với tên NCC
-      final summaryNote = 'CHỐT NCC $partnerName - $dateStr | '
-          'Số phiếu: ${invoices.length} | '
-          'SL: $totalQuantity con | '
-          'KL: ${_numberFormat.format(totalWeight)}kg | '
-          'Tổng tiền: ${NumberFormat('#,###').format(totalAmount)} | '
-          'Cước xe: ${NumberFormat('#,###').format(transportFee)} | '
-          'Thải loại: ${NumberFormat('#,###').format(rejectAmount)}';
+      // Tạo note tổng kết chi tiết theo LÔ
+      final noteBuilder = StringBuffer();
+      noteBuilder.write('CHỐT LÔ $batchNumber');
+      if (partnerName.isNotEmpty) noteBuilder.write(' - NCC: $partnerName');
+      noteBuilder.write(' - $dateStr | ');
+      noteBuilder.write('Số phiếu: ${invoices.length} | ');
+      noteBuilder.write('SL: $totalQuantity con | ');
+      noteBuilder.write('KL: ${_numberFormat.format(totalWeight)}kg | ');
+      noteBuilder.write('Thành tiền: ${NumberFormat('#,###').format(invoiceTotal)}');
+      if (otherCost > 0) {
+        noteBuilder.write(' | +CP khác: ${NumberFormat('#,###').format(otherCost)}');
+        if (otherCostNote.isNotEmpty) noteBuilder.write(' ($otherCostNote)');
+      }
+      if (transportFee > 0) {
+        noteBuilder.write(' | +Cước xe: ${NumberFormat('#,###').format(transportFee)}');
+      }
+      if (rejectAmount > 0) {
+        noteBuilder.write(' | -Thải loại: ${NumberFormat('#,###').format(rejectAmount)}');
+        if (rejectNote.isNotEmpty) noteBuilder.write(' ($rejectNote)');
+      }
+      noteBuilder.write(' | TỔNG: ${NumberFormat('#,###').format(totalAmount)}');
+      noteBuilder.write(' | BQ: ${NumberFormat('#,###').format(averagePrice)}/kg');
 
-      // Lưu transaction thanh toán cho NCC
-      // Lấy partnerId từ _selectedPartner (đã kiểm tra không null)
-      final partnerId = _selectedPartner!.id;
-      
+      // Lưu transaction theo LÔ (batchNumber) để sau này báo cáo
+      // partnerId là required trong Transactions table, nên dùng 'BATCH' nếu không có NCC
       await _db.transactionsDao.createTransaction(
         TransactionsCompanion(
-          id: Value('ncc_${partnerId}_${today.millisecondsSinceEpoch}'),
-          partnerId: Value(partnerId),
+          id: Value('batch_${batchNumber}_${today.millisecondsSinceEpoch}'),
+          partnerId: Value(partnerId ?? 'BATCH_$batchNumber'), // Dùng mã lô làm ID nếu không có NCC
           invoiceId: const Value(null),
           amount: Value(totalAmount),
           type: const Value(1), // 1 = Chi (trả tiền cho NCC)
           paymentMethod: const Value(0), // 0 = Tiền mặt
           transactionDate: Value(today),
-          note: Value(summaryNote),
+          note: Value(noteBuilder.toString()),
         ),
       );
 
-      // Reset các ô nhập cước xe và thải loại
+      // Reset các ô nhập chi phí và mã lô
       setState(() {
+        _dailyOtherCostController.text = '0';
+        _dailyOtherCostNoteController.clear();
         _dailyTransportFeeController.text = '0';
         _dailyRejectController.text = '0';
+        _dailyRejectNoteController.clear();
+        _batchNumberController.clear(); // Reset mã lô sau khi chốt
       });
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                '✅ Đã chốt $partnerName! Tổng tiền: ${NumberFormat('#,###').format(totalAmount)}đ'),
+                '✅ Đã chốt Lô $batchNumber! Tổng tiền: ${NumberFormat('#,###').format(totalAmount)}đ | BQ: ${NumberFormat('#,###').format(averagePrice)}đ/kg'),
             backgroundColor: Colors.purple.shade600,
             duration: const Duration(seconds: 3),
           ),
@@ -2881,12 +3420,41 @@ class _MarketImportViewState extends State<_MarketImportView> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Lỗi khi chốt: $e'),
+            content: Text('❌ Lỗi khi chốt lô: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
     }
+  }
+
+  Widget _buildDialogRow(String label, String value, {bool isBold = false, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                color: color ?? Colors.grey.shade700,
+                fontSize: isBold ? 14 : 13,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              color: color ?? Colors.black87,
+              fontSize: isBold ? 14 : 13,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _saveInvoice(BuildContext context) async {
@@ -2901,8 +3469,13 @@ class _MarketImportViewState extends State<_MarketImportView> {
       return;
     }
 
-    // Generate invoice code
-    final invoiceCode = await _invoiceRepo.generateInvoiceCode(3);
+    // Kiểm tra đang sửa phiếu hay tạo mới
+    final isEditing = _editingInvoiceId != null;
+    
+    // Chỉ generate code mới nếu tạo phiếu mới
+    final invoiceCode = isEditing 
+        ? null // Giữ code cũ khi sửa
+        : await _invoiceRepo.generateInvoiceCode(3);
 
     // Build note với thông tin Trại và Lô
     final noteBuilder = <String>[];
@@ -2925,8 +3498,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
     // - discount = Chiết khấu (số tiền giảm)
     // - finalAmount = Tổng tiền (TL Chợ × Đơn giá - Chiết khấu)
     final invoice = InvoiceEntity(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      invoiceCode: invoiceCode,
+      id: isEditing ? _editingInvoiceId! : DateTime.now().millisecondsSinceEpoch.toString(),
+      invoiceCode: invoiceCode, // null khi sửa (giữ code cũ)
       type: 3, // Nhập chợ
       partnerId: _selectedPartner?.id,
       partnerName: _selectedPartner?.name,
@@ -2942,29 +3515,38 @@ class _MarketImportViewState extends State<_MarketImportView> {
       createdDate: DateTime.now(),
     );
 
-    await _invoiceRepo.createInvoice(invoice);
-
-    // Lưu chi tiết với loại heo
-    if (_pigTypeController.text.isNotEmpty) {
-      final weighingItem = WeighingItemEntity(
-        id: '${invoice.id}_1',
-        sequence: 1,
-        weight: _marketWeight,
-        quantity: quantity,
-        time: DateTime.now(),
-        batchNumber: _batchNumberController.text.isNotEmpty
-            ? _batchNumberController.text
-            : null,
-        pigType: _pigTypeController.text.trim(),
-      );
-      await _invoiceRepo.addWeighingItem(invoice.id, weighingItem);
+    // Sửa phiếu hoặc tạo mới
+    if (isEditing) {
+      await _invoiceRepo.updateInvoice(invoice);
+      // Xóa details cũ và thêm mới
+      await _db.weighingDetailsDao.deleteByInvoiceId(_editingInvoiceId!);
+    } else {
+      await _invoiceRepo.createInvoice(invoice);
     }
+
+    // Lưu chi tiết với loại heo (luôn thêm detail để lưu batchNumber)
+    final weighingItem = WeighingItemEntity(
+      id: '${invoice.id}_1',
+      sequence: 1,
+      weight: _marketWeight,
+      quantity: quantity,
+      time: DateTime.now(),
+      batchNumber: _batchNumberController.text.isNotEmpty
+          ? _batchNumberController.text
+          : null,
+      pigType: _pigTypeController.text.trim().isNotEmpty 
+          ? _pigTypeController.text.trim() 
+          : null,
+    );
+    await _invoiceRepo.addWeighingItem(invoice.id, weighingItem);
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              '✅ Đã lưu phiếu nhập chợ! TL Trại: ${_numberFormat.format(_farmWeight)}kg, TL Chợ: ${_numberFormat.format(_marketWeight)}kg, Hao: ${_numberFormat.format(_haoWeight)}kg'),
+              isEditing 
+                  ? '✅ Đã cập nhật phiếu! TL Trại: ${_numberFormat.format(_farmWeight)}kg, TL Chợ: ${_numberFormat.format(_marketWeight)}kg'
+                  : '✅ Đã lưu phiếu nhập chợ! TL Trại: ${_numberFormat.format(_farmWeight)}kg, TL Chợ: ${_numberFormat.format(_marketWeight)}kg, Hao: ${_numberFormat.format(_haoWeight)}kg'),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 3),
         ),
@@ -2975,6 +3557,9 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
   void _resetForm() {
     setState(() {
+      // Reset chế độ sửa phiếu
+      _editingInvoiceId = null;
+      
       // Chỉ reset các trường cần nhập lại cho phiếu mới
       _scaleInputController.clear(); // TL Chợ
       _farmWeightController.clear(); // TL Trại
@@ -2999,6 +3584,9 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
   void _loadInvoiceToForm(InvoiceEntity inv) {
     setState(() {
+      // Lưu ID phiếu đang sửa
+      _editingInvoiceId = inv.id;
+      
       _scaleInputController.text = inv.totalWeight.toString(); // TL Chợ
       _farmWeightController.text =
           inv.deduction.toString(); // TL Trại (lưu trong deduction/truckCost)
@@ -3006,12 +3594,41 @@ class _MarketImportViewState extends State<_MarketImportView> {
       _quantityController.text = inv.totalQuantity.toString();
       _manualDiscount = inv.discount; // Chiết khấu
       _noteController.text = inv.note ?? '';
-      // Load loại heo từ details nếu có
+      
+      // Load NCC từ invoice
+      if (inv.partnerId != null) {
+        // Tìm partner từ DB
+        _db.partnersDao.getPartnerById(inv.partnerId!).then((partner) {
+          if (partner != null && mounted) {
+            setState(() {
+              _selectedPartner = PartnerEntity(
+                id: partner.id,
+                name: partner.name,
+                phone: partner.phone,
+                address: partner.address,
+                isSupplier: partner.isSupplier,
+                currentDebt: partner.currentDebt,
+              );
+            });
+          }
+        });
+      }
+      
+      // Load loại heo và lô từ details nếu có
       if (inv.details.isNotEmpty) {
         _pigTypeController.text = inv.details.first.pigType ?? '';
         _batchNumberController.text = inv.details.first.batchNumber ?? '';
       }
     });
+    
+    // Show snackbar to indicate editing mode
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✏️ Đang sửa phiếu ${inv.invoiceCode ?? inv.id}'),
+        backgroundColor: Colors.blue,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   /// Lưu phiên cân với nhiều lần cân và chi phí khác

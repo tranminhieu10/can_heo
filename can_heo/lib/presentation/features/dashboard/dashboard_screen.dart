@@ -3,15 +3,12 @@ import 'package:flutter/material.dart';
 import '../../../core/utils/responsive.dart';
 
 // Import các màn hình con
-import '../market_export/market_export_screen.dart';
 import '../market_export/scale_test_screen.dart';
-import '../market_import/market_import_screen.dart';
-import '../import_barn/import_barn_screen.dart';
-import '../export_barn/export_barn_screen.dart';
+import '../market/market_menu_screen.dart';
+import '../barn/barn_menu_screen.dart';
 import '../history/invoice_history_screen.dart';
 import '../partners/partners_screen.dart';
 import '../pig_types/pig_types_screen.dart';
-import '../market_report/market_report_screen.dart';
 import '../settings/settings_screen.dart';
 import 'widgets/overview_screen.dart';
 
@@ -28,20 +25,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Danh sách các menu items
   static const List<_NavItem> _navItems = [
     _NavItem(Icons.dashboard_outlined, Icons.dashboard, 'Tổng quan'),
-    _NavItem(Icons.input_outlined, Icons.input, 'Nhập Kho'),
-    _NavItem(Icons.outbox_outlined, Icons.outbox, 'Xuất Kho'),
-    _NavItem(Icons.storefront_outlined, Icons.storefront, 'Xuất Chợ'),
-    _NavItem(Icons.shopping_basket_outlined, Icons.shopping_basket, 'Nhập Chợ'),
+    _NavItem(Icons.warehouse_outlined, Icons.warehouse, 'Kho'),
+    _NavItem(Icons.store_outlined, Icons.store, 'Chợ'),
     _NavItem(Icons.people_outline, Icons.people, 'Đối tác'),
     _NavItem(Icons.pets_outlined, Icons.pets, 'Loại heo'),
     _NavItem(Icons.history_outlined, Icons.history, 'Lịch sử'),
-    _NavItem(Icons.assessment_outlined, Icons.assessment, 'Báo cáo chợ'),
     _NavItem(Icons.usb_outlined, Icons.usb, 'Test Cân'),
     _NavItem(Icons.settings_outlined, Icons.settings, 'Cài đặt'),
   ];
 
   // Bottom nav chỉ hiện 4 items chính, còn lại trong drawer
-  static const List<int> _bottomNavIndexes = [0, 3, 4, 10]; // Tổng quan, Xuất Chợ, Nhập Chợ, Cài đặt
+  static const List<int> _bottomNavIndexes = [0, 1, 2, 7]; // Tổng quan, Kho, Chợ, Cài đặt
 
   @override
   Widget build(BuildContext context) {
@@ -242,10 +236,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     switch (label) {
       case 'Tổng quan':
         return 'Tổng quan';
-      case 'Xuất Chợ':
-        return 'Xuất';
-      case 'Nhập Chợ':
-        return 'Nhập';
+      case 'Kho':
+        return 'Kho';
+      case 'Chợ':
+        return 'Chợ';
       case 'Cài đặt':
         return 'Cài đặt';
       default:
@@ -258,24 +252,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 0:
         return const OverviewScreen();
       case 1:
-        return const ImportBarnScreen();
+        return const BarnMenuScreen();
       case 2:
-        return const ExportBarnScreen();
+        return const MarketMenuScreen();
       case 3:
-        return const MarketExportScreen();
-      case 4:
-        return const MarketImportScreen();
-      case 5:
         return const PartnersScreen();
-      case 6:
+      case 4:
         return const PigTypesScreen();
-      case 7:
+      case 5:
         return const InvoiceHistoryScreen(invoiceType: 2);
-      case 8:
-        return const MarketReportScreen();
-      case 9:
+      case 6:
         return const ScaleTestScreen();
-      case 10:
+      case 7:
         return const SettingsScreen();
       default:
         return const SizedBox();

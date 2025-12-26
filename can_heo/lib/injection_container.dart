@@ -93,6 +93,9 @@ Future<void> init() async {
   );
 
   sl.registerFactory(
-    () => MarketReportBloc(invoiceRepository: sl<IInvoiceRepository>()),
+    () => MarketReportBloc(
+      invoiceRepository: sl<IInvoiceRepository>(),
+      db: sl<AppDatabase>(),
+    ),
   );
 }

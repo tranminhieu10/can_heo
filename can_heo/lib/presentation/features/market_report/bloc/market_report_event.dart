@@ -4,7 +4,7 @@ abstract class MarketReportEvent extends Equatable {
   const MarketReportEvent();
 
   @override
-  List<Object> get props => [];
+  List<Object?> get props => [];
 }
 
 class MarketReportSubscriptionRequested extends MarketReportEvent {
@@ -18,5 +18,9 @@ class MarketReportDateRangeChanged extends MarketReportEvent {
   final DateTime endDate;
 
   @override
-  List<Object> get props => [startDate, endDate];
+  List<Object?> get props => [startDate, endDate];
+}
+
+class MarketReportRefreshRequested extends MarketReportEvent {
+  const MarketReportRefreshRequested();
 }
