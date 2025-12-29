@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../injection_container.dart';
 import '../../../domain/entities/invoice.dart';
 import '../../../domain/entities/transaction.dart';
+import '../../../core/services/excel_export_service.dart';
 import 'bloc/market_report_bloc.dart';
 
 class MarketReportScreen extends StatelessWidget {
@@ -134,6 +135,252 @@ class _MarketReportViewState extends State<MarketReportView>
     _applyDateFilter();
   }
 
+  Future<void> _handleExportExcel(BuildContext context, String type) async {
+    final state = context.read<MarketReportBloc>().state;
+    
+    // Filter invoices by date
+    final filteredImports = state.marketImports.where((inv) {
+      if (state.startDate == null || state.endDate == null) return true;
+      return !inv.createdDate.isBefore(state.startDate!) &&
+          inv.createdDate.isBefore(state.endDate!);
+    }).toList();
+
+    final filteredExports = state.marketExports.where((inv) {
+      if (state.startDate == null || state.endDate == null) return true;
+      return !inv.createdDate.isBefore(state.startDate!) &&
+          inv.createdDate.isBefore(state.endDate!);
+    }).toList();
+
+    try {
+      switch (type) {
+        case 'overview':
+          await ExcelExportService.exportOverviewReport(
+            imports: filteredImports,
+            exports: filteredExports,
+            otherCost: state.costSummary.otherCost,
+            transportFee: state.costSummary.transportFee,
+            rejectAmount: state.costSummary.rejectAmount,
+            startDate: _startDate,
+            endDate: _endDate,
+          );
+          break;
+        case 'sales':
+          if (filteredExports.isEmpty) {
+            throw Exception('Không có dữ liệu bán hàng để xuất.');
+          }
+          await ExcelExportService.exportSalesOrPurchaseReport(
+            invoices: filteredExports,
+            reportType: 'ban_hang',
+            startDate: _startDate,
+            endDate: _endDate,
+          );
+          break;
+        case 'purchase':
+          if (filteredImports.isEmpty) {
+            throw Exception('Không có dữ liệu nhập hàng để xuất.');
+          }
+          await ExcelExportService.exportSalesOrPurchaseReport(
+            invoices: filteredImports,
+            reportType: 'nhap_hang',
+            startDate: _startDate,
+            endDate: _endDate,
+          );
+          break;
+        case 'cost':
+          await ExcelExportService.exportCostReport(
+            otherCost: state.costSummary.otherCost,
+            transportFee: state.costSummary.transportFee,
+            rejectAmount: state.costSummary.rejectAmount,
+            otherCostNote: state.costSummary.otherCostNote,
+            rejectNote: state.costSummary.rejectNote,
+            transactions: state.transactions,
+            startDate: _startDate,
+            endDate: _endDate,
+          );
+          break;
+        case 'debt':
+          await ExcelExportService.exportDebtReport(
+            totalDebt: state.debtSummary.totalDebt,
+            totalPaid: state.debtSummary.totalPaid,
+            totalDebtPaid: state.debtSummary.totalDebtPaid,
+            remaining: state.debtSummary.remaining,
+            transactions: state.transactions,
+            startDate: _startDate,
+            endDate: _endDate,
+          );
+          break;
+        case 'by_partner_sales':
+          await _showPartnerSelectionDialog(
+            context: context,
+            invoices: filteredExports,
+            reportType: 'ban_hang',
+            title: 'Chọn đối tác (Bán hàng)',
+          );
+          return; // Don't show success message here, dialog handles it
+        case 'by_partner_purchase':
+          await _showPartnerSelectionDialog(
+            context: context,
+            invoices: filteredImports,
+            reportType: 'nhap_hang',
+            title: 'Chọn đối tác (Nhập hàng)',
+          );
+          return; // Don't show success message here, dialog handles it
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Đã xuất file Excel thành công!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Lỗi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showPartnerSelectionDialog({
+    required BuildContext context,
+    required List<InvoiceEntity> invoices,
+    required String reportType,
+    required String title,
+  }) async {
+    if (invoices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('❌ Không có dữ liệu trong khoảng thời gian này'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Lấy danh sách đối tác duy nhất
+    final partners = <String, int>{}; // partnerId -> count
+    final partnerNames = <String, String>{}; // partnerId -> partnerName
+    
+    for (final inv in invoices) {
+      final partnerId = inv.partnerId ?? 'unknown';
+      final partnerName = inv.partnerName ?? 'Không xác định';
+      partners[partnerId] = (partners[partnerId] ?? 0) + 1;
+      partnerNames[partnerId] = partnerName;
+    }
+
+    // Sắp xếp theo tên
+    final sortedPartnerIds = partners.keys.toList()
+      ..sort((a, b) => (partnerNames[a] ?? '').compareTo(partnerNames[b] ?? ''));
+
+    final selectedPartnerId = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Từ ${_dateFormat.format(_startDate)} đến ${_dateFormat.format(_endDate)}',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              const Text('Chọn đối tác để xuất báo cáo:'),
+              const SizedBox(height: 8),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: sortedPartnerIds.length,
+                  itemBuilder: (context, index) {
+                    final partnerId = sortedPartnerIds[index];
+                    final partnerName = partnerNames[partnerId] ?? 'N/A';
+                    final count = partners[partnerId] ?? 0;
+                    
+                    // Tính tổng tiền của đối tác
+                    final partnerInvoices = invoices.where((inv) => 
+                        (inv.partnerId ?? 'unknown') == partnerId).toList();
+                    final totalAmount = partnerInvoices.fold<double>(
+                        0, (sum, inv) => sum + inv.finalAmount);
+                    
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: reportType == 'ban_hang' 
+                            ? Colors.green.shade100 
+                            : Colors.blue.shade100,
+                        child: Icon(
+                          Icons.person,
+                          color: reportType == 'ban_hang' 
+                              ? Colors.green 
+                              : Colors.blue,
+                        ),
+                      ),
+                      title: Text(
+                        partnerName,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text('$count phiếu - ${_currencyFormat.format(totalAmount)}đ'),
+                      onTap: () => Navigator.of(ctx).pop(partnerId),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('HỦY'),
+          ),
+        ],
+      ),
+    );
+
+    if (selectedPartnerId == null) return;
+
+    // Lọc phiếu theo đối tác đã chọn
+    final partnerInvoices = invoices.where((inv) => 
+        (inv.partnerId ?? 'unknown') == selectedPartnerId).toList();
+    
+    final partnerName = partnerNames[selectedPartnerId] ?? 'N/A';
+
+    try {
+      await ExcelExportService.exportByPartnerReport(
+        invoices: partnerInvoices,
+        partnerName: partnerName,
+        reportType: reportType,
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Đã xuất báo cáo "$partnerName" thành công!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Lỗi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -142,6 +389,71 @@ class _MarketReportViewState extends State<MarketReportView>
         backgroundColor: Colors.teal.shade600,
         foregroundColor: Colors.white,
         actions: [
+          // Nút xuất Excel
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.file_download),
+            tooltip: 'Xuất Excel',
+            onSelected: (value) => _handleExportExcel(context, value),
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'overview',
+                child: ListTile(
+                  leading: Icon(Icons.dashboard, color: Colors.teal),
+                  title: Text('Xuất Tổng hợp'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'sales',
+                child: ListTile(
+                  leading: Icon(Icons.sell, color: Colors.green),
+                  title: Text('Xuất Bán hàng'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'purchase',
+                child: ListTile(
+                  leading: Icon(Icons.inventory, color: Colors.blue),
+                  title: Text('Xuất Nhập hàng'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'cost',
+                child: ListTile(
+                  leading: Icon(Icons.money_off, color: Colors.orange),
+                  title: Text('Xuất Chi phí'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'debt',
+                child: ListTile(
+                  leading: Icon(Icons.account_balance_wallet, color: Colors.red),
+                  title: Text('Xuất Công nợ'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'by_partner_sales',
+                child: ListTile(
+                  leading: Icon(Icons.person, color: Colors.green),
+                  title: Text('Bán hàng theo đối tác'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'by_partner_purchase',
+                child: ListTile(
+                  leading: Icon(Icons.person, color: Colors.blue),
+                  title: Text('Nhập hàng theo đối tác'),
+                  dense: true,
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Làm mới',
@@ -801,6 +1113,7 @@ class _MarketReportViewState extends State<MarketReportView>
       'Bán hàng (Xuất chợ)',
       Colors.green,
       Icons.sell,
+      exportType: 'ban_hang',
     );
   }
 
@@ -811,6 +1124,7 @@ class _MarketReportViewState extends State<MarketReportView>
       'Nhập hàng (Nhập chợ)',
       Colors.blue,
       Icons.inventory,
+      exportType: 'nhap_hang',
     );
   }
 
@@ -818,8 +1132,9 @@ class _MarketReportViewState extends State<MarketReportView>
     List<InvoiceEntity> invoices,
     String title,
     Color color,
-    IconData icon,
-  ) {
+    IconData icon, {
+    String? exportType,
+  }) {
     // Sort by date desc
     final sortedInvoices = List<InvoiceEntity>.from(invoices)
       ..sort((a, b) => b.createdDate.compareTo(a.createdDate));
@@ -836,30 +1151,70 @@ class _MarketReportViewState extends State<MarketReportView>
 
     return Column(
       children: [
-        // Summary bar
+        // Summary bar with export button
         Container(
           padding: const EdgeInsets.all(12),
           color: color.withValues(alpha: 0.1),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatChip(
-                  'Số phiếu', '${invoices.length}', Icons.receipt, color),
-              _buildStatChip('Tổng con', '$totalQuantity', Icons.pets, color),
-              _buildStatChip(
-                  'Tổng KL',
-                  '${_numberFormat.format(totalWeight)} kg',
-                  Icons.scale,
-                  color),
-              _buildStatChip('BQ/con', '${_numberFormat.format(avgWeight)} kg',
-                  Icons.balance, color),
-              _buildStatChip('Giá BQ', '${_currencyFormat.format(avgPrice)}',
-                  Icons.attach_money, color),
-              _buildStatChip(
-                  'Tổng tiền',
-                  '${_currencyFormat.format(totalAmount)}đ',
-                  Icons.payments,
-                  color),
+              Expanded(
+                child: Wrap(
+                  alignment: WrapAlignment.spaceAround,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildStatChip(
+                        'Số phiếu', '${invoices.length}', Icons.receipt, color),
+                    _buildStatChip('Tổng con', '$totalQuantity', Icons.pets, color),
+                    _buildStatChip(
+                        'Tổng KL',
+                        '${_numberFormat.format(totalWeight)} kg',
+                        Icons.scale,
+                        color),
+                    _buildStatChip('BQ/con', '${_numberFormat.format(avgWeight)} kg',
+                        Icons.balance, color),
+                    _buildStatChip('Giá BQ', '${_currencyFormat.format(avgPrice)}',
+                        Icons.attach_money, color),
+                    _buildStatChip(
+                        'Tổng tiền',
+                        '${_currencyFormat.format(totalAmount)}đ',
+                        Icons.payments,
+                        color),
+                  ],
+                ),
+              ),
+              if (exportType != null && invoices.isNotEmpty)
+                IconButton(
+                  icon: Icon(Icons.file_download, color: color),
+                  tooltip: 'Xuất Excel',
+                  onPressed: () async {
+                    try {
+                      await ExcelExportService.exportSalesOrPurchaseReport(
+                        invoices: invoices,
+                        reportType: exportType,
+                        startDate: _startDate,
+                        endDate: _endDate,
+                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('✅ Đã xuất file Excel thành công!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('❌ Lỗi: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
             ],
           ),
         ),
@@ -1060,6 +1415,53 @@ class _MarketReportViewState extends State<MarketReportView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Export button row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () async {
+                  try {
+                    await ExcelExportService.exportCostReport(
+                      otherCost: cost.otherCost,
+                      transportFee: cost.transportFee,
+                      rejectAmount: cost.rejectAmount,
+                      otherCostNote: cost.otherCostNote,
+                      rejectNote: cost.rejectNote,
+                      transactions: state.transactions,
+                      startDate: _startDate,
+                      endDate: _endDate,
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Đã xuất file Excel thành công!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('❌ Lỗi: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.file_download, size: 18),
+                label: const Text('Xuất Excel'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
           // Summary cards
           Row(
             children: [
@@ -1273,6 +1675,52 @@ class _MarketReportViewState extends State<MarketReportView>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Export button row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () async {
+                  try {
+                    await ExcelExportService.exportDebtReport(
+                      totalDebt: debt.totalDebt,
+                      totalPaid: debt.totalPaid,
+                      totalDebtPaid: debt.totalDebtPaid,
+                      remaining: debt.remaining,
+                      transactions: state.transactions,
+                      startDate: _startDate,
+                      endDate: _endDate,
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Đã xuất file Excel thành công!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('❌ Lỗi: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.file_download, size: 18),
+                label: const Text('Xuất Excel'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
           // Summary cards
           Row(
             children: [

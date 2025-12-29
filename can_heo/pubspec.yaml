@@ -35,6 +35,9 @@ dependencies:
   file_picker: ^10.3.7
   excel: ^4.0.6
   
+  # --- License & Security ---
+  crypto: ^3.0.3
+  
   # --- Serial Port (Kết nối cân điện tử) ---
   flutter_libserialport: ^0.4.0
 
