@@ -19,10 +19,10 @@ class UpdateService {
     'https://api.github.com/repos/$githubOwner/$githubRepo/releases/latest';
   
   /// Version hiện tại của app (cập nhật khi build mới)
-  static const String currentVersion = '1.0.3';
+  static const String currentVersion = '1.0.5';
   
   /// Build number hiện tại
-  static const int currentBuildNumber = 3;
+  static const int currentBuildNumber = 5;
 
   /// Singleton instance
   static final UpdateService _instance = UpdateService._internal();
