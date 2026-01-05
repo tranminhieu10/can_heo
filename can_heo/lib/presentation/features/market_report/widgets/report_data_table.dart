@@ -164,7 +164,7 @@ class _ReportDataTableState extends State<ReportDataTable> {
           children: [
              _buildTotalRow(
                 'Tổng cộng', 
-                '${totalQuantity} con', 
+                '$totalQuantity con', 
                 '${_numberFormat.format(totalWeight)} kg',
                 _currencyFormat.format(totalAmount)),
             const Divider(height: 24),

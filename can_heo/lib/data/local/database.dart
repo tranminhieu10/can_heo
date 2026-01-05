@@ -14,6 +14,7 @@ import 'tables/pig_types.dart';
 import 'tables/farms.dart';
 import 'tables/cages.dart';
 import 'tables/users.dart';
+import 'tables/supplies.dart';
 
 // Import DAOs
 import 'daos/partners_dao.dart';
@@ -24,11 +25,12 @@ import 'daos/pig_types_dao.dart';
 import 'daos/farms_dao.dart';
 import 'daos/cages_dao.dart';
 import 'daos/users_dao.dart';
+import 'daos/supplies_dao.dart';
 
 part 'database.g.dart';
 
 @DriftDatabase(
-  tables: [Partners, Invoices, WeighingDetails, Transactions, PigTypes, Farms, Cages, Users],
+  tables: [Partners, Invoices, WeighingDetails, Transactions, PigTypes, Farms, Cages, Users, Supplies, SupplyTransactions],
   daos: [
     PartnersDao,
     InvoicesDao,
@@ -37,14 +39,15 @@ part 'database.g.dart';
     PigTypesDao,
     FarmsDao,
     CagesDao,
-    UsersDao
+    UsersDao,
+    SuppliesDao
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   /// Xóa toàn bộ dữ liệu trong database
   Future<void> deleteAllData() async {
@@ -160,6 +163,16 @@ class AppDatabase extends _$AppDatabase {
           if (from < 11) {
             try {
               await m.createTable(users);
+            } catch (_) {}
+          }
+          
+          // Từ version 11 -> 12: Tạo bảng Supplies và SupplyTransactions
+          if (from < 12) {
+            try {
+              await m.createTable(supplies);
+            } catch (_) {}
+            try {
+              await m.createTable(supplyTransactions);
             } catch (_) {}
           }
         },

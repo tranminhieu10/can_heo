@@ -8,6 +8,27 @@ import 'package:path/path.dart' as p;
 import '../../domain/entities/invoice.dart';
 import '../../domain/entities/transaction.dart';
 
+/// Model đơn giản cho công nợ đối tác (dùng cho Excel export)
+class DebtInfo {
+  final String partnerName;
+  final double totalAmount;
+  final double totalPaid;
+  final double debtAmount;
+  final double debtPaid;
+  final double remaining;
+  final int invoiceCount;
+
+  const DebtInfo({
+    required this.partnerName,
+    required this.totalAmount,
+    required this.totalPaid,
+    required this.debtAmount,
+    required this.debtPaid,
+    required this.remaining,
+    required this.invoiceCount,
+  });
+}
+
 class ExcelExportService {
   static final _dateFormat = DateFormat('dd/MM/yyyy');
   static final _currencyFormat = NumberFormat('#,##0', 'vi_VN');
@@ -321,63 +342,206 @@ class ExcelExportService {
     required List<TransactionEntity> transactions,
     required DateTime startDate,
     required DateTime endDate,
+    // New params for NCC and Customer separation
+    double? totalSupplierDebt,
+    double? totalSupplierPaid,
+    double? supplierRemaining,
+    double? totalCustomerDebt,
+    double? totalCustomerPaid,
+    double? customerRemaining,
+    List<DebtInfo>? supplierDebts,
+    List<DebtInfo>? customerDebts,
+    String? reportTitle,
   }) async {
     final excel = Excel.createExcel();
     final sheet = excel['CongNo'];
-
+    
+    // Xác định loại báo cáo
+    final isSupplierOnly = (supplierDebts?.isNotEmpty ?? false) && (customerDebts?.isEmpty ?? true);
+    final isCustomerOnly = (customerDebts?.isNotEmpty ?? false) && (supplierDebts?.isEmpty ?? true);
+    
     // Title
-    sheet.appendRow([TextCellValue('BÁO CÁO CÔNG NỢ')]);
+    final title = reportTitle ?? 'BÁO CÁO CÔNG NỢ';
+    sheet.appendRow([TextCellValue(title)]);
     sheet.appendRow([TextCellValue('Từ ${_dateFormat.format(startDate)} đến ${_dateFormat.format(endDate)}')]);
     sheet.appendRow([]);
 
-    // Summary
-    sheet.appendRow([TextCellValue('TỔNG HỢP CÔNG NỢ')]);
-    sheet.appendRow([
-      TextCellValue('Nợ phát sinh'),
-      TextCellValue(_currencyFormat.format(totalDebt)),
-    ]);
-    sheet.appendRow([
-      TextCellValue('Đã thanh toán'),
-      TextCellValue(_currencyFormat.format(totalPaid)),
-    ]);
-    sheet.appendRow([
-      TextCellValue('Đã trả nợ'),
-      TextCellValue(_currencyFormat.format(totalDebtPaid)),
-    ]);
-    sheet.appendRow([
-      TextCellValue('Còn nợ'),
-      TextCellValue(_currencyFormat.format(remaining)),
-    ]);
-
-    // Transactions
-    sheet.appendRow([]);
-    sheet.appendRow([TextCellValue('LỊCH SỬ THANH TOÁN / TRẢ NỢ')]);
-    sheet.appendRow([
-      TextCellValue('Ngày'),
-      TextCellValue('Đối tác'),
-      TextCellValue('Loại'),
-      TextCellValue('Số tiền'),
-      TextCellValue('Ghi chú'),
-    ]);
-
-    final paymentTransactions = transactions.where((t) {
-      final note = t.note?.toLowerCase() ?? '';
-      return t.type == 1 &&
-          (note.contains('thanh toán') || note.contains('trả nợ'));
-    }).toList();
-
-    for (final t in paymentTransactions) {
-      final isDebtPayment = t.note?.toLowerCase().contains('trả nợ') == true;
+    // ========== CÔNG NỢ NHÀ CUNG CẤP (Ta nợ NCC) ==========
+    if (!isCustomerOnly) {
+      sheet.appendRow([TextCellValue('═══════════════════════════════════════════')]);
+      sheet.appendRow([TextCellValue('CÔNG NỢ NHÀ CUNG CẤP (Ta nợ NCC)')]);
+      sheet.appendRow([TextCellValue('═══════════════════════════════════════════')]);
+      sheet.appendRow([]);
+      
       sheet.appendRow([
-        TextCellValue(_dateFormat.format(t.date)),
-        TextCellValue(t.partnerName ?? 'N/A'),
-        TextCellValue(isDebtPayment ? 'Trả nợ' : 'Thanh toán'),
-        TextCellValue(_currencyFormat.format(t.amount)),
-        TextCellValue(t.note ?? ''),
+        TextCellValue('Nợ NCC phát sinh'),
+        TextCellValue(_currencyFormat.format(totalSupplierDebt ?? totalDebt)),
       ]);
+      sheet.appendRow([
+        TextCellValue('Đã trả NCC'),
+        TextCellValue(_currencyFormat.format(totalSupplierPaid ?? totalPaid)),
+      ]);
+      sheet.appendRow([
+        TextCellValue('Còn nợ NCC'),
+        TextCellValue(_currencyFormat.format(supplierRemaining ?? remaining)),
+      ]);
+      sheet.appendRow([]);
+      
+      // Danh sách NCC còn nợ
+      if (supplierDebts != null && supplierDebts.isNotEmpty) {
+        sheet.appendRow([TextCellValue('DANH SÁCH NCC CÒN NỢ')]);
+        sheet.appendRow([
+          TextCellValue('Tên NCC'),
+          TextCellValue('Tổng mua'),
+          TextCellValue('Đã trả lúc mua'),
+          TextCellValue('Nợ phát sinh'),
+          TextCellValue('Đã trả nợ'),
+          TextCellValue('Còn nợ'),
+          TextCellValue('Số phiếu'),
+        ]);
+        
+        for (final supplier in supplierDebts) {
+          sheet.appendRow([
+            TextCellValue(supplier.partnerName),
+            TextCellValue(_currencyFormat.format(supplier.totalAmount)),
+            TextCellValue(_currencyFormat.format(supplier.totalPaid)),
+            TextCellValue(_currencyFormat.format(supplier.debtAmount)),
+            TextCellValue(_currencyFormat.format(supplier.debtPaid)),
+            TextCellValue(_currencyFormat.format(supplier.remaining)),
+            TextCellValue('${supplier.invoiceCount}'),
+          ]);
+        }
+        sheet.appendRow([]);
+      }
+      
+      // Transactions - Ta trả NCC
+      sheet.appendRow([]);
+      sheet.appendRow([TextCellValue('LỊCH SỬ TA TRẢ NCC')]);
+      sheet.appendRow([
+        TextCellValue('Ngày'),
+        TextCellValue('NCC'),
+        TextCellValue('Số tiền'),
+        TextCellValue('Ghi chú'),
+      ]);
+
+      final supplierPayments = transactions.where((t) {
+        return t.type == 1; // Chi = ta trả NCC
+      }).toList();
+
+      for (final t in supplierPayments) {
+        sheet.appendRow([
+          TextCellValue(_dateFormat.format(t.date)),
+          TextCellValue(t.partnerName ?? 'N/A'),
+          TextCellValue(_currencyFormat.format(t.amount)),
+          TextCellValue(t.note ?? ''),
+        ]);
+      }
+      sheet.appendRow([]);
     }
 
-    await _saveExcelFile(excel, 'bao_cao_cong_no');
+    // ========== CÔNG NỢ KHÁCH HÀNG (Khách nợ ta) ==========
+    if (!isSupplierOnly) {
+      sheet.appendRow([TextCellValue('═══════════════════════════════════════════')]);
+      sheet.appendRow([TextCellValue('CÔNG NỢ KHÁCH HÀNG (Khách nợ ta)')]);
+      sheet.appendRow([TextCellValue('═══════════════════════════════════════════')]);
+      sheet.appendRow([]);
+      
+      sheet.appendRow([
+        TextCellValue('Khách nợ phát sinh'),
+        TextCellValue(_currencyFormat.format(totalCustomerDebt ?? 0)),
+      ]);
+      sheet.appendRow([
+        TextCellValue('Khách đã trả'),
+        TextCellValue(_currencyFormat.format(totalCustomerPaid ?? 0)),
+      ]);
+      sheet.appendRow([
+        TextCellValue('Khách còn nợ'),
+        TextCellValue(_currencyFormat.format(customerRemaining ?? 0)),
+      ]);
+      sheet.appendRow([]);
+      
+      // Danh sách khách hàng còn nợ
+      if (customerDebts != null && customerDebts.isNotEmpty) {
+        sheet.appendRow([TextCellValue('DANH SÁCH KHÁCH HÀNG CÒN NỢ')]);
+        sheet.appendRow([
+          TextCellValue('Tên khách hàng'),
+          TextCellValue('Tổng bán'),
+          TextCellValue('Đã trả lúc bán'),
+          TextCellValue('Nợ phát sinh'),
+          TextCellValue('Đã trả nợ'),
+          TextCellValue('Còn nợ'),
+          TextCellValue('Số phiếu'),
+        ]);
+        
+        for (final customer in customerDebts) {
+          sheet.appendRow([
+            TextCellValue(customer.partnerName),
+            TextCellValue(_currencyFormat.format(customer.totalAmount)),
+            TextCellValue(_currencyFormat.format(customer.totalPaid)),
+            TextCellValue(_currencyFormat.format(customer.debtAmount)),
+            TextCellValue(_currencyFormat.format(customer.debtPaid)),
+            TextCellValue(_currencyFormat.format(customer.remaining)),
+            TextCellValue('${customer.invoiceCount}'),
+          ]);
+        }
+        sheet.appendRow([]);
+      }
+      
+      // Transactions - Khách trả ta
+      sheet.appendRow([]);
+      sheet.appendRow([TextCellValue('LỊCH SỬ KHÁCH TRẢ TA')]);
+      sheet.appendRow([
+        TextCellValue('Ngày'),
+        TextCellValue('Khách hàng'),
+        TextCellValue('Số tiền'),
+        TextCellValue('Ghi chú'),
+      ]);
+
+      final customerPayments = transactions.where((t) {
+        return t.type == 0; // Thu = khách trả ta
+      }).toList();
+
+      for (final t in customerPayments) {
+        sheet.appendRow([
+          TextCellValue(_dateFormat.format(t.date)),
+          TextCellValue(t.partnerName ?? 'N/A'),
+          TextCellValue(_currencyFormat.format(t.amount)),
+          TextCellValue(t.note ?? ''),
+        ]);
+      }
+      sheet.appendRow([]);
+    }
+
+    // ========== TỔNG HỢP (chỉ hiển thị khi có cả 2 loại) ==========
+    if (!isSupplierOnly && !isCustomerOnly) {
+      sheet.appendRow([TextCellValue('═══════════════════════════════════════════')]);
+      sheet.appendRow([TextCellValue('TỔNG HỢP CÔNG NỢ')]);
+      sheet.appendRow([TextCellValue('═══════════════════════════════════════════')]);
+      sheet.appendRow([]);
+      sheet.appendRow([
+        TextCellValue('Tổng ta nợ NCC'),
+        TextCellValue(_currencyFormat.format(supplierRemaining ?? remaining)),
+      ]);
+      sheet.appendRow([
+        TextCellValue('Tổng khách nợ ta'),
+        TextCellValue(_currencyFormat.format(customerRemaining ?? 0)),
+      ]);
+      final netDebt = (customerRemaining ?? 0) - (supplierRemaining ?? remaining);
+      sheet.appendRow([
+        TextCellValue(netDebt >= 0 ? 'Công nợ ròng (Thu)' : 'Công nợ ròng (Chi)'),
+        TextCellValue(_currencyFormat.format(netDebt.abs())),
+      ]);
+    }
+    
+    // Tên file tùy theo loại báo cáo
+    String fileName = 'bao_cao_cong_no';
+    if (isSupplierOnly) {
+      fileName = 'cong_no_ncc';
+    } else if (isCustomerOnly) {
+      fileName = 'cong_no_khach_hang';
+    }
+
+    await _saveExcelFile(excel, fileName);
   }
 
   /// Xuất báo cáo Tổng hợp ra Excel

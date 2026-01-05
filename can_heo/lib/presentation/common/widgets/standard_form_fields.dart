@@ -84,7 +84,7 @@ class StandardDropdownField<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       items: items,
       onChanged: enabled ? onChanged : null,
       style: TextStyle(fontSize: fontSize, color: Colors.black87),

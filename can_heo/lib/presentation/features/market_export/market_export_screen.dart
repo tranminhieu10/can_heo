@@ -252,8 +252,6 @@ class _MarketExportViewState extends State<_MarketExportView> {
                             : Responsive.screenType == ScreenType.laptop15
                                 ? 360.0
                                 : 340.0;
-                final debtBarHeight =
-                    Responsive.screenType == ScreenType.desktop27 ? 48.0 : 44.0;
                 final padding = Responsive.spacing;
 
                 return Padding(
@@ -402,7 +400,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -757,9 +755,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
           return Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: color.withOpacity(0.3)),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -841,9 +839,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -1125,7 +1123,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                 ),
-                value: safeCustomer,
+                initialValue: safeCustomer,
                 style: const TextStyle(fontSize: 13, color: Colors.black),
                 items: customers
                     .map((p) => DropdownMenuItem(
@@ -1637,7 +1635,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 orElse: () => types.first);
 
         return DropdownButtonFormField<PigTypeEntity?>(
-          value: selected,
+          initialValue: selected,
           decoration: InputDecoration(
             hintText: 'Chọn loại heo',
             hintStyle: const TextStyle(fontSize: 13),
@@ -1798,9 +1796,10 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 InkWell(
                   onTap: () {
                     final current = int.tryParse(_quantityController.text) ?? 1;
-                    if (current > 1)
+                    if (current > 1) {
                       setState(
                           () => _quantityController.text = '${current - 1}');
+                    }
                   },
                   child: Container(
                     height: 14,
@@ -2002,7 +2001,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 }
 
                 return DropdownButtonFormField<PigTypeEntity?>(
-                  value: selected,
+                  initialValue: selected,
                   decoration: const InputDecoration(
                     labelText: 'Loại heo',
                     labelStyle: TextStyle(fontSize: 10),
@@ -2315,7 +2314,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
       decoration: BoxDecoration(
         border: Border.all(color: highlight ? color : Colors.grey[400]!),
         borderRadius: BorderRadius.circular(4),
-        color: highlight ? color.withOpacity(0.1) : Colors.grey[200],
+        color: highlight ? color.withValues(alpha: 0.1) : Colors.grey[200],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2356,7 +2355,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                 orElse: () => types.first,
               );
         return DropdownButtonFormField<PigTypeEntity>(
-          value: selected,
+          initialValue: selected,
           decoration: const InputDecoration(
             labelText: 'Loại heo',
             border: OutlineInputBorder(),
@@ -2520,8 +2519,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox.shrink();
         var invoices = snapshot.data!;
-        if (invoices.isEmpty)
+        if (invoices.isEmpty) {
           return const Center(child: Text('Chưa có phiếu xuất nào'));
+        }
 
         // Filter invoices
         invoices = invoices.where((inv) {
@@ -2536,12 +2536,15 @@ class _MarketExportViewState extends State<_MarketExportView> {
           final invQuantity = '${inv.totalQuantity}';
 
           bool matches = true;
-          if (partner.isNotEmpty && !invPartner.contains(partner))
+          if (partner.isNotEmpty && !invPartner.contains(partner)) {
             matches = false;
-          if (pigType.isNotEmpty && !invPigType.contains(pigType))
+          }
+          if (pigType.isNotEmpty && !invPigType.contains(pigType)) {
             matches = false;
-          if (quantity.isNotEmpty && !invQuantity.contains(quantity))
+          }
+          if (quantity.isNotEmpty && !invQuantity.contains(quantity)) {
             matches = false;
+          }
           return matches;
         }).toList();
 
@@ -2719,6 +2722,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                                       color: Colors.red, size: 18),
                                   tooltip: 'Xóa',
                                   onPressed: () async {
+                                    final scaffoldMessenger = ScaffoldMessenger.of(context);
                                     final confirmed = await showDialog<bool>(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
@@ -2741,7 +2745,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                                       await sl<IInvoiceRepository>()
                                           .deleteInvoice(inv.id);
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context)
+                                        scaffoldMessenger
                                             .showSnackBar(const SnackBar(
                                                 content: Text('Đã xóa phiếu')));
                                       }
@@ -2780,7 +2784,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
             isDense: true,
             contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           ),
-          value: safeValue,
+          initialValue: safeValue,
           style: const TextStyle(fontSize: 13, color: Colors.black),
           items: partners
               .map((p) => DropdownMenuItem(
@@ -2833,6 +2837,10 @@ class _MarketExportViewState extends State<_MarketExportView> {
   void _addInvoice(BuildContext context) async {
     if (!_canAddInvoice()) return;
 
+    // Capture before async
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final weighingBloc = context.read<WeighingBloc>();
+    
     final quantity = int.tryParse(_quantityController.text) ?? 1;
     final pigType = _pigTypeController.text.trim();
 
@@ -2883,7 +2891,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
       if (quantity > available) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          scaffoldMessenger.showSnackBar(
             SnackBar(
               content: Text(
                 '❌ Không đủ hàng! Loại: $pigType | Tồn: $available | Yêu cầu: $quantity',
@@ -2897,7 +2905,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
       }
 
       // Add invoice item - store gross weight (before deduction)
-      context.read<WeighingBloc>().add(
+      weighingBloc.add(
             WeighingItemAdded(
               weight: _isWeightLocked ? _grossWeight : 0,
               quantity: quantity,
@@ -2909,7 +2917,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
           );
 
       // Update invoice info with new fields
-      context.read<WeighingBloc>().add(
+      weighingBloc.add(
             WeighingInvoiceUpdated(
               partnerId: _selectedPartner!.id,
               partnerName: _selectedPartner!.name,
@@ -2921,7 +2929,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
           );
 
       // Save immediately
-      context.read<WeighingBloc>().add(const WeighingSaved());
+      weighingBloc.add(const WeighingSaved());
 
       // Store info for debt section
       setState(() {
@@ -2942,7 +2950,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(content: Text('❌ Lỗi: $e'), backgroundColor: Colors.red),
         );
       }
@@ -3262,9 +3270,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -3286,9 +3294,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.5), width: 2),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 2),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -3371,7 +3379,6 @@ class _MarketExportViewState extends State<_MarketExportView> {
                   itemBuilder: (context, index) {
                     final t = filtered[index];
                     final isDebt = t.paymentMethod == 2;
-                    final isDebtPayment = t.paymentMethod == 3;
                     final typeLabel = switch (t.paymentMethod) {
                       0 => 'T.Mặt',
                       1 => 'C.Khoản',
@@ -3412,7 +3419,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: typeColor.withOpacity(0.2),
+                                color: typeColor.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -3473,7 +3480,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.2) : Colors.white,
+          color: isSelected ? color.withValues(alpha: 0.2) : Colors.white,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
               color: isSelected ? color : Colors.grey.shade300, width: 2),
@@ -3532,8 +3539,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
                                   style: TextStyle(fontSize: 10)),
                               selected: _selectedPaymentMethod == 0,
                               onSelected: (selected) {
-                                if (selected)
+                                if (selected) {
                                   setState(() => _selectedPaymentMethod = 0);
+                                }
                               },
                               selectedColor: Colors.green[200],
                               visualDensity: VisualDensity.compact,
@@ -3544,8 +3552,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
                                   style: TextStyle(fontSize: 10)),
                               selected: _selectedPaymentMethod == 1,
                               onSelected: (selected) {
-                                if (selected)
+                                if (selected) {
                                   setState(() => _selectedPaymentMethod = 1);
+                                }
                               },
                               selectedColor: Colors.blue[200],
                               visualDensity: VisualDensity.compact,
@@ -3684,9 +3693,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3709,9 +3718,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
       width: double.infinity,
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Column(
         children: [
@@ -3732,9 +3741,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Column(
         children: [
@@ -3894,7 +3903,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
     final transactions =
         await _db.transactionsDao.watchTransactionsByPartner(partnerId).first;
 
-    if (!mounted) return;
+    if (!mounted || !context.mounted) return;
 
     showDialog(
       context: context,
@@ -4063,8 +4072,12 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Future<void> _savePayment(BuildContext context) async {
-    if (_lastSavedInvoice?.partnerId == null && _selectedPartner == null)
+    // Capture before async
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    if (_lastSavedInvoice?.partnerId == null && _selectedPartner == null) {
       return;
+    }
 
     final partnerId = _lastSavedInvoice?.partnerId ?? _selectedPartner?.id;
     if (partnerId == null) return;
@@ -4075,7 +4088,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
         : (double.tryParse(_invoicePaymentAmountController.text) ?? 0);
 
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(
             content: Text('❌ Vui lòng nhập số tiền'),
             backgroundColor: Colors.red),
@@ -4121,7 +4134,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text(
                 '✅ Đã ghi nhận: ${_currencyFormat.format(amount)} - $note'),
@@ -4131,7 +4144,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(content: Text('❌ Lỗi: $e'), backgroundColor: Colors.red),
         );
       }

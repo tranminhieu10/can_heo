@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../domain/entities/invoice.dart';
 import '../../../../domain/repositories/i_invoice_repository.dart';
@@ -84,24 +86,19 @@ class InvoiceHistoryBloc
   }
 
   List<InvoiceEntity> _applyClientSideFilters(List<InvoiceEntity> invoices) {
-    // Debug: In ra số lượng invoice ban đầu
-    print('🔍 DEBUG: Tổng số phiếu từ DB: ${invoices.length}');
-    print('🔍 DEBUG: Bộ lọc hiện tại:');
-    print('   - Loại heo: $_currentPigType');
-    print('   - Số lô: $_currentBatchNumber');
-    print('   - Min weight: $_currentMinWeight');
-    print('   - Max weight: $_currentMaxWeight');
-    print('   - Min amount: $_currentMinAmount');
-    print('   - Max amount: $_currentMaxAmount');
+    // Debug logging only in debug mode
+    if (kDebugMode) {
+      developer.log('🔍 DEBUG: Tổng số phiếu từ DB: ${invoices.length}');
+      developer.log('🔍 DEBUG: Bộ lọc hiện tại:');
+      developer.log('   - Loại heo: $_currentPigType');
+      developer.log('   - Số lô: $_currentBatchNumber');
+      developer.log('   - Min weight: $_currentMinWeight');
+      developer.log('   - Max weight: $_currentMaxWeight');
+      developer.log('   - Min amount: $_currentMinAmount');
+      developer.log('   - Max amount: $_currentMaxAmount');
+    }
 
     final filtered = invoices.where((inv) {
-      // Debug: In ra thông tin mỗi phiếu
-      print('📄 Phiếu ${inv.invoiceCode}: ${inv.details.length} details');
-      for (var detail in inv.details) {
-        print(
-            '   - Detail: PigType="${detail.pigType}", Batch="${detail.batchNumber}"');
-      }
-
       // Lọc theo loại heo
       if (_currentPigType != null && _currentPigType!.isNotEmpty) {
         final hasMatchingPigType = inv.details.any((detail) =>
@@ -110,7 +107,6 @@ class InvoiceHistoryBloc
                 .contains(_currentPigType!.toLowerCase()) ??
             false);
         if (!hasMatchingPigType) {
-          print('   ❌ Không khớp loại heo');
           return false;
         }
       }
@@ -123,36 +119,32 @@ class InvoiceHistoryBloc
                 .contains(_currentBatchNumber!.toLowerCase()) ??
             false);
         if (!hasMatchingBatch) {
-          print('   ❌ Không khớp số lô');
           return false;
         }
       }
 
       // Lọc theo khối lượng
       if (_currentMinWeight != null && inv.totalWeight < _currentMinWeight!) {
-        print('   ❌ Khối lượng quá nhỏ');
         return false;
       }
       if (_currentMaxWeight != null && inv.totalWeight > _currentMaxWeight!) {
-        print('   ❌ Khối lượng quá lớn');
         return false;
       }
 
       // Lọc theo giá trị
       if (_currentMinAmount != null && inv.finalAmount < _currentMinAmount!) {
-        print('   ❌ Giá trị quá nhỏ');
         return false;
       }
       if (_currentMaxAmount != null && inv.finalAmount > _currentMaxAmount!) {
-        print('   ❌ Giá trị quá lớn');
         return false;
       }
 
-      print('   ✅ Phiếu hợp lệ!');
       return true;
     }).toList();
 
-    print('🔍 DEBUG: Kết quả sau lọc: ${filtered.length} phiếu');
+    if (kDebugMode) {
+      developer.log('🔍 DEBUG: Kết quả sau lọc: ${filtered.length} phiếu');
+    }
     return filtered;
   }
 

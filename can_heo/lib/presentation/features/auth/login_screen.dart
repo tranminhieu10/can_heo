@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../domain/entities/user.dart';
 import '../../../domain/repositories/i_user_repository.dart';
 import '../../../injection_container.dart';
 import '../dashboard/dashboard_screen.dart';

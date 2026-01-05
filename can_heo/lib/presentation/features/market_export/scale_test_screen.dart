@@ -207,7 +207,7 @@ class _ScaleTestScreenState extends State<ScaleTestScreen> {
                         Expanded(
                           flex: 2,
                           child: DropdownButtonFormField<String>(
-                            value: _selectedPort,
+                            initialValue: _selectedPort,
                             decoration: const InputDecoration(
                               labelText: 'Cổng COM',
                               border: OutlineInputBorder(),
@@ -222,7 +222,7 @@ class _ScaleTestScreenState extends State<ScaleTestScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<int>(
-                            value: _selectedBaudRate,
+                            initialValue: _selectedBaudRate,
                             decoration: const InputDecoration(
                               labelText: 'Baud Rate',
                               border: OutlineInputBorder(),

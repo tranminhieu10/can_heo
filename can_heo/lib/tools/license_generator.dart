@@ -219,7 +219,7 @@ class _LicenseGeneratorScreenState extends State<LicenseGeneratorScreen> {
                 
                 // License type
                 DropdownButtonFormField<int>(
-                  value: _selectedLicenseType,
+                  initialValue: _selectedLicenseType,
                   decoration: InputDecoration(
                     labelText: 'Loại License',
                     prefixIcon: const Icon(Icons.category),

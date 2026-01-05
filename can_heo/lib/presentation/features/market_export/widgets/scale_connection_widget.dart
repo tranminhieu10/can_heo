@@ -165,7 +165,7 @@ class _ScaleConnectionWidgetState extends State<ScaleConnectionWidget> {
                   Expanded(
                     flex: 2,
                     child: DropdownButtonFormField<String>(
-                      value: _selectedPort,
+                      initialValue: _selectedPort,
                       decoration: const InputDecoration(
                         labelText: 'Cổng COM',
                         isDense: true,
@@ -185,7 +185,7 @@ class _ScaleConnectionWidgetState extends State<ScaleConnectionWidget> {
                   // Baud rate selection
                   Expanded(
                     child: DropdownButtonFormField<int>(
-                      value: _selectedBaudRate,
+                      initialValue: _selectedBaudRate,
                       decoration: const InputDecoration(
                         labelText: 'Baud',
                         isDense: true,

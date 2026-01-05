@@ -88,7 +88,7 @@ class MarketReportBloc extends Bloc<MarketReportEvent, MarketReportState> {
       final overviewSummary =
           _calculateOverviewSummary(filteredImports, filteredExports);
       final costSummary = _calculateCostSummary(filteredImports, transactions);
-      final debtSummary = _calculateDebtSummary(filteredImports, transactions);
+      final debtSummary = _calculateDebtSummary(filteredImports, filteredExports, transactions);
 
       emit(state.copyWith(
         status: MarketReportStatus.success,
@@ -226,40 +226,205 @@ class MarketReportBloc extends Bloc<MarketReportEvent, MarketReportState> {
 
   DebtSummary _calculateDebtSummary(
     List<InvoiceEntity> imports,
+    List<InvoiceEntity> exports,
     List<TransactionEntity> transactions,
   ) {
-    // Tổng nợ phát sinh = Tổng tiền nhập - Tiền đã thanh toán lúc nhập
-    double totalDebt = 0;
+    // ========== CÔNG NỢ NCC (ta nợ NCC) - từ Nhập Chợ ==========
+    final Map<String, CustomerDebt> supplierDebtMap = {};
+    
+    // Lấy danh sách partnerId của NCC từ imports
+    final Set<String> supplierIds = {};
     for (final inv in imports) {
-      final debt = inv.finalAmount - inv.paidAmount;
-      if (debt > 0) {
-        totalDebt += debt;
+      if (inv.partnerId != null) supplierIds.add(inv.partnerId!);
+    }
+
+    for (final inv in imports) {
+      final partnerId = inv.partnerId ?? 'unknown';
+      final partnerName = inv.partnerName ?? 'Không xác định';
+      final debtFromInvoice = inv.finalAmount - inv.paidAmount;
+
+      if (supplierDebtMap.containsKey(partnerId)) {
+        final existing = supplierDebtMap[partnerId]!;
+        supplierDebtMap[partnerId] = CustomerDebt(
+          partnerId: partnerId,
+          partnerName: partnerName,
+          debtType: 0, // NCC
+          totalAmount: existing.totalAmount + inv.finalAmount,
+          totalPaid: existing.totalPaid + inv.paidAmount,
+          debtAmount: existing.debtAmount + (debtFromInvoice > 0 ? debtFromInvoice : 0),
+          debtPaid: existing.debtPaid,
+          remaining: existing.remaining + (debtFromInvoice > 0 ? debtFromInvoice : 0),
+          invoiceCount: existing.invoiceCount + 1,
+          lastTransaction: inv.createdDate.isAfter(existing.lastTransaction ?? DateTime(1970))
+              ? inv.createdDate
+              : existing.lastTransaction,
+        );
+      } else {
+        supplierDebtMap[partnerId] = CustomerDebt(
+          partnerId: partnerId,
+          partnerName: partnerName,
+          debtType: 0, // NCC
+          totalAmount: inv.finalAmount,
+          totalPaid: inv.paidAmount,
+          debtAmount: debtFromInvoice > 0 ? debtFromInvoice : 0,
+          debtPaid: 0,
+          remaining: debtFromInvoice > 0 ? debtFromInvoice : 0,
+          invoiceCount: 1,
+          lastTransaction: inv.createdDate,
+        );
       }
     }
 
-    // Đã thanh toán (type = 1 = Chi, note chứa "thanh toán")
-    double totalPaid = 0;
-    double totalDebtPaid = 0;
+    // ========== CÔNG NỢ KHÁCH HÀNG (khách nợ ta) - từ Xuất Chợ ==========
+    final Map<String, CustomerDebt> customerDebtMap = {};
+    
+    // Lấy danh sách partnerId của khách hàng từ exports
+    final Set<String> customerIds = {};
+    for (final inv in exports) {
+      if (inv.partnerId != null) customerIds.add(inv.partnerId!);
+    }
 
+    for (final inv in exports) {
+      final partnerId = inv.partnerId ?? 'unknown';
+      final partnerName = inv.partnerName ?? 'Không xác định';
+      final debtFromInvoice = inv.finalAmount - inv.paidAmount;
+
+      if (customerDebtMap.containsKey(partnerId)) {
+        final existing = customerDebtMap[partnerId]!;
+        customerDebtMap[partnerId] = CustomerDebt(
+          partnerId: partnerId,
+          partnerName: partnerName,
+          debtType: 1, // Khách hàng
+          totalAmount: existing.totalAmount + inv.finalAmount,
+          totalPaid: existing.totalPaid + inv.paidAmount,
+          debtAmount: existing.debtAmount + (debtFromInvoice > 0 ? debtFromInvoice : 0),
+          debtPaid: existing.debtPaid,
+          remaining: existing.remaining + (debtFromInvoice > 0 ? debtFromInvoice : 0),
+          invoiceCount: existing.invoiceCount + 1,
+          lastTransaction: inv.createdDate.isAfter(existing.lastTransaction ?? DateTime(1970))
+              ? inv.createdDate
+              : existing.lastTransaction,
+        );
+      } else {
+        customerDebtMap[partnerId] = CustomerDebt(
+          partnerId: partnerId,
+          partnerName: partnerName,
+          debtType: 1, // Khách hàng
+          totalAmount: inv.finalAmount,
+          totalPaid: inv.paidAmount,
+          debtAmount: debtFromInvoice > 0 ? debtFromInvoice : 0,
+          debtPaid: 0,
+          remaining: debtFromInvoice > 0 ? debtFromInvoice : 0,
+          invoiceCount: 1,
+          lastTransaction: inv.createdDate,
+        );
+      }
+    }
+
+    // Duyệt qua transactions để tính tiền đã trả nợ
     for (final t in transactions) {
-      if (t.type == 1) {
-        // Chi
-        final note = t.note?.toLowerCase() ?? '';
-        if (note.contains('trả nợ')) {
-          totalDebtPaid += t.amount;
-        } else if (note.contains('thanh toán')) {
-          totalPaid += t.amount;
+      final partnerId = t.partnerId;
+      if (partnerId == null) continue;
+
+      // Type = 1 (Chi): Ta chi tiền cho NCC (thanh toán hoặc trả nợ NCC)
+      if (t.type == 1 && supplierIds.contains(partnerId)) {
+        if (supplierDebtMap.containsKey(partnerId)) {
+          final existing = supplierDebtMap[partnerId]!;
+          supplierDebtMap[partnerId] = CustomerDebt(
+            partnerId: existing.partnerId,
+            partnerName: existing.partnerName,
+            debtType: 0,
+            totalAmount: existing.totalAmount,
+            totalPaid: existing.totalPaid,
+            debtAmount: existing.debtAmount,
+            debtPaid: existing.debtPaid + t.amount,
+            remaining: (existing.remaining - t.amount) > 0 
+                ? existing.remaining - t.amount 
+                : 0,
+            invoiceCount: existing.invoiceCount,
+            lastTransaction: t.date.isAfter(existing.lastTransaction ?? DateTime(1970))
+                ? t.date
+                : existing.lastTransaction,
+          );
+        }
+      }
+      
+      // Type = 0 (Thu): Khách trả tiền cho ta (thanh toán hoặc trả nợ khách)
+      if (t.type == 0 && customerIds.contains(partnerId)) {
+        if (customerDebtMap.containsKey(partnerId)) {
+          final existing = customerDebtMap[partnerId]!;
+          customerDebtMap[partnerId] = CustomerDebt(
+            partnerId: existing.partnerId,
+            partnerName: existing.partnerName,
+            debtType: 1,
+            totalAmount: existing.totalAmount,
+            totalPaid: existing.totalPaid,
+            debtAmount: existing.debtAmount,
+            debtPaid: existing.debtPaid + t.amount,
+            remaining: (existing.remaining - t.amount) > 0 
+                ? existing.remaining - t.amount 
+                : 0,
+            invoiceCount: existing.invoiceCount,
+            lastTransaction: t.date.isAfter(existing.lastTransaction ?? DateTime(1970))
+                ? t.date
+                : existing.lastTransaction,
+          );
         }
       }
     }
 
-    final remaining = totalDebt - totalDebtPaid;
+    // Tổng hợp NCC - nợ phát sinh từ invoices
+    double totalSupplierDebt = 0;
+    for (final inv in imports) {
+      final debt = inv.finalAmount - inv.paidAmount;
+      if (debt > 0) totalSupplierDebt += debt;
+    }
+    
+    // Tổng tiền đã trả NCC từ transactions (Chi cho NCC)
+    double totalSupplierPaid = 0;
+    for (final t in transactions) {
+      if (t.type == 1 && t.partnerId != null && supplierIds.contains(t.partnerId)) {
+        totalSupplierPaid += t.amount;
+      }
+    }
+    final supplierRemaining = totalSupplierDebt - totalSupplierPaid;
+
+    // Tổng hợp Khách hàng - nợ phát sinh từ invoices
+    double totalCustomerDebt = 0;
+    for (final inv in exports) {
+      final debt = inv.finalAmount - inv.paidAmount;
+      if (debt > 0) totalCustomerDebt += debt;
+    }
+    
+    // Tổng tiền khách đã trả từ transactions (Thu từ khách)
+    double totalCustomerPaid = 0;
+    for (final t in transactions) {
+      if (t.type == 0 && t.partnerId != null && customerIds.contains(t.partnerId)) {
+        totalCustomerPaid += t.amount;
+      }
+    }
+    final customerRemaining = totalCustomerDebt - totalCustomerPaid;
+
+    // Sắp xếp theo số tiền còn nợ giảm dần
+    final supplierDebts = supplierDebtMap.values.toList()
+      ..sort((a, b) => b.remaining.compareTo(a.remaining));
+    final customerDebts = customerDebtMap.values.toList()
+      ..sort((a, b) => b.remaining.compareTo(a.remaining));
 
     return DebtSummary(
-      totalDebt: totalDebt,
-      totalPaid: totalPaid,
-      totalDebtPaid: totalDebtPaid,
-      remaining: remaining > 0 ? remaining : 0,
+      totalSupplierDebt: totalSupplierDebt,
+      totalSupplierPaid: totalSupplierPaid,
+      supplierRemaining: supplierRemaining > 0 ? supplierRemaining : 0,
+      totalCustomerDebt: totalCustomerDebt,
+      totalCustomerPaid: totalCustomerPaid,
+      customerRemaining: customerRemaining > 0 ? customerRemaining : 0,
+      // Legacy
+      totalDebt: totalSupplierDebt,
+      totalPaid: totalSupplierPaid,
+      totalDebtPaid: totalSupplierPaid,
+      remaining: supplierRemaining > 0 ? supplierRemaining : 0,
+      supplierDebts: supplierDebts,
+      customerDebts: customerDebts,
     );
   }
 }

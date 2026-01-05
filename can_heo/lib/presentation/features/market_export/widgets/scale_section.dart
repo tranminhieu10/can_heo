@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/services/scale_service.dart';
 import '../../../../domain/entities/invoice.dart';
 import '../../../../domain/repositories/i_invoice_repository.dart';
 import '../../../../injection_container.dart';
@@ -214,9 +213,9 @@ class _ScaleSummaryRow extends StatelessWidget {
             height: 50,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: color.withOpacity(0.3)),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [

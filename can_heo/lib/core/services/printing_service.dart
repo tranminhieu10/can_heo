@@ -62,7 +62,7 @@ class PrintingService {
               pw.SizedBox(height: 12),
 
               // 3. Bảng kê chi tiết
-              pw.Table.fromTextArray(
+              pw.TableHelper.fromTextArray(
                 headers: const ['STT', 'KL (kg)', 'SL', 'Giờ'],
                 data: invoice.details.map((item) {
                   return [

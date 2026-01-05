@@ -386,7 +386,7 @@ class InvoiceForm extends StatelessWidget {
               isDense: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             ),
-            value: safeValue,
+            initialValue: safeValue,
             style: const TextStyle(fontSize: 13, color: Colors.black),
             items: partners
                 .map((p) => DropdownMenuItem(
@@ -474,7 +474,7 @@ class InvoiceForm extends StatelessWidget {
                 }
 
                 return DropdownButtonFormField<PigTypeEntity?>(
-                  value: selected,
+                  initialValue: selected,
                   decoration: const InputDecoration(
                     labelText: 'Loại heo',
                     labelStyle: TextStyle(fontSize: 10),

@@ -106,6 +106,306 @@ class _MarketReportViewState extends State<MarketReportView>
         );
   }
 
+  /// Hiển thị dialog xuất Excel với giao diện chuyên nghiệp
+  void _showExportDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 500,
+          padding: const EdgeInsets.all(0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.teal.shade600, Colors.teal.shade400],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.file_download,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Xuất Báo Cáo Excel',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_dateFormat.format(_startDate)} - ${_dateFormat.format(_endDate)}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Section: Báo cáo tổng hợp
+                    _buildExportSection(
+                      title: '📊 Báo cáo tổng hợp',
+                      items: [
+                        _ExportItem(
+                          icon: Icons.dashboard,
+                          color: Colors.teal,
+                          title: 'Tổng hợp',
+                          subtitle: 'Bao gồm bán hàng, nhập hàng, lãi/lỗ',
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _handleExportExcel(context, 'overview');
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Section: Báo cáo chi tiết
+                    _buildExportSection(
+                      title: '📋 Báo cáo chi tiết',
+                      items: [
+                        _ExportItem(
+                          icon: Icons.sell,
+                          color: Colors.green,
+                          title: 'Bán hàng',
+                          subtitle: 'Chi tiết các phiếu xuất chợ',
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _handleExportExcel(context, 'sales');
+                          },
+                        ),
+                        _ExportItem(
+                          icon: Icons.inventory,
+                          color: Colors.blue,
+                          title: 'Nhập hàng',
+                          subtitle: 'Chi tiết các phiếu nhập chợ',
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _handleExportExcel(context, 'purchase');
+                          },
+                        ),
+                        _ExportItem(
+                          icon: Icons.money_off,
+                          color: Colors.orange,
+                          title: 'Chi phí',
+                          subtitle: 'Cước xe, chi phí cân, thải loại',
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _handleExportExcel(context, 'cost');
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Section: Công nợ
+                    _buildExportSection(
+                      title: '💰 Công nợ',
+                      items: [
+                        _ExportItem(
+                          icon: Icons.account_balance_wallet,
+                          color: Colors.red,
+                          title: 'Tổng hợp công nợ',
+                          subtitle: 'Bao gồm cả NCC và khách hàng',
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _handleExportExcel(context, 'debt');
+                          },
+                        ),
+                        _ExportItem(
+                          icon: Icons.business,
+                          color: Colors.orange,
+                          title: 'Công nợ NCC',
+                          subtitle: 'Ta nợ nhà cung cấp',
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _handleExportExcel(context, 'debt_supplier');
+                          },
+                        ),
+                        _ExportItem(
+                          icon: Icons.people,
+                          color: Colors.purple,
+                          title: 'Công nợ khách hàng',
+                          subtitle: 'Khách hàng nợ ta',
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _handleExportExcel(context, 'debt_customer');
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Section: Báo cáo theo đối tác
+                    _buildExportSection(
+                      title: '👤 Báo cáo theo đối tác',
+                      items: [
+                        _ExportItem(
+                          icon: Icons.person_outline,
+                          color: Colors.green.shade700,
+                          title: 'Bán hàng theo đối tác',
+                          subtitle: 'Chọn khách hàng cụ thể',
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _handleExportExcel(context, 'by_partner_sales');
+                          },
+                        ),
+                        _ExportItem(
+                          icon: Icons.person_outline,
+                          color: Colors.blue.shade700,
+                          title: 'Nhập hàng theo đối tác',
+                          subtitle: 'Chọn nhà cung cấp cụ thể',
+                          onTap: () {
+                            Navigator.of(ctx).pop();
+                            _handleExportExcel(context, 'by_partner_purchase');
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExportSection({
+    required String title,
+    required List<_ExportItem> items,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            children: items.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              final isLast = index == items.length - 1;
+              
+              return Column(
+                children: [
+                  InkWell(
+                    onTap: item.onTap,
+                    borderRadius: BorderRadius.vertical(
+                      top: index == 0 ? const Radius.circular(12) : Radius.zero,
+                      bottom: isLast ? const Radius.circular(12) : Radius.zero,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: item.color.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(item.icon, color: item.color, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  item.subtitle,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.download_rounded,
+                            color: Colors.grey.shade400,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (!isLast)
+                    Divider(height: 1, color: Colors.grey.shade200, indent: 52),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _selectToday() {
     final now = DateTime.now();
     setState(() {
@@ -136,6 +436,8 @@ class _MarketReportViewState extends State<MarketReportView>
   }
 
   Future<void> _handleExportExcel(BuildContext context, String type) async {
+    // Capture before async
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final state = context.read<MarketReportBloc>().state;
     
     // Filter invoices by date
@@ -199,14 +501,107 @@ class _MarketReportViewState extends State<MarketReportView>
           );
           break;
         case 'debt':
+          final debt = state.debtSummary;
           await ExcelExportService.exportDebtReport(
-            totalDebt: state.debtSummary.totalDebt,
-            totalPaid: state.debtSummary.totalPaid,
-            totalDebtPaid: state.debtSummary.totalDebtPaid,
-            remaining: state.debtSummary.remaining,
+            totalDebt: debt.totalSupplierDebt + debt.totalCustomerDebt,
+            totalPaid: debt.totalSupplierPaid + debt.totalCustomerPaid,
+            totalDebtPaid: debt.totalSupplierPaid + debt.totalCustomerPaid,
+            remaining: debt.supplierRemaining + debt.customerRemaining,
             transactions: state.transactions,
             startDate: _startDate,
             endDate: _endDate,
+            totalSupplierDebt: debt.totalSupplierDebt,
+            totalSupplierPaid: debt.totalSupplierPaid,
+            supplierRemaining: debt.supplierRemaining,
+            totalCustomerDebt: debt.totalCustomerDebt,
+            totalCustomerPaid: debt.totalCustomerPaid,
+            customerRemaining: debt.customerRemaining,
+            supplierDebts: debt.supplierDebts.map((d) => DebtInfo(
+              partnerName: d.partnerName,
+              totalAmount: d.totalAmount,
+              totalPaid: d.totalPaid,
+              debtAmount: d.debtAmount,
+              debtPaid: d.debtPaid,
+              remaining: d.remaining,
+              invoiceCount: d.invoiceCount,
+            )).toList(),
+            customerDebts: debt.customerDebts.map((d) => DebtInfo(
+              partnerName: d.partnerName,
+              totalAmount: d.totalAmount,
+              totalPaid: d.totalPaid,
+              debtAmount: d.debtAmount,
+              debtPaid: d.debtPaid,
+              remaining: d.remaining,
+              invoiceCount: d.invoiceCount,
+            )).toList(),
+          );
+          break;
+        case 'debt_supplier':
+          // Chỉ xuất công nợ NCC
+          final debt = state.debtSummary;
+          await ExcelExportService.exportDebtReport(
+            totalDebt: debt.totalSupplierDebt,
+            totalPaid: debt.totalSupplierPaid,
+            totalDebtPaid: debt.totalSupplierPaid,
+            remaining: debt.supplierRemaining,
+            transactions: state.transactions.where((t) => 
+              t.type == 1 && // Chi
+              (t.note?.toLowerCase().contains('thanh toán') == true || 
+               t.note?.toLowerCase().contains('trả nợ') == true)
+            ).toList(),
+            startDate: _startDate,
+            endDate: _endDate,
+            totalSupplierDebt: debt.totalSupplierDebt,
+            totalSupplierPaid: debt.totalSupplierPaid,
+            supplierRemaining: debt.supplierRemaining,
+            totalCustomerDebt: 0,
+            totalCustomerPaid: 0,
+            customerRemaining: 0,
+            supplierDebts: debt.supplierDebts.map((d) => DebtInfo(
+              partnerName: d.partnerName,
+              totalAmount: d.totalAmount,
+              totalPaid: d.totalPaid,
+              debtAmount: d.debtAmount,
+              debtPaid: d.debtPaid,
+              remaining: d.remaining,
+              invoiceCount: d.invoiceCount,
+            )).toList(),
+            customerDebts: [],
+            reportTitle: 'CÔNG NỢ NHÀ CUNG CẤP',
+          );
+          break;
+        case 'debt_customer':
+          // Chỉ xuất công nợ khách hàng
+          final debtCustomer = state.debtSummary;
+          await ExcelExportService.exportDebtReport(
+            totalDebt: debtCustomer.totalCustomerDebt,
+            totalPaid: debtCustomer.totalCustomerPaid,
+            totalDebtPaid: debtCustomer.totalCustomerPaid,
+            remaining: debtCustomer.customerRemaining,
+            transactions: state.transactions.where((t) => 
+              t.type == 0 && // Thu
+              (t.note?.toLowerCase().contains('thanh toán') == true || 
+               t.note?.toLowerCase().contains('trả nợ') == true)
+            ).toList(),
+            startDate: _startDate,
+            endDate: _endDate,
+            totalSupplierDebt: 0,
+            totalSupplierPaid: 0,
+            supplierRemaining: 0,
+            totalCustomerDebt: debtCustomer.totalCustomerDebt,
+            totalCustomerPaid: debtCustomer.totalCustomerPaid,
+            customerRemaining: debtCustomer.customerRemaining,
+            supplierDebts: [],
+            customerDebts: debtCustomer.customerDebts.map((d) => DebtInfo(
+              partnerName: d.partnerName,
+              totalAmount: d.totalAmount,
+              totalPaid: d.totalPaid,
+              debtAmount: d.debtAmount,
+              debtPaid: d.debtPaid,
+              remaining: d.remaining,
+              invoiceCount: d.invoiceCount,
+            )).toList(),
+            reportTitle: 'CÔNG NỢ KHÁCH HÀNG',
           );
           break;
         case 'by_partner_sales':
@@ -228,7 +623,7 @@ class _MarketReportViewState extends State<MarketReportView>
       }
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           const SnackBar(
             content: Text('✅ Đã xuất file Excel thành công!'),
             backgroundColor: Colors.green,
@@ -237,7 +632,7 @@ class _MarketReportViewState extends State<MarketReportView>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text('❌ Lỗi: $e'),
             backgroundColor: Colors.red,
@@ -253,8 +648,11 @@ class _MarketReportViewState extends State<MarketReportView>
     required String reportType,
     required String title,
   }) async {
+    // Capture before async
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
     if (invoices.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(
           content: Text('❌ Không có dữ liệu trong khoảng thời gian này'),
           backgroundColor: Colors.red,
@@ -362,7 +760,7 @@ class _MarketReportViewState extends State<MarketReportView>
       );
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text('✅ Đã xuất báo cáo "$partnerName" thành công!'),
             backgroundColor: Colors.green,
@@ -371,7 +769,7 @@ class _MarketReportViewState extends State<MarketReportView>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text('❌ Lỗi: $e'),
             backgroundColor: Colors.red,
@@ -390,69 +788,10 @@ class _MarketReportViewState extends State<MarketReportView>
         foregroundColor: Colors.white,
         actions: [
           // Nút xuất Excel
-          PopupMenuButton<String>(
+          IconButton(
             icon: const Icon(Icons.file_download),
             tooltip: 'Xuất Excel',
-            onSelected: (value) => _handleExportExcel(context, value),
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'overview',
-                child: ListTile(
-                  leading: Icon(Icons.dashboard, color: Colors.teal),
-                  title: Text('Xuất Tổng hợp'),
-                  dense: true,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'sales',
-                child: ListTile(
-                  leading: Icon(Icons.sell, color: Colors.green),
-                  title: Text('Xuất Bán hàng'),
-                  dense: true,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'purchase',
-                child: ListTile(
-                  leading: Icon(Icons.inventory, color: Colors.blue),
-                  title: Text('Xuất Nhập hàng'),
-                  dense: true,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'cost',
-                child: ListTile(
-                  leading: Icon(Icons.money_off, color: Colors.orange),
-                  title: Text('Xuất Chi phí'),
-                  dense: true,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'debt',
-                child: ListTile(
-                  leading: Icon(Icons.account_balance_wallet, color: Colors.red),
-                  title: Text('Xuất Công nợ'),
-                  dense: true,
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'by_partner_sales',
-                child: ListTile(
-                  leading: Icon(Icons.person, color: Colors.green),
-                  title: Text('Bán hàng theo đối tác'),
-                  dense: true,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'by_partner_purchase',
-                child: ListTile(
-                  leading: Icon(Icons.person, color: Colors.blue),
-                  title: Text('Nhập hàng theo đối tác'),
-                  dense: true,
-                ),
-              ),
-            ],
+            onPressed: () => _showExportDialog(context),
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -513,15 +852,17 @@ class _MarketReportViewState extends State<MarketReportView>
 
                 // Filter invoices by date
                 final filteredImports = state.marketImports.where((inv) {
-                  if (state.startDate == null || state.endDate == null)
+                  if (state.startDate == null || state.endDate == null) {
                     return true;
+                  }
                   return !inv.createdDate.isBefore(state.startDate!) &&
                       inv.createdDate.isBefore(state.endDate!);
                 }).toList();
 
                 final filteredExports = state.marketExports.where((inv) {
-                  if (state.startDate == null || state.endDate == null)
+                  if (state.startDate == null || state.endDate == null) {
                     return true;
+                  }
                   return !inv.createdDate.isBefore(state.startDate!) &&
                       inv.createdDate.isBefore(state.endDate!);
                 }).toList();
@@ -635,7 +976,7 @@ class _MarketReportViewState extends State<MarketReportView>
     );
   }
 
-  /// Bảng báo cáo chi tiết theo đơn giá (giống bản nháp)
+  /// Bảng báo cáo chi tiết theo ngày + đơn giá (giống bản nháp)
   Widget _buildDetailedReportTable({
     required String title,
     required List<InvoiceEntity> invoices,
@@ -643,25 +984,32 @@ class _MarketReportViewState extends State<MarketReportView>
     required CostSummary? costSummary,
     required bool showCosts,
   }) {
-    // Nhóm theo đơn giá
-    final priceGroups = <double, _PriceGroup>{};
+    // Nhóm theo ngày + đơn giá
+    final priceGroups = <String, _PriceGroup>{};
 
     for (final inv in invoices) {
+      final date = DateTime(inv.createdDate.year, inv.createdDate.month, inv.createdDate.day);
       final price = inv.pricePerKg;
-      if (!priceGroups.containsKey(price)) {
-        priceGroups[price] = _PriceGroup(price);
+      final key = '${date.year}-${date.month}-${date.day}_$price';
+      
+      if (!priceGroups.containsKey(key)) {
+        priceGroups[key] = _PriceGroup(date, price);
       }
-      priceGroups[price]!.quantity += inv.totalQuantity;
-      priceGroups[price]!.weight += inv.totalWeight;
-      priceGroups[price]!.amount += inv.finalAmount;
+      priceGroups[key]!.quantity += inv.totalQuantity;
+      priceGroups[key]!.weight += inv.totalWeight;
+      priceGroups[key]!.amount += inv.finalAmount;
       if (inv.note != null && inv.note!.isNotEmpty) {
-        priceGroups[price]!.note = inv.note;
+        priceGroups[key]!.note = inv.note;
       }
     }
 
-    // Sắp xếp theo đơn giá giảm dần
+    // Sắp xếp theo ngày giảm dần, sau đó theo đơn giá giảm dần
     final sortedGroups = priceGroups.values.toList()
-      ..sort((a, b) => b.pricePerKg.compareTo(a.pricePerKg));
+      ..sort((a, b) {
+        final dateCompare = b.date.compareTo(a.date);
+        if (dateCompare != 0) return dateCompare;
+        return b.pricePerKg.compareTo(a.pricePerKg);
+      });
 
     // Tính tổng
     final totalQuantity =
@@ -732,7 +1080,7 @@ class _MarketReportViewState extends State<MarketReportView>
                     const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                 child: Row(
                   children: [
-                    _buildTableCell('', flex: 2, align: TextAlign.center),
+                    _buildTableCell(_dateFormat.format(group.date), flex: 2, align: TextAlign.center),
                     _buildTableCell('${group.quantity}',
                         flex: 2, align: TextAlign.center),
                     _buildTableCell(_numberFormat.format(group.weight),
@@ -1683,13 +2031,38 @@ class _MarketReportViewState extends State<MarketReportView>
                 onPressed: () async {
                   try {
                     await ExcelExportService.exportDebtReport(
-                      totalDebt: debt.totalDebt,
-                      totalPaid: debt.totalPaid,
-                      totalDebtPaid: debt.totalDebtPaid,
-                      remaining: debt.remaining,
+                      totalDebt: debt.totalSupplierDebt + debt.totalCustomerDebt,
+                      totalPaid: debt.totalSupplierPaid + debt.totalCustomerPaid,
+                      totalDebtPaid: debt.totalSupplierPaid + debt.totalCustomerPaid,
+                      remaining: debt.supplierRemaining + debt.customerRemaining,
                       transactions: state.transactions,
                       startDate: _startDate,
                       endDate: _endDate,
+                      // New params for NCC and Customer separation
+                      totalSupplierDebt: debt.totalSupplierDebt,
+                      totalSupplierPaid: debt.totalSupplierPaid,
+                      supplierRemaining: debt.supplierRemaining,
+                      totalCustomerDebt: debt.totalCustomerDebt,
+                      totalCustomerPaid: debt.totalCustomerPaid,
+                      customerRemaining: debt.customerRemaining,
+                      supplierDebts: debt.supplierDebts.map((d) => DebtInfo(
+                        partnerName: d.partnerName,
+                        totalAmount: d.totalAmount,
+                        totalPaid: d.totalPaid,
+                        debtAmount: d.debtAmount,
+                        debtPaid: d.debtPaid,
+                        remaining: d.remaining,
+                        invoiceCount: d.invoiceCount,
+                      )).toList(),
+                      customerDebts: debt.customerDebts.map((d) => DebtInfo(
+                        partnerName: d.partnerName,
+                        totalAmount: d.totalAmount,
+                        totalPaid: d.totalPaid,
+                        debtAmount: d.debtAmount,
+                        debtPaid: d.debtPaid,
+                        remaining: d.remaining,
+                        invoiceCount: d.invoiceCount,
+                      )).toList(),
                     );
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1721,13 +2094,36 @@ class _MarketReportViewState extends State<MarketReportView>
           ),
           const SizedBox(height: 16),
           
-          // Summary cards
+          // ========== CÔNG NỢ NCC (Ta nợ NCC) ==========
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.business, color: Colors.orange.shade700),
+                const SizedBox(width: 8),
+                Text(
+                  'CÔNG NỢ NHÀ CUNG CẤP (Ta nợ NCC)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.orange.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: _buildDebtCard(
-                  'Nợ phát sinh',
-                  debt.totalDebt,
+                  'Nợ NCC phát sinh',
+                  debt.totalSupplierDebt,
                   Icons.trending_up,
                   Colors.orange,
                 ),
@@ -1735,17 +2131,8 @@ class _MarketReportViewState extends State<MarketReportView>
               const SizedBox(width: 16),
               Expanded(
                 child: _buildDebtCard(
-                  'Đã thanh toán',
-                  debt.totalPaid,
-                  Icons.payment,
-                  Colors.blue,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildDebtCard(
-                  'Đã trả nợ',
-                  debt.totalDebtPaid,
+                  'Đã trả NCC',
+                  debt.totalSupplierPaid,
                   Icons.check_circle,
                   Colors.green,
                 ),
@@ -1753,14 +2140,80 @@ class _MarketReportViewState extends State<MarketReportView>
               const SizedBox(width: 16),
               Expanded(
                 child: _buildDebtCard(
-                  'Còn nợ',
-                  debt.remaining,
+                  'Còn nợ NCC',
+                  debt.supplierRemaining,
                   Icons.account_balance_wallet,
                   Colors.red,
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          
+          // Danh sách NCC còn nợ
+          _buildSupplierDebtList(debt.supplierDebts),
+          
+          const SizedBox(height: 32),
+          
+          // ========== CÔNG NỢ KHÁCH HÀNG (Khách nợ ta) ==========
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.people, color: Colors.blue.shade700),
+                const SizedBox(width: 8),
+                Text(
+                  'CÔNG NỢ KHÁCH HÀNG (Khách nợ ta)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.blue.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDebtCard(
+                  'Khách nợ phát sinh',
+                  debt.totalCustomerDebt,
+                  Icons.trending_up,
+                  Colors.blue,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildDebtCard(
+                  'Khách đã trả',
+                  debt.totalCustomerPaid,
+                  Icons.check_circle,
+                  Colors.teal,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildDebtCard(
+                  'Khách còn nợ',
+                  debt.customerRemaining,
+                  Icons.account_balance_wallet,
+                  Colors.purple,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Danh sách khách hàng còn nợ
+          _buildCustomerDebtList(debt.customerDebts),
+
           const SizedBox(height: 24),
 
           // Payment transactions list
@@ -1768,6 +2221,269 @@ class _MarketReportViewState extends State<MarketReportView>
         ],
       ),
     );
+  }
+
+  Widget _buildSupplierDebtList(List<CustomerDebt> supplierDebts) {
+    // Lọc chỉ những NCC còn nợ
+    final debtors = supplierDebts.where((c) => c.remaining > 0).toList();
+    
+    return Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(8),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.business, color: Colors.orange.shade700),
+                const SizedBox(width: 8),
+                Text(
+                  'Danh sách NCC còn nợ (${debtors.length} NCC)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (debtors.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.check_circle, size: 48, color: Colors.green.shade400),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Không nợ NCC nào',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: debtors.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final supplier = debtors[index];
+                return ExpansionTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.orange.shade600,
+                    child: Text(
+                      supplier.partnerName.isNotEmpty 
+                          ? supplier.partnerName[0].toUpperCase() 
+                          : '?',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  title: Text(
+                    supplier.partnerName,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'Ta còn nợ: ${_currencyFormat.format(supplier.remaining)}đ',
+                    style: TextStyle(
+                      color: Colors.orange.shade700,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${supplier.invoiceCount} phiếu',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                      if (supplier.lastTransaction != null)
+                        Text(
+                          _dateFormat.format(supplier.lastTransaction!),
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                        ),
+                    ],
+                  ),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.grey.shade50,
+                      child: Column(
+                        children: [
+                          _buildDebtDetailRow('Tổng mua hàng', supplier.totalAmount, Colors.blue),
+                          _buildDebtDetailRow('Đã thanh toán (lúc mua)', supplier.totalPaid, Colors.green),
+                          _buildDebtDetailRow('Nợ phát sinh', supplier.debtAmount, Colors.orange),
+                          _buildDebtDetailRow('Đã trả nợ', supplier.debtPaid, Colors.teal),
+                          const Divider(),
+                          _buildDebtDetailRow('Còn nợ', supplier.remaining, Colors.red, isBold: true),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerDebtList(List<CustomerDebt> customerDebts) {
+    // Lọc chỉ những khách còn nợ
+    final debtors = customerDebts.where((c) => c.remaining > 0).toList();
+    
+    return Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(8),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.people, color: Colors.blue.shade700),
+                const SizedBox(width: 8),
+                Text(
+                  'Danh sách khách hàng còn nợ (${debtors.length} khách)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (debtors.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.check_circle, size: 48, color: Colors.green.shade400),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Không có khách hàng nào còn nợ',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: debtors.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final customer = debtors[index];
+                return ExpansionTile(
+                  leading: CircleAvatar(
+                    backgroundColor: _getDebtColor(customer.remaining),
+                    child: Text(
+                      customer.partnerName.isNotEmpty 
+                          ? customer.partnerName[0].toUpperCase() 
+                          : '?',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  title: Text(
+                    customer.partnerName,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'Khách còn nợ: ${_currencyFormat.format(customer.remaining)}đ',
+                    style: TextStyle(
+                      color: Colors.purple.shade700,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${customer.invoiceCount} phiếu',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                      if (customer.lastTransaction != null)
+                        Text(
+                          _dateFormat.format(customer.lastTransaction!),
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                        ),
+                    ],
+                  ),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.grey.shade50,
+                      child: Column(
+                        children: [
+                          _buildDebtDetailRow('Tổng bán hàng', customer.totalAmount, Colors.blue),
+                          _buildDebtDetailRow('Đã thanh toán (lúc bán)', customer.totalPaid, Colors.green),
+                          _buildDebtDetailRow('Nợ phát sinh', customer.debtAmount, Colors.orange),
+                          _buildDebtDetailRow('Đã trả nợ', customer.debtPaid, Colors.teal),
+                          const Divider(),
+                          _buildDebtDetailRow('Còn nợ', customer.remaining, Colors.purple, isBold: true),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDebtDetailRow(String label, double amount, Color color, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          Text(
+            '${_currencyFormat.format(amount)}đ',
+            style: TextStyle(
+              color: color,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              fontSize: isBold ? 16 : 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getDebtColor(double amount) {
+    if (amount > 10000000) return Colors.red.shade700;      // > 10 triệu
+    if (amount > 5000000) return Colors.red.shade500;       // > 5 triệu
+    if (amount > 1000000) return Colors.orange.shade600;    // > 1 triệu
+    return Colors.orange.shade400;
   }
 
   Widget _buildDebtCard(
@@ -1813,12 +2529,16 @@ class _MarketReportViewState extends State<MarketReportView>
   }
 
   Widget _buildPaymentTransactionsList(List<TransactionEntity> transactions) {
-    // Filter payment transactions (type = 1 = Chi)
+    // Filter payment transactions:
+    // - type = 1 (Chi): Ta thanh toán/trả nợ cho NCC
+    // - type = 0 (Thu): Khách hàng thanh toán/trả nợ cho ta
     final paymentTransactions = transactions.where((t) {
       final note = t.note?.toLowerCase() ?? '';
-      return t.type == 1 &&
-          (note.contains('thanh toán') || note.contains('trả nợ'));
+      return (note.contains('thanh toán') || note.contains('trả nợ'));
     }).toList();
+
+    // Sort by date descending
+    paymentTransactions.sort((a, b) => b.date.compareTo(a.date));
 
     return Card(
       child: Column(
@@ -1827,9 +2547,23 @@ class _MarketReportViewState extends State<MarketReportView>
           Container(
             padding: const EdgeInsets.all(12),
             color: Colors.grey.shade100,
-            child: const Text(
-              'Lịch sử thanh toán / trả nợ',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            child: Row(
+              children: [
+                const Icon(Icons.history, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Lịch sử thanh toán / trả nợ',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                Text(
+                  '${paymentTransactions.length} giao dịch',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
             ),
           ),
           if (paymentTransactions.isEmpty)
@@ -1843,47 +2577,87 @@ class _MarketReportViewState extends State<MarketReportView>
               ),
             )
           else
-            ...paymentTransactions.map((t) => ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor:
-                        t.note?.toLowerCase().contains('trả nợ') == true
-                            ? Colors.green
-                            : Colors.blue,
-                    child: Icon(
-                      t.note?.toLowerCase().contains('trả nợ') == true
-                          ? Icons.check_circle
-                          : Icons.payment,
-                      color: Colors.white,
-                      size: 20,
+            ...paymentTransactions.map((t) {
+              // Determine transaction type
+              final isFromCustomer = t.type == 0; // Thu = khách trả cho ta
+              final isDebtPayment = t.note?.toLowerCase().contains('trả nợ') == true;
+              
+              // Colors: Thu từ khách = xanh lá/tím, Chi cho NCC = xanh dương/cam
+              Color bgColor;
+              Color textColor;
+              IconData icon;
+              String typeLabel;
+              
+              if (isFromCustomer) {
+                // Khách hàng thanh toán/trả nợ cho ta
+                bgColor = isDebtPayment ? Colors.purple : Colors.teal;
+                textColor = isDebtPayment ? Colors.purple : Colors.teal;
+                icon = isDebtPayment ? Icons.arrow_downward : Icons.call_received;
+                typeLabel = isDebtPayment ? 'Khách trả nợ' : 'Khách thanh toán';
+              } else {
+                // Ta thanh toán/trả nợ cho NCC
+                bgColor = isDebtPayment ? Colors.green : Colors.blue;
+                textColor = isDebtPayment ? Colors.green : Colors.blue;
+                icon = isDebtPayment ? Icons.check_circle : Icons.payment;
+                typeLabel = isDebtPayment ? 'Trả nợ NCC' : 'Thanh toán NCC';
+              }
+              
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: bgColor,
+                  child: Icon(icon, color: Colors.white, size: 20),
+                ),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        t.partnerName ?? 'N/A',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
-                  ),
-                  title: Text(t.partnerName ?? 'N/A'),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_dateFormat.format(t.date)),
-                      if (t.note != null && t.note!.isNotEmpty)
-                        Text(
-                          t.note!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                            fontStyle: FontStyle.italic,
-                          ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: bgColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: bgColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        typeLabel,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: textColor,
+                          fontWeight: FontWeight.bold,
                         ),
-                    ],
-                  ),
-                  trailing: Text(
-                    '${_currencyFormat.format(t.amount)}đ',
-                    style: TextStyle(
-                      color: t.note?.toLowerCase().contains('trả nợ') == true
-                          ? Colors.green
-                          : Colors.blue,
-                      fontWeight: FontWeight.bold,
+                      ),
                     ),
+                  ],
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_dateFormat.format(t.date)),
+                    if (t.note != null && t.note!.isNotEmpty)
+                      Text(
+                        t.note!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                  ],
+                ),
+                trailing: Text(
+                  '${_currencyFormat.format(t.amount)}đ',
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
                   ),
-                  isThreeLine: t.note != null && t.note!.isNotEmpty,
-                )),
+                ),
+                isThreeLine: t.note != null && t.note!.isNotEmpty,
+              );
+            }),
         ],
       ),
     );
@@ -1908,17 +2682,21 @@ class _PartnerSummary {
   _PartnerSummary(this.name);
 }
 
-/// Model nhóm theo đơn giá
+/// Model nhóm theo ngày + đơn giá
 class _PriceGroup {
+  final DateTime date;
   final double pricePerKg;
   int quantity = 0;
   double weight = 0;
   double amount = 0;
   String? note;
 
-  _PriceGroup(this.pricePerKg);
+  _PriceGroup(this.date, this.pricePerKg);
 
   double get avgWeight => quantity > 0 ? weight / quantity : 0;
+  
+  /// Key duy nhất cho nhóm
+  String get key => '${date.year}-${date.month}-${date.day}_$pricePerKg';
 }
 
 /// Model chi phí
@@ -1927,4 +2705,21 @@ class _CostItem {
   final double amount;
 
   _CostItem(this.label, this.amount);
+}
+
+/// Model cho item xuất Excel
+class _ExportItem {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  _ExportItem({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 }

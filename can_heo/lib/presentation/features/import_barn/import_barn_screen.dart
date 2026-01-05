@@ -387,9 +387,9 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
           return Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: color.withOpacity(0.3)),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -424,8 +424,6 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
   }
 
   Widget _buildInvoiceDetailsSection(BuildContext context) {
-    const fieldHeight = 42.0;
-
     return Card(
       elevation: 2,
       child: Padding(
@@ -526,7 +524,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                                   contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 10),
                                 ),
-                                value: safeValue,
+                                initialValue: safeValue,
                                 style: const TextStyle(
                                     fontSize: 13, color: Colors.black),
                                 items: partners
@@ -755,7 +753,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
-                value: safeValue,
+                initialValue: safeValue,
                 style: const TextStyle(fontSize: 13, color: Colors.black),
                 items: partners
                     .map((p) => DropdownMenuItem(
@@ -965,7 +963,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         final safeValue = farms.contains(_selectedFarm) ? _selectedFarm : null;
 
         return DropdownButtonFormField<FarmEntity>(
-          value: safeValue,
+          initialValue: safeValue,
           isExpanded: true,
           decoration: InputDecoration(
             hintText: farms.isEmpty ? 'Chưa có trại' : 'Chọn trại',
@@ -996,7 +994,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         final cages = snapshot.data ?? [];
 
         return DropdownButtonFormField<CageEntity>(
-          value: _selectedCage != null && cages.contains(_selectedCage) ? _selectedCage : null,
+          initialValue: _selectedCage != null && cages.contains(_selectedCage) ? _selectedCage : null,
           isExpanded: true,
           decoration: InputDecoration(
             hintText: cages.isEmpty ? 'Chưa có chuồng' : 'Chọn chuồng',
@@ -1033,7 +1031,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                 orElse: () => types.first);
 
         return DropdownButtonFormField<PigTypeEntity?>(
-          value: selected,
+          initialValue: selected,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.pets, size: 18),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
@@ -1090,40 +1088,46 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         // Tồn kho = Nhập kho (Type 0) - Xuất kho (Type 1)
         for (final inv in importBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               barnInventory += item.quantity;
+            }
           }
         }
         for (final inv in exportBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               barnInventory -= item.quantity;
+            }
           }
         }
 
         // Tồn chợ = Nhập chợ (Type 3) + Xuất kho (Type 1) - Xuất chợ (Type 2) - Nhập kho (Type 0)
         for (final inv in importMarket) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               marketInventory += item.quantity;
+            }
           }
         }
         for (final inv in exportBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               marketInventory += item.quantity;
+            }
           }
         }
         for (final inv in exportMarket) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               marketInventory -= item.quantity;
+            }
           }
         }
         for (final inv in importBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               marketInventory -= item.quantity;
+            }
           }
         }
 
@@ -1159,14 +1163,16 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         int exported = 0;
         for (final inv in importSnap) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               imported += item.quantity;
+            }
           }
         }
         for (final inv in exportSnap) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               exported += item.quantity;
+            }
           }
         }
         final availableQty = imported - exported;
@@ -1208,29 +1214,33 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         // + Nhập chợ (Type 3)
         for (final inv in importMarket) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               marketInventory += item.quantity;
+            }
           }
         }
         // + Xuất kho (Type 1)
         for (final inv in exportBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               marketInventory += item.quantity;
+            }
           }
         }
         // - Xuất chợ (Type 2)
         for (final inv in exportMarket) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               marketInventory -= item.quantity;
+            }
           }
         }
         // - Nhập kho (Type 0)
         for (final inv in importBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               marketInventory -= item.quantity;
+            }
           }
         }
 
@@ -1269,16 +1279,18 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         // + Nhập kho (Type 0)
         for (final inv in importBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available += item.quantity;
+            }
           }
         }
         
         // - Xuất kho (Type 1)
         for (final inv in exportBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available -= item.quantity;
+            }
           }
         }
         
@@ -1320,32 +1332,36 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
         // + Nhập chợ từ NCC (Type 3)
         for (final inv in importMarket) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available += item.quantity;
+            }
           }
         }
         
         // + Xuất kho ra chợ (Type 1)
         for (final inv in exportBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available += item.quantity;
+            }
           }
         }
         
         // - Xuất chợ bán (Type 2)
         for (final inv in exportMarket) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available -= item.quantity;
+            }
           }
         }
         
         // - Nhập kho hàng thừa (Type 0)
         for (final inv in importBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available -= item.quantity;
+            }
           }
         }
         
@@ -1476,14 +1492,16 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
 
           for (final inv in importSnap) {
             for (final item in inv.details) {
-              if ((item.pigType ?? '').trim() == pigType)
+              if ((item.pigType ?? '').trim() == pigType) {
                 imported += item.quantity;
+              }
             }
           }
           for (final inv in exportSnap) {
             for (final item in inv.details) {
-              if ((item.pigType ?? '').trim() == pigType)
+              if ((item.pigType ?? '').trim() == pigType) {
                 exported += item.quantity;
+              }
             }
           }
           availableQty = imported - exported;
@@ -1783,7 +1801,6 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
   /// Load invoice data into form for editing
   void _loadInvoiceToForm(InvoiceEntity invoice) {
     // Extract farm name, cage, and note from invoice note
-    String farmName = '';
     String cage = '';
     String otherNote = '';
 
@@ -1791,7 +1808,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
       final parts = invoice.note!.split(' | ');
       for (final part in parts) {
         if (part.startsWith('Trại: ')) {
-          farmName = part.replaceFirst('Trại: ', '');
+          // Farm name extracted but handled by _selectedFarm
         } else if (part.startsWith('Chuồng: ')) {
           cage = part.replaceFirst('Chuồng: ', '');
         } else {
@@ -2069,6 +2086,7 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     }
 
     // Show confirmation dialog
+    if (!context.mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -2148,11 +2166,13 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     return StreamBuilder<List<InvoiceEntity>>(
       stream: _invoiceRepo.watchInvoices(type: 0),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         var invoices = snapshot.data!;
-        if (invoices.isEmpty)
+        if (invoices.isEmpty) {
           return const Center(child: Text('Chưa có phiếu nhập nào'));
+        }
 
         // Tách phiếu nhập kho (gốc) và phiếu chiết khấu/trả nợ
         final importInvoices = invoices.where((inv) {
@@ -2305,33 +2325,10 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                             ? 'Chiết khấu'
                             : (isDebtPayment ? 'Trả nợ' : 'Nhập kho');
 
-                        // Extract values - deduction stores farmWeight, discount stores transportFee
+                        // Extract values - deduction stores farmWeight
                         final farmWeight = inv.deduction;
                         final marketWeight = inv.totalWeight;
                         final wastage = farmWeight - marketWeight;
-                        final transportFee = inv.discount;
-
-                        // Calculate based on invoice type
-                        double subtotal;
-                        double totalImport;
-                        double paidAmount;
-                        double remainingDebt;
-
-                        if (isDiscount || isDebtPayment) {
-                          // Chiết khấu/Trả nợ: không hiển thị công nợ riêng
-                          subtotal = 0;
-                          totalImport = 0;
-                          paidAmount = inv.finalAmount.abs();
-                          remainingDebt =
-                              0; // Không hiển thị công nợ cho dòng này
-                        } else {
-                          // Nhập kho: công nợ = công nợ cộng dồn theo NCC
-                          subtotal = marketWeight * inv.pricePerKg;
-                          totalImport = subtotal + transportFee;
-                          paidAmount = inv.finalAmount;
-                          // Sử dụng công nợ cộng dồn theo NCC thay vì công nợ riêng
-                          remainingDebt = cumulativeDebtByInvoice[inv.id] ?? 0;
-                        }
 
                         // Extract farm name from note, and get cage name from cageId
                         String farmName = '';
@@ -2414,17 +2411,17 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
                               DataCell(Align(
                                 alignment: Alignment.centerRight,
                                 child: Text(
-                                    '${_numberFormat.format(farmWeight.toInt())}'),
+                                    _numberFormat.format(farmWeight.toInt())),
                               )),
                               DataCell(Align(
                                 alignment: Alignment.centerRight,
                                 child: Text(
-                                    '${_numberFormat.format(marketWeight.toInt())}'),
+                                    _numberFormat.format(marketWeight.toInt())),
                               )),
                               DataCell(Align(
                                 alignment: Alignment.centerRight,
                                 child: Text(
-                                  '${_numberFormat.format(wastage.toInt())}',
+                                  _numberFormat.format(wastage.toInt()),
                                   style: TextStyle(
                                     color:
                                         wastage > 0 ? Colors.red : Colors.green,
@@ -2511,8 +2508,6 @@ class _ImportBarnViewState extends State<_ImportBarnView> {
     }
 
     // Tính tổng từ các lần cân
-    final totalWeight = weighingItems.fold<double>(0.0, (sum, item) => sum + item.weight);
-    final totalQuantity = weighingItems.fold<int>(0, (sum, item) => sum + item.quantity);
     final totalAdditionalCost = additionalCosts.fold<double>(0.0, (sum, cost) => sum + cost.amount);
 
     // Tạo note tổng hợp

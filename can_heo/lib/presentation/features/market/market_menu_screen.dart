@@ -125,7 +125,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.teal.withOpacity(0.1),
+            color: Colors.teal.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -206,7 +206,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.teal.withOpacity(0.4),
+            color: Colors.teal.withValues(alpha: 0.4),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -222,7 +222,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
@@ -248,7 +248,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
                 Text(
                   'Quản lý nhập xuất heo, theo dõi công nợ và báo cáo doanh thu một cách dễ dàng.',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 14,
                     height: 1.5,
                   ),
@@ -261,13 +261,13 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -327,7 +327,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: data.color.withOpacity(0.2),
+            color: data.color.withValues(alpha: 0.2),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -344,7 +344,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: data.color.withOpacity(0.2),
+                color: data.color.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -360,7 +360,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            data.color.withOpacity(0.8),
+                            data.color.withValues(alpha: 0.8),
                             data.color,
                           ],
                           begin: Alignment.topLeft,
@@ -369,7 +369,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: data.color.withOpacity(0.4),
+                            color: data.color.withValues(alpha: 0.4),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -381,7 +381,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: data.color.withOpacity(0.1),
+                        color: data.color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -427,7 +427,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: data.color.withOpacity(0.1),
+                              color: data.color.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -457,7 +457,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -515,7 +515,7 @@ class _MarketMenuScreenState extends State<MarketMenuScreen>
           width: 28,
           height: 28,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Center(

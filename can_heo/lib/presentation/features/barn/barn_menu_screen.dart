@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../import_barn/import_barn_screen.dart';
 import '../export_barn/export_barn_screen.dart';
+import '../supply/supply_screen.dart';
 
 /// Màn hình menu Kho - gộp Nhập Kho, Xuất Kho
 class BarnMenuScreen extends StatefulWidget {
@@ -25,10 +26,10 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
       duration: const Duration(milliseconds: 800),
     );
 
-    // Staggered animations cho 2 card
-    _fadeAnimations = List.generate(2, (index) {
-      final start = index * 0.25;
-      final end = start + 0.6;
+    // Staggered animations cho 3 card
+    _fadeAnimations = List.generate(3, (index) {
+      final start = index * 0.2;  // 0, 0.2, 0.4
+      final end = (start + 0.5).clamp(0.0, 1.0);  // 0.5, 0.7, 0.9
       return Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(
           parent: _animationController,
@@ -37,9 +38,9 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
       );
     });
 
-    _slideAnimations = List.generate(2, (index) {
-      final start = index * 0.25;
-      final end = start + 0.6;
+    _slideAnimations = List.generate(3, (index) {
+      final start = index * 0.2;  // 0, 0.2, 0.4
+      final end = (start + 0.5).clamp(0.0, 1.0);  // 0.5, 0.7, 0.9
       return Tween<Offset>(
         begin: const Offset(0, 0.3),
         end: Offset.zero,
@@ -124,7 +125,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.indigo.withOpacity(0.1),
+            color: Colors.indigo.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -172,7 +173,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
                       ),
                     ),
                     Text(
-                      'Nhập • Xuất',
+                      'Nhập • Xuất • Vật tư',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -205,7 +206,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.indigo.withOpacity(0.4),
+            color: Colors.indigo.withValues(alpha: 0.4),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -221,7 +222,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
@@ -247,7 +248,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
                 Text(
                   'Quản lý nhập xuất kho, theo dõi tồn kho và luân chuyển hàng hóa một cách dễ dàng.',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 14,
                     height: 1.5,
                   ),
@@ -260,13 +261,13 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -287,6 +288,8 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
         Expanded(child: _buildAnimatedCard(0, _importCardData())),
         const SizedBox(width: 20),
         Expanded(child: _buildAnimatedCard(1, _exportCardData())),
+        const SizedBox(width: 20),
+        Expanded(child: _buildAnimatedCard(2, _supplyCardData())),
       ],
     );
   }
@@ -297,11 +300,17 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
         _buildAnimatedCard(0, _importCardData()),
         const SizedBox(height: 16),
         _buildAnimatedCard(1, _exportCardData()),
+        const SizedBox(height: 16),
+        _buildAnimatedCard(2, _supplyCardData()),
       ],
     );
   }
 
   Widget _buildAnimatedCard(int index, _MenuCardData data) {
+    // Kiểm tra index hợp lệ
+    if (index >= _fadeAnimations.length || index >= _slideAnimations.length) {
+      return _buildMenuCard(data);
+    }
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -322,7 +331,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: data.color.withOpacity(0.2),
+            color: data.color.withValues(alpha: 0.2),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -339,7 +348,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: data.color.withOpacity(0.2),
+                color: data.color.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -355,7 +364,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            data.color.withOpacity(0.8),
+                            data.color.withValues(alpha: 0.8),
                             data.color,
                           ],
                           begin: Alignment.topLeft,
@@ -364,7 +373,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: data.color.withOpacity(0.4),
+                            color: data.color.withValues(alpha: 0.4),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -376,7 +385,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: data.color.withOpacity(0.1),
+                        color: data.color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -422,7 +431,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: data.color.withOpacity(0.1),
+                              color: data.color.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -452,7 +461,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -489,6 +498,13 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
             'Xuất heo từ kho ra chợ để bán, quản lý tồn kho',
             Colors.orange,
           ),
+          const SizedBox(height: 12),
+          _buildGuideItem(
+            '3',
+            'Vật tư',
+            'Quản lý thức ăn, thuốc, dụng cụ... trong kho',
+            Colors.teal,
+          ),
         ],
       ),
     );
@@ -503,7 +519,7 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
           width: 28,
           height: 28,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Center(
@@ -566,6 +582,18 @@ class _BarnMenuScreenState extends State<BarnMenuScreen>
         onTap: (ctx) => Navigator.push(
           ctx,
           MaterialPageRoute(builder: (_) => const ExportBarnScreen()),
+        ),
+      );
+
+  _MenuCardData _supplyCardData() => _MenuCardData(
+        icon: Icons.inventory_2_rounded,
+        title: 'Vật tư',
+        subtitle: 'Quản lý thức ăn, thuốc, dụng cụ trong kho.',
+        color: Colors.teal.shade600,
+        features: ['Nhập/Xuất', 'Tồn kho', 'Lịch sử'],
+        onTap: (ctx) => Navigator.push(
+          ctx,
+          MaterialPageRoute(builder: (_) => const SupplyScreen()),
         ),
       );
 }

@@ -26,24 +26,6 @@ class _HistoryTheme {
     end: Alignment.bottomRight,
   );
 
-  static const successGradient = LinearGradient(
-    colors: [Color(0xFF11998e), Color(0xFF38ef7d)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const warningGradient = LinearGradient(
-    colors: [Color(0xFFf093fb), Color(0xFFf5576c)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const infoGradient = LinearGradient(
-    colors: [Color(0xFF4facfe), Color(0xFF00f2fe)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
   // Tab colors
   static const tabColors = [
     Color(0xFF11998e), // Nhập kho - green
@@ -287,10 +269,12 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView>
 
     try {
       await ExcelExportService.exportInvoicesToExcel(state.invoices);
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Đã xuất Excel')),
       );
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi xuất Excel: $e')),
       );
@@ -656,15 +640,29 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView>
 
   int _countActiveFilters() {
     int count = 0;
-    if (_searchController.text.isNotEmpty) count++;
-    if (_daysFilter != null) count++;
-    if (_pigTypeController.text.isNotEmpty) count++;
-    if (_batchNumberController.text.isNotEmpty) count++;
-    if (_customerController.text.isNotEmpty) count++;
+    if (_searchController.text.isNotEmpty) {
+      count++;
+    }
+    if (_daysFilter != null) {
+      count++;
+    }
+    if (_pigTypeController.text.isNotEmpty) {
+      count++;
+    }
+    if (_batchNumberController.text.isNotEmpty) {
+      count++;
+    }
+    if (_customerController.text.isNotEmpty) {
+      count++;
+    }
     if (_minWeightController.text.isNotEmpty ||
-        _maxWeightController.text.isNotEmpty) count++;
+        _maxWeightController.text.isNotEmpty) {
+      count++;
+    }
     if (_minAmountController.text.isNotEmpty ||
-        _maxAmountController.text.isNotEmpty) count++;
+        _maxAmountController.text.isNotEmpty) {
+      count++;
+    }
     return count;
   }
 
@@ -1196,7 +1194,6 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView>
   }
 
   Widget _buildModernList(BuildContext context, List<InvoiceEntity> invoices) {
-    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
     final currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
     return Container(
@@ -1631,6 +1628,7 @@ class _InvoiceHistoryViewState extends State<_InvoiceHistoryView>
       }
     }
 
+    if (!context.mounted) return;
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(

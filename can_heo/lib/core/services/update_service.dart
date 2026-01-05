@@ -1,25 +1,28 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 
-/// Service quản lý việc kiểm tra và cập nhật ứng dụng
+/// Service quản lý việc kiểm tra và cập nhật ứng dụng từ GitHub Releases
 /// 
 /// Quy trình:
-/// 1. Check version từ server (version.json)
+/// 1. Kiểm tra GitHub Releases API
 /// 2. So sánh với version hiện tại
-/// 3. Nếu có bản mới -> tải file .msi
+/// 3. Nếu có bản mới -> tải file Setup.exe
 /// 4. Chạy installer và tắt app
 class UpdateService {
-  /// URL tới file version.json trên server
-  /// Thay đổi URL này theo hosting của bạn
-  static const String versionUrl = 'https://github.com/tranminhieu10/can_heo/releases/download/v1.0.1/can_heo_1.0.1.msix';
+  /// Thông tin GitHub Repository - THAY ĐỔI THEO REPO CỦA BẠN
+  static const String githubOwner = 'tranminhieu10';
+  static const String githubRepo = 'can_heo';
   
-  /// Version hiện tại của app (lấy từ pubspec.yaml)
-  static const String currentVersion = '1.0.0';
+  /// URL GitHub API
+  static String get _apiUrl => 
+    'https://api.github.com/repos/$githubOwner/$githubRepo/releases/latest';
+  
+  /// Version hiện tại của app (cập nhật khi build mới)
+  static const String currentVersion = '1.0.3';
   
   /// Build number hiện tại
-  static const int currentBuildNumber = 1;
+  static const int currentBuildNumber = 3;
 
   /// Singleton instance
   static final UpdateService _instance = UpdateService._internal();
@@ -34,33 +37,74 @@ class UpdateService {
   /// Thông tin bản cập nhật mới (nếu có)
   UpdateInfo? latestUpdate;
 
-  /// Kiểm tra có bản cập nhật mới không
+  /// Kiểm tra có bản cập nhật mới không từ GitHub Releases
   Future<UpdateCheckResult> checkForUpdates() async {
     try {
       status.value = UpdateStatus.checking;
       errorMessage.value = null;
 
       final httpClient = HttpClient();
-      final request = await httpClient.getUrl(Uri.parse(versionUrl));
+      final request = await httpClient.getUrl(Uri.parse(_apiUrl));
+      request.headers.add('Accept', 'application/vnd.github.v3+json');
+      request.headers.add('User-Agent', 'CanHeo-App');
       final response = await request.close();
 
       if (response.statusCode != 200) {
-        throw Exception('Server trả về lỗi: ${response.statusCode}');
+        throw Exception('GitHub API trả về lỗi: ${response.statusCode}');
       }
 
       final jsonString = await response.transform(utf8.decoder).join();
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
-
-      latestUpdate = UpdateInfo.fromJson(json);
       httpClient.close();
 
+      // Parse thông tin từ GitHub Release
+      final tagName = (json['tag_name'] as String? ?? 'v1.0.0').replaceAll('v', '');
+      final releaseNotes = json['body'] as String? ?? '';
+      final publishedAt = json['published_at'] as String?;
+      
+      // Tìm file installer trong assets
+      String? downloadUrl;
+      int fileSize = 0;
+      final assets = json['assets'] as List? ?? [];
+      
+      for (final asset in assets) {
+        final name = asset['name'] as String? ?? '';
+        // Tìm file .exe Setup
+        if (name.toLowerCase().contains('setup') && name.endsWith('.exe')) {
+          downloadUrl = asset['browser_download_url'] as String?;
+          fileSize = asset['size'] as int? ?? 0;
+          break;
+        }
+      }
+      
+      // Nếu không tìm thấy Setup, tìm file .exe bất kỳ
+      if (downloadUrl == null) {
+        for (final asset in assets) {
+          final name = asset['name'] as String? ?? '';
+          if (name.endsWith('.exe')) {
+            downloadUrl = asset['browser_download_url'] as String?;
+            fileSize = asset['size'] as int? ?? 0;
+            break;
+          }
+        }
+      }
+
+      latestUpdate = UpdateInfo(
+        version: tagName,
+        buildNumber: 1,
+        downloadUrl: downloadUrl ?? '',
+        releaseNotes: releaseNotes,
+        fileSize: fileSize,
+        releaseDate: publishedAt != null ? DateTime.parse(publishedAt) : DateTime.now(),
+        forceUpdate: releaseNotes.toLowerCase().contains('[force]'),
+      );
+
       // So sánh version
-      final hasUpdate = _compareVersions(currentVersion, latestUpdate!.version) < 0 ||
-          (currentVersion == latestUpdate!.version && currentBuildNumber < latestUpdate!.buildNumber);
+      final hasUpdate = _compareVersions(currentVersion, latestUpdate!.version) < 0;
 
       status.value = UpdateStatus.idle;
 
-      if (hasUpdate) {
+      if (hasUpdate && downloadUrl != null) {
         return UpdateCheckResult(
           hasUpdate: true,
           currentVersion: currentVersion,
@@ -89,8 +133,8 @@ class UpdateService {
 
   /// Tải và cài đặt bản cập nhật
   Future<bool> downloadAndInstall() async {
-    if (latestUpdate == null) {
-      errorMessage.value = 'Chưa kiểm tra cập nhật';
+    if (latestUpdate == null || latestUpdate!.downloadUrl.isEmpty) {
+      errorMessage.value = 'Không tìm thấy file cập nhật';
       return false;
     }
 
@@ -99,9 +143,9 @@ class UpdateService {
       downloadProgress.value = 0.0;
       errorMessage.value = null;
 
-      // Lấy thư mục Temp
-      final tempDir = await getTemporaryDirectory();
-      final installerPath = '${tempDir.path}\\can_heo_${latestUpdate!.version}.msix';
+      // Lấy thư mục Temp từ biến môi trường (không dùng path_provider)
+      final tempPath = Platform.environment['TEMP'] ?? Platform.environment['TMP'] ?? 'C:\\Temp';
+      final installerPath = '$tempPath\\CanHeo_Setup_${latestUpdate!.version}.exe';
       final installerFile = File(installerPath);
 
       // Xóa file cũ nếu có
@@ -109,9 +153,10 @@ class UpdateService {
         await installerFile.delete();
       }
 
-      // Tải file
+      // Tải file từ GitHub
       final httpClient = HttpClient();
       final request = await httpClient.getUrl(Uri.parse(latestUpdate!.downloadUrl));
+      request.headers.add('User-Agent', 'CanHeo-App');
       final response = await request.close();
 
       if (response.statusCode != 200) {
@@ -137,26 +182,16 @@ class UpdateService {
 
       status.value = UpdateStatus.installing;
 
-      // Chạy installer
-      // Với MSIX, dùng PowerShell Add-AppxPackage
-      final result = await Process.run(
-        'powershell',
-        [
-          '-ExecutionPolicy', 'Bypass',
-          '-Command',
-          'Add-AppxPackage -Path "$installerPath" -ForceApplicationShutdown'
-        ],
-        runInShell: true,
+      // Chạy installer (Inno Setup với /SILENT)
+      await Process.start(
+        installerPath, 
+        ['/SILENT', '/CLOSEAPPLICATIONS'],
+        mode: ProcessStartMode.detached,
       );
-
-      if (result.exitCode != 0) {
-        // Nếu MSIX không hoạt động, thử mở file để user tự cài
-        await Process.run('explorer', [installerPath]);
-      }
 
       status.value = UpdateStatus.completed;
 
-      // Tắt app sau 2 giây
+      // Tắt app sau 2 giây để installer chạy
       await Future.delayed(const Duration(seconds: 2));
       exit(0);
 
@@ -165,8 +200,6 @@ class UpdateService {
       errorMessage.value = 'Lỗi cài đặt: $e';
       return false;
     }
-
-    return true;
   }
 
   /// So sánh 2 version string (vd: "1.0.0" vs "1.0.1")

@@ -1,204 +1,181 @@
-# Hướng Dẫn Triển Khai Auto-Update cho Can Heo
+# Hướng Dẫn Auto-Update từ GitHub Releases
 
 ## Tổng Quan Quy Trình
 
 ```
-[App khởi động] → [Check version.json] → [So sánh version]
-                                              ↓
-                          [Có bản mới] → [Tải .msix] → [Cài đặt] → [Tắt app]
+[App khởi động] → [Check GitHub Releases API] → [So sánh version]
+                                                      ↓
+                              [Có bản mới] → [Tải Setup.exe] → [Cài đặt] → [Restart app]
 ```
 
-## 1. Cấu Trúc Server
+## 1. Cách Hoạt Động
 
-Bạn cần host 2 file trên server (GitHub Releases, AWS S3, hoặc web hosting):
+App sử dụng **GitHub Releases API** để kiểm tra và tải bản cập nhật:
 
-### a) `version.json` - File kiểm tra version
-```json
-{
-  "version": "1.0.1",
-  "build_number": 2,
-  "download_url": "https://your-server.com/updates/can_heo_1.0.1.msix",
-  "release_notes": "- Cải thiện giao diện\n- Sửa lỗi",
-  "file_size": 52428800,
-  "release_date": "2024-12-22",
-  "force_update": false
-}
-```
-
-### b) `can_heo_x.x.x.msix` - File cài đặt
+1. Gọi API: `https://api.github.com/repos/tranminhieu10/can_heo/releases/latest`
+2. So sánh version trong tag_name với version hiện tại
+3. Nếu có bản mới → Tìm file `.exe` trong assets
+4. Tải file installer và chạy với `/SILENT`
 
 ---
 
-## 2. Build MSIX cho Windows
+## 2. Tạo Release Mới
 
-### Bước 1: Cấu hình pubspec.yaml
+### Bước 1: Cập nhật version trong code
 
-Đảm bảo có config msix:
+**File `lib/core/services/update_service.dart`:**
+```dart
+static const String currentVersion = '1.0.1';  // Tăng version
+```
+
+**File `pubspec.yaml`:**
 ```yaml
-msix_config:
-  display_name: Cân Heo
-  publisher_display_name: Your Company
-  identity_name: com.yourcompany.canheo
-  msix_version: 1.0.1.0
-  logo_path: assets/icon.png
-  capabilities: internetClient
+version: 1.0.1+2  # format: major.minor.patch+build
 ```
 
-### Bước 2: Build MSIX
+### Bước 2: Build Release
 
 ```powershell
-# Build release
+cd can_heo
+flutter clean
+flutter pub get
 flutter build windows --release
-
-# Tạo MSIX
-dart run msix:create
 ```
 
-File MSIX sẽ được tạo tại:
-```
-build\windows\x64\runner\Release\can_heo.msix
-```
+### Bước 3: Build Installer (Inno Setup)
 
-### Bước 3: Đổi tên file theo version
 ```powershell
-# Đổi tên: can_heo_1.0.1.msix
-Rename-Item "build\windows\x64\runner\Release\can_heo.msix" "can_heo_1.0.1.msix"
+# Compile Inno Setup
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer\can_heo_setup.iss"
 ```
 
----
+File installer: `installer\Output\CanHeo_Setup_1.0.1.exe`
 
-## 3. Upload lên Server
+### Bước 4: Tạo GitHub Release
 
-### Option A: GitHub Releases (Miễn phí)
-
-1. Tạo Release mới trên GitHub
-2. Upload file `can_heo_1.0.1.msix`
-3. Copy URL download (dạng: `https://github.com/user/repo/releases/download/v1.0.1/can_heo_1.0.1.msix`)
-4. Tạo `version.json` trong repo hoặc GitHub Pages
-
-### Option B: AWS S3 / Google Cloud Storage
-
-1. Tạo bucket public
-2. Upload `version.json` và `can_heo_1.0.1.msix`
-3. Lấy public URL
-
-### Option C: Web Hosting thông thường
-
-Upload 2 file vào folder `/updates/` trên hosting
+1. Vào GitHub repo → **Releases** → **Draft a new release**
+2. **Tag**: `v1.0.1` (phải có prefix `v`)
+3. **Title**: `Version 1.0.1`
+4. **Description**: Ghi nội dung cập nhật
+5. **Upload file**: `CanHeo_Setup_1.0.1.exe`
+6. **Publish release**
 
 ---
 
-## 4. Cấu Hình App
+## 3. Quy Tắc Đặt Tên
 
-### Cập nhật URL trong UpdateService
+| Item | Format | Ví dụ |
+|------|--------|-------|
+| Tag | `v{major}.{minor}.{patch}` | `v1.0.1` |
+| Installer | `CanHeo_Setup_{version}.exe` | `CanHeo_Setup_1.0.1.exe` |
+| pubspec.yaml | `{version}+{build}` | `1.0.1+2` |
 
-File: `lib/core/services/update_service.dart`
+---
+
+## 4. Sử Dụng Trong App
+
+### Kiểm tra cập nhật thủ công (Settings)
 
 ```dart
-/// URL tới file version.json trên server
-static const String versionUrl = 'https://your-server.com/updates/version.json';
+import 'presentation/features/settings/update_dialog.dart';
 
-/// Version hiện tại (phải khớp với pubspec.yaml)
-static const String currentVersion = '1.0.0';
-static const int currentBuildNumber = 1;
+// Hiển thị dialog kiểm tra cập nhật
+ElevatedButton(
+  onPressed: () => UpdateDialog.show(context),
+  child: Text('Kiểm tra cập nhật'),
+)
 ```
 
----
+### Kiểm tra tự động khi khởi động
 
-## 5. Quy Trình Phát Hành Bản Mới
-
-### Checklist mỗi lần release:
-
-1. ☐ Cập nhật `version` trong `pubspec.yaml`
-2. ☐ Cập nhật `currentVersion` và `currentBuildNumber` trong `update_service.dart`
-3. ☐ Build MSIX: `dart run msix:create`
-4. ☐ Đổi tên file theo version: `can_heo_x.x.x.msix`
-5. ☐ Upload file MSIX lên server
-6. ☐ Cập nhật `version.json` trên server:
-   - `version`: version mới
-   - `build_number`: tăng lên
-   - `download_url`: URL file MSIX mới
-   - `release_notes`: mô tả thay đổi
-   - `file_size`: kích thước file MSIX (bytes)
-   - `release_date`: ngày phát hành
-
----
-
-## 6. Cách Khách Hàng Cập Nhật
-
-### Tự động:
-1. Vào **Cài đặt** → **Kiểm tra cập nhật**
-2. Nếu có bản mới, nhấn **Cập nhật ngay**
-3. Đợi tải xong → App tự động đóng và cài đặt
-
-### Thủ công (nếu tự động không hoạt động):
-1. Tải file `.msix` từ link
-2. Double-click để cài đặt
-3. Nhấn **Install** / **Update**
-
----
-
-## 7. Ví Dụ GitHub Releases
-
-### Cấu trúc version.json cho GitHub:
-```json
-{
-  "version": "1.0.1",
-  "build_number": 2,
-  "download_url": "https://github.com/tranminhieu10/can_heo/releases/download/v1.0.1/can_heo_1.0.1.msix",
-  "release_notes": "Bản cập nhật 1.0.1:\n- Cải thiện responsive\n- Thêm đăng nhập\n- Sửa lỗi tồn kho",
-  "file_size": 52428800,
-  "release_date": "2024-12-22",
-  "force_update": false
+```dart
+// Trong initState của màn hình chính
+@override
+void initState() {
+  super.initState();
+  // Kiểm tra cập nhật sau 3 giây
+  Future.delayed(Duration(seconds: 3), () {
+    UpdateDialog.checkOnStartup(context);
+  });
 }
 ```
 
-### Host version.json trên GitHub Pages:
-1. Tạo branch `gh-pages`
-2. Đặt `version.json` ở root
-3. URL: `https://tranminhieu10.github.io/can_heo/version.json`
-
 ---
 
-## 8. Troubleshooting
+## 5. Force Update
 
-### Lỗi "App package signature validation failed"
-- MSIX chưa được sign. Cần certificate hoặc dùng sideloading
+Để bắt buộc người dùng cập nhật, thêm `[force]` vào Release notes:
 
-### Lỗi "File in use"
-- App cần tắt trước khi cài. Code đã xử lý bằng `exit(0)`
-
-### Không tải được file
-- Kiểm tra URL trong version.json
-- Đảm bảo file MSIX đã public
-- Kiểm tra kết nối internet
-
----
-
-## 9. Script Tự Động Build & Upload
-
-Tạo file `release.ps1`:
-
-```powershell
-param (
-    [string]$Version = "1.0.0"
-)
-
-Write-Host "🚀 Building version $Version..."
-
-# Build Flutter
-flutter build windows --release
-
-# Create MSIX
-dart run msix:create
-
-# Rename
-$msixPath = "build\windows\x64\runner\Release\can_heo.msix"
-$newName = "can_heo_$Version.msix"
-Copy-Item $msixPath $newName
-
-Write-Host "✅ Build complete: $newName"
-Write-Host "📤 Upload file này lên server và cập nhật version.json"
+```
+[force] Bản cập nhật bảo mật quan trọng!
+- Sửa lỗi bảo mật
+- Cải thiện hiệu năng
 ```
 
-Chạy: `.\release.ps1 -Version "1.0.1"`
+---
+
+## 6. Cấu Hình Repository
+
+Thay đổi thông tin repo trong `update_service.dart`:
+
+```dart
+static const String githubOwner = 'tranminhieu10';  // Username GitHub
+static const String githubRepo = 'can_heo';          // Tên repo
+```
+
+---
+
+## 7. Quy Trình Phát Hành Version Mới (Checklist)
+
+```
+□ 1. Sửa code, test kỹ
+□ 2. Tăng version trong:
+     - pubspec.yaml
+     - update_service.dart (currentVersion)
+     - can_heo_setup.iss (MyAppVersion)
+□ 3. flutter build windows --release
+□ 4. Build Inno Setup installer
+□ 5. Tạo GitHub Release:
+     - Tag: vX.X.X
+     - Upload: CanHeo_Setup_X.X.X.exe
+□ 6. Publish release
+□ 7. Test cập nhật từ app cũ
+```
+
+---
+
+## 8. Cập Nhật Version trong Inno Setup
+
+Mở file `installer/can_heo_setup.iss`:
+
+```iss
+#define MyAppVersion "1.0.1"  ; Thay đổi version ở đây
+```
+
+---
+
+## 9. Lưu Ý Quan Trọng
+
+- ⚠️ **Tag phải có prefix `v`**: `v1.0.0`, `v1.0.1`...
+- ⚠️ **File installer phải chứa "Setup" và đuôi ".exe"**
+- ⚠️ **GitHub API có rate limit**: 60 requests/hour (không auth)
+- ⚠️ **Version trong code phải khớp với tag** (không có prefix `v`)
+
+---
+
+## 10. Troubleshooting
+
+### Không tìm thấy bản cập nhật
+- Kiểm tra tag có đúng format `vX.X.X` không
+- Kiểm tra file upload có chứa "Setup" và đuôi ".exe" không
+- Kiểm tra version trong code có thấp hơn tag không
+
+### Lỗi tải file
+- Kiểm tra kết nối mạng
+- Kiểm tra GitHub API rate limit
+- File có thể quá lớn, thử compress installer
+
+### Lỗi cài đặt
+- Chạy installer với quyền Admin
+- Kiểm tra antivirus có chặn không
+- Đóng app trước khi cài đặt

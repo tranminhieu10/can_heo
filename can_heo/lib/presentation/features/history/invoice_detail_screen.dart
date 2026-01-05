@@ -57,6 +57,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       }
     }
     
+    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -168,9 +169,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                   icon: const Icon(Icons.print),
                   label: const Text('IN PHIẾU'),
                   onPressed: () {
-                    if (invoice != null) {
-                      PrintingService.printInvoice(invoice);
-                    }
+                    PrintingService.printInvoice(invoice!);
                   },
                 )
               : null,

@@ -9,6 +9,7 @@ import 'data/repositories/pigtype_repository_impl.dart';
 import 'data/repositories/farm_repository_impl.dart';
 import 'data/repositories/cage_repository_impl.dart';
 import 'data/repositories/user_repository_impl.dart';
+import 'data/repositories/supply_repository_impl.dart';
 
 import 'domain/repositories/i_invoice_repository.dart';
 import 'domain/repositories/i_partner_repository.dart';
@@ -17,6 +18,7 @@ import 'domain/repositories/i_pigtype_repository.dart';
 import 'domain/repositories/i_farm_repository.dart';
 import 'domain/repositories/i_cage_repository.dart';
 import 'domain/repositories/i_user_repository.dart';
+import 'domain/repositories/i_supply_repository.dart';
 
 import 'presentation/features/weighing/bloc/weighing_bloc.dart';
 import 'presentation/features/history/bloc/invoice_history_bloc.dart';
@@ -67,6 +69,10 @@ Future<void> init() async {
 
   sl.registerLazySingleton<IUserRepository>(
     () => UserRepositoryImpl(sl<AppDatabase>()),
+  );
+
+  sl.registerLazySingleton<ISupplyRepository>(
+    () => SupplyRepositoryImpl(sl<AppDatabase>()),
   );
 
   // Blocs / Cubits

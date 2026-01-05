@@ -96,11 +96,6 @@ class _MarketImportViewState extends State<_MarketImportView> {
   // Track which search columns are visible
   final Set<String> _activeSearchColumns = {};
 
-  // Panel ratio for resizable layout (default 1/3 for form)
-  final double _panelRatio = 0.33;
-  static const double _minPanelRatio = 0.2;
-  static const double _maxPanelRatio = 0.5;
-
   // Payment
   int _selectedPaymentMethod =
       0; // 0 = Tiền mặt, 1 = Chuyển khoản, 2 = Nợ, 3 = Trả nợ
@@ -127,9 +122,22 @@ class _MarketImportViewState extends State<_MarketImportView> {
   final TextEditingController _dailyRejectNoteController =
       TextEditingController(); // Ghi chú thải loại
 
+  // Cached streams để tránh tạo mới mỗi lần build
+  late final Stream<List<List<InvoiceEntity>>> _inventoryStream;
+  
   @override
   void initState() {
     super.initState();
+    
+    // Cache inventory stream
+    _inventoryStream = Rx.combineLatest4(
+      _invoiceRepo.watchInvoices(type: 3), // Nhập chợ từ NCC (+)
+      _invoiceRepo.watchInvoices(type: 1), // Xuất kho ra chợ (+)
+      _invoiceRepo.watchInvoices(type: 2), // Xuất chợ bán (-)
+      _invoiceRepo.watchInvoices(type: 0), // Nhập kho hàng thừa (-)
+      (a, b, c, d) => [a, b, c, d],
+    ).shareReplay(maxSize: 1);
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _scaleInputFocus.requestFocus();
     });
@@ -173,14 +181,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
   double get _netWeight => _marketWeight; // TL Chợ is the net weight
   double get _pricePerKg =>
       double.tryParse(_priceController.text.replaceAll(',', '')) ?? 0;
-  double get _subtotal => _marketWeight * _pricePerKg;
-  double get _transportFee =>
-      double.tryParse(_transportFeeController.text.replaceAll(',', '')) ?? 0;
-  double get _totalImport => _subtotal + _transportFee;
-  double get _paymentAmount =>
-      double.tryParse(_paymentAmountController.text.replaceAll(',', '')) ?? 0;
-  double get _debtAmount =>
-      (_totalImport - _paymentAmount).clamp(0, double.infinity);
+  // Thành tiền = Đơn giá × TL Trại (thay vì TL Chợ)
+  double get _subtotal => _farmWeight * _pricePerKg;
   double get _autoDiscount => _subtotal - (_subtotal / 1000).floor() * 1000;
   double get _discount => _manualDiscount > 0 ? _manualDiscount : _autoDiscount;
   double get _totalAmount => (_subtotal - _discount).clamp(0, double.infinity);
@@ -341,7 +343,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
             ),
             const SizedBox(height: 12),
 
-            // Scale display - Direct input
+            // Scale display - Direct input for TL Trại (auto-fill TL Chợ)
             GestureDetector(
               onTap: () => _scaleInputFocus.requestFocus(),
               child: Container(
@@ -354,7 +356,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                 child: Center(
                   child: IntrinsicWidth(
                     child: TextField(
-                      controller: _scaleInputController,
+                      controller: _farmWeightController,
                       focusNode: _scaleInputFocus,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
@@ -399,7 +401,11 @@ class _MarketImportViewState extends State<_MarketImportView> {
                         FilteringTextInputFormatter.allow(
                             RegExp(r'^\d*\.?\d*')),
                       ],
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (value) {
+                        // Auto-fill TL Chợ bằng TL Trại
+                        _scaleInputController.text = value;
+                        setState(() {});
+                      },
                     ),
                   ),
                 ),
@@ -413,6 +419,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
+                      _farmWeightController.clear();
                       _scaleInputController.clear();
                       setState(() {});
                       _scaleInputFocus.requestFocus();
@@ -511,7 +518,6 @@ class _MarketImportViewState extends State<_MarketImportView> {
   Widget _buildInvoiceDetailsSection(BuildContext context) {
     final fontSize = Responsive.bodyFontSize;
     final spacing = Responsive.spacing;
-    const fieldHeight = 40.0;
 
     return Card(
       child: Padding(
@@ -586,22 +592,28 @@ class _MarketImportViewState extends State<_MarketImportView> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  // Row 3: TL Trại + TL Chợ + Chênh lệch
+                  // Row 3: TL Trại + TL Chợ + Chênh lệch (Tổng | Mỗi con)
                   _buildRowLabels(
-                      ['TL Trại (kg)', 'TL Chợ (kg)', 'Chênh lệch (kg)'],
+                      ['TL Trại (kg)', 'TL Chợ (kg)', 'C.Lệch (Tổng | /con)'],
                       fontSize),
                   Expanded(
                     child: Row(
                       children: [
+                        // TL Trại - khi thay đổi sẽ auto-fill TL Chợ
                         Expanded(
                           child: _buildCompactTextField(
                             controller: _farmWeightController,
                             fontSize: fontSize,
                             keyboardType: TextInputType.number,
-                            onChanged: (_) => setState(() {}),
+                            onChanged: (value) {
+                              // Auto-fill TL Chợ bằng TL Trại
+                              _scaleInputController.text = value;
+                              setState(() {});
+                            },
                           ),
                         ),
                         const SizedBox(width: 4),
+                        // TL Chợ - có thể click để sửa (mặc định = TL Trại)
                         Expanded(
                           child: _buildCompactTextField(
                             controller: _scaleInputController,
@@ -612,12 +624,12 @@ class _MarketImportViewState extends State<_MarketImportView> {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        // Hao (read-only calculated: TL Trại - TL Chợ)
+                        // Chênh lệch (chia đôi: Tổng | Mỗi con)
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 10),
-                            alignment: Alignment.centerLeft,
+                            height: 38,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: _haoWeight > 0
                                   ? Colors.red.shade50
@@ -628,15 +640,51 @@ class _MarketImportViewState extends State<_MarketImportView> {
                                       ? Colors.red.shade300
                                       : Colors.grey.shade300),
                             ),
-                            child: Text(
-                              _numberFormat.format(_haoWeight),
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: _haoWeight > 0
-                                    ? Colors.red.shade700
-                                    : Colors.grey.shade600,
-                              ),
+                            child: Row(
+                              children: [
+                                // Phần 1: Tổng chênh lệch
+                                Expanded(
+                                  child: Text(
+                                    _numberFormat.format(_haoWeight),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: _haoWeight > 0
+                                          ? Colors.red.shade700
+                                          : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ),
+                                // Dấu phân cách - rõ hơn
+                                Container(
+                                  width: 2,
+                                  height: 24,
+                                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                                  decoration: BoxDecoration(
+                                    color: _haoWeight > 0
+                                        ? Colors.red.shade400
+                                        : Colors.grey.shade500,
+                                    borderRadius: BorderRadius.circular(1),
+                                  ),
+                                ),
+                                // Phần 2: Chênh lệch mỗi con
+                                Expanded(
+                                  child: Text(
+                                    (int.tryParse(_quantityController.text) ?? 1) > 0
+                                        ? (_haoWeight / (int.tryParse(_quantityController.text) ?? 1)).toStringAsFixed(2)
+                                        : '0',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: _haoWeight > 0
+                                          ? Colors.orange.shade700
+                                          : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -660,8 +708,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
                           child: GestureDetector(
                             onTap: _handleDiscountClick,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 10),
+                              height: 38,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
                               decoration: BoxDecoration(
                                 color: Colors.orange.shade50,
                                 borderRadius: BorderRadius.circular(6),
@@ -671,6 +719,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                                 ),
                               ),
                               child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   Expanded(
                                     child: Text(
@@ -790,17 +839,20 @@ class _MarketImportViewState extends State<_MarketImportView> {
     TextInputType keyboardType = TextInputType.text,
     Function(String)? onChanged,
   }) {
-    return TextField(
-      controller: controller,
-      focusNode: focusNode,
-      keyboardType: keyboardType,
-      style: const TextStyle(fontSize: 13),
-      decoration: InputDecoration(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+    return SizedBox(
+      height: 38,
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        keyboardType: keyboardType,
+        style: const TextStyle(fontSize: 13),
+        decoration: InputDecoration(
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        ),
+        onChanged: onChanged,
       ),
-      onChanged: onChanged,
     );
   }
 
@@ -822,49 +874,51 @@ class _MarketImportViewState extends State<_MarketImportView> {
         // Sắp xếp theo thứ tự giảm dần (mới nhất trước)
         final batchList = batchSet.toList()..sort((a, b) => b.compareTo(a));
 
-        return Autocomplete<String>(
-          optionsBuilder: (textEditingValue) {
-            if (textEditingValue.text.isEmpty) {
-              return batchList.take(10); // Hiển thị 10 lô gần nhất
-            }
-            // Lọc theo text nhập vào
-            return batchList.where((batch) {
-              return batch.toLowerCase().contains(
-                  textEditingValue.text.toLowerCase());
-            }).take(10);
-          },
-          onSelected: (batch) {
-            setState(() {
-              _batchNumberController.text = batch;
-            });
-          },
-          fieldViewBuilder:
-              (context, textController, focusNode, onFieldSubmitted) {
-            // Sync với _batchNumberController
-            if (_batchNumberController.text.isNotEmpty &&
-                textController.text != _batchNumberController.text) {
-              textController.text = _batchNumberController.text;
-            }
-            return TextField(
-              controller: textController,
-              focusNode: focusNode,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                hintText: 'Nhập hoặc chọn lô',
-                hintStyle: TextStyle(fontSize: 11, color: Colors.grey.shade400),
-                suffixIcon: batchList.isNotEmpty
-                    ? Icon(Icons.arrow_drop_down, size: 18, color: Colors.grey.shade600)
-                    : null,
-              ),
-              onChanged: (value) {
-                _batchNumberController.text = value;
-                setState(() {});
-              },
-            );
-          },
+        return SizedBox(
+          height: 38,
+          child: Autocomplete<String>(
+            optionsBuilder: (textEditingValue) {
+              if (textEditingValue.text.isEmpty) {
+                return batchList.take(10); // Hiển thị 10 lô gần nhất
+              }
+              // Lọc theo text nhập vào
+              return batchList.where((batch) {
+                return batch.toLowerCase().contains(
+                    textEditingValue.text.toLowerCase());
+              }).take(10);
+            },
+            onSelected: (batch) {
+              setState(() {
+                _batchNumberController.text = batch;
+              });
+            },
+            fieldViewBuilder:
+                (context, textController, focusNode, onFieldSubmitted) {
+              // Sync với _batchNumberController
+              if (_batchNumberController.text.isNotEmpty &&
+                  textController.text != _batchNumberController.text) {
+                textController.text = _batchNumberController.text;
+              }
+              return TextField(
+                controller: textController,
+                focusNode: focusNode,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  hintText: 'Nhập hoặc chọn lô',
+                  hintStyle: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                  suffixIcon: batchList.isNotEmpty
+                      ? Icon(Icons.arrow_drop_down, size: 18, color: Colors.grey.shade600)
+                      : null,
+                ),
+                onChanged: (value) {
+                  _batchNumberController.text = value;
+                  setState(() {});
+                },
+              );
+            },
           optionsViewBuilder: (context, onSelected, options) {
             return Align(
               alignment: Alignment.topLeft,
@@ -904,7 +958,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
                 ),
               ),
             );
-          },
+            },
+          ),
         );
       },
     );
@@ -924,56 +979,56 @@ class _MarketImportViewState extends State<_MarketImportView> {
         }
         final priceList = priceSet.toList()..sort((a, b) => b.compareTo(a));
 
-        return Autocomplete<double>(
-          displayStringForOption: (price) =>
-              NumberFormat('#,###').format(price),
-          optionsBuilder: (textEditingValue) {
-            if (textEditingValue.text.isEmpty) {
-              return priceList.take(10); // Hiển thị 10 giá gần nhất
-            }
-            final inputValue =
-                double.tryParse(textEditingValue.text.replaceAll(',', '')) ?? 0;
-            // Lọc các giá gần với giá trị nhập vào
-            return priceList.where((price) {
-              return price.toString().contains(textEditingValue.text) ||
-                  NumberFormat('#,###')
-                      .format(price)
-                      .contains(textEditingValue.text);
-            }).take(10);
-          },
-          onSelected: (price) {
-            setState(() {
-              _priceController.text = price.toStringAsFixed(0);
-            });
-          },
-          fieldViewBuilder:
-              (context, textController, focusNode, onFieldSubmitted) {
-            // Sync với _priceController
-            if (_priceController.text.isNotEmpty &&
-                textController.text != _priceController.text) {
-              textController.text = _priceController.text;
-            }
-            return TextField(
-              controller: textController,
-              focusNode: focusNode,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                suffixIcon: priceList.isNotEmpty
-                    ? const Icon(Icons.arrow_drop_down, size: 18)
-                    : null,
-              ),
-              onChanged: (value) {
-                _priceController.text = value;
-                setState(() {});
-              },
-            );
-          },
+        return SizedBox(
+          height: 38,
+          child: Autocomplete<double>(
+            displayStringForOption: (price) =>
+                NumberFormat('#,###').format(price),
+            optionsBuilder: (textEditingValue) {
+              if (textEditingValue.text.isEmpty) {
+                return priceList.take(10); // Hiển thị 10 giá gần nhất
+              }
+              // Lọc các giá gần với giá trị nhập vào
+              return priceList.where((price) {
+                return price.toString().contains(textEditingValue.text) ||
+                    NumberFormat('#,###')
+                        .format(price)
+                        .contains(textEditingValue.text);
+              }).take(10);
+            },
+            onSelected: (price) {
+              setState(() {
+                _priceController.text = price.toStringAsFixed(0);
+              });
+            },
+            fieldViewBuilder:
+                (context, textController, focusNode, onFieldSubmitted) {
+              // Sync với _priceController
+              if (_priceController.text.isNotEmpty &&
+                  textController.text != _priceController.text) {
+                textController.text = _priceController.text;
+              }
+              return TextField(
+                controller: textController,
+                focusNode: focusNode,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  border:
+                      OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  suffixIcon: priceList.isNotEmpty
+                      ? const Icon(Icons.arrow_drop_down, size: 18)
+                      : null,
+                ),
+                onChanged: (value) {
+                  _priceController.text = value;
+                  setState(() {});
+                },
+              );
+            },
           optionsViewBuilder: (context, onSelected, options) {
             return Align(
               alignment: Alignment.topLeft,
@@ -1008,7 +1063,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
                 ),
               ),
             );
-          },
+            },
+          ),
         );
       },
     );
@@ -1017,7 +1073,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
   Widget _buildFarmDropdown({required double fontSize}) {
     if (_selectedPartner == null) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey.shade400),
@@ -1038,7 +1095,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
         if (farms.isEmpty) {
           return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             alignment: Alignment.centerLeft,
             decoration: BoxDecoration(
               border: Border.all(color: Colors.orange.shade400),
@@ -1052,29 +1110,32 @@ class _MarketImportViewState extends State<_MarketImportView> {
           );
         }
 
-        return DropdownButtonFormField<FarmEntity>(
-          initialValue: _selectedFarm,
-          isExpanded: true,
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.home_work, size: 18),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-            isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        return SizedBox(
+          height: 38,
+          child: DropdownButtonFormField<FarmEntity>(
+            initialValue: _selectedFarm,
+            isExpanded: true,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.home_work, size: 18),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            ),
+            style: const TextStyle(fontSize: 13, color: Colors.black),
+            hint: const Text('Chọn trại', style: TextStyle(fontSize: 13)),
+            items: farms.map((farm) {
+              return DropdownMenuItem<FarmEntity>(
+                value: farm,
+                child: Text(farm.name, style: const TextStyle(fontSize: 13)),
+              );
+            }).toList(),
+            onChanged: (farm) {
+              setState(() {
+                _selectedFarm = farm;
+              });
+            },
           ),
-          style: const TextStyle(fontSize: 13, color: Colors.black),
-          hint: const Text('Chọn trại', style: TextStyle(fontSize: 13)),
-          items: farms.map((farm) {
-            return DropdownMenuItem<FarmEntity>(
-              value: farm,
-              child: Text(farm.name, style: const TextStyle(fontSize: 13)),
-            );
-          }).toList(),
-          onChanged: (farm) {
-            setState(() {
-              _selectedFarm = farm;
-            });
-          },
         );
       },
     );
@@ -1084,16 +1145,18 @@ class _MarketImportViewState extends State<_MarketImportView> {
     return BlocBuilder<PartnerBloc, PartnerState>(
       builder: (context, state) {
         final partners = state.partners;
-        return DropdownButtonFormField<PartnerEntity>(
-          initialValue: _selectedPartner,
-          isExpanded: true,
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.person, size: 18),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-            isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          ),
+        return SizedBox(
+          height: 38,
+          child: DropdownButtonFormField<PartnerEntity>(
+            initialValue: _selectedPartner,
+            isExpanded: true,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.person, size: 18),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            ),
           style: const TextStyle(fontSize: 13, color: Colors.black),
           hint: const Text('Chọn NCC', style: TextStyle(fontSize: 13)),
           items: partners.map((partner) {
@@ -1108,6 +1171,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
               _selectedFarm = null; // Reset farm khi đổi NCC
             });
           },
+          ),
         );
       },
     );
@@ -1118,40 +1182,43 @@ class _MarketImportViewState extends State<_MarketImportView> {
       stream: sl<IPigTypeRepository>().watchPigTypes(),
       builder: (context, snapshot) {
         final pigTypes = snapshot.data ?? [];
-        return Autocomplete<PigTypeEntity>(
-          displayStringForOption: (p) => p.name,
-          optionsBuilder: (textEditingValue) {
-            if (textEditingValue.text.isEmpty) return pigTypes;
-            return pigTypes.where((p) => p.name
-                .toLowerCase()
-                .contains(textEditingValue.text.toLowerCase()));
-          },
-          onSelected: (pigType) {
-            setState(() {
-              _pigTypeController.text = pigType.name;
-            });
-          },
-          fieldViewBuilder:
-              (context, textController, focusNode, onFieldSubmitted) {
-            return TextField(
-              controller: textController,
-              focusNode: focusNode,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.pets, size: 18),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _pigTypeController.text = value;
-                });
-              },
-            );
-          },
+        return SizedBox(
+          height: 38,
+          child: Autocomplete<PigTypeEntity>(
+            displayStringForOption: (p) => p.name,
+            optionsBuilder: (textEditingValue) {
+              if (textEditingValue.text.isEmpty) return pigTypes;
+              return pigTypes.where((p) => p.name
+                  .toLowerCase()
+                  .contains(textEditingValue.text.toLowerCase()));
+            },
+            onSelected: (pigType) {
+              setState(() {
+                _pigTypeController.text = pigType.name;
+              });
+            },
+            fieldViewBuilder:
+                (context, textController, focusNode, onFieldSubmitted) {
+              return TextField(
+                controller: textController,
+                focusNode: focusNode,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.pets, size: 18),
+                  border:
+                      OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _pigTypeController.text = value;
+                  });
+                },
+              );
+            },
+          ),
         );
       },
     );
@@ -1164,13 +1231,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
       return _buildInventoryContainer(0);
     }
     return StreamBuilder<List<List<InvoiceEntity>>>(
-      stream: Rx.combineLatest4(
-        _invoiceRepo.watchInvoices(type: 3), // Nhập chợ từ NCC (+)
-        _invoiceRepo.watchInvoices(type: 1), // Xuất kho ra chợ (+)
-        _invoiceRepo.watchInvoices(type: 2), // Xuất chợ bán (-)
-        _invoiceRepo.watchInvoices(type: 0), // Nhập kho hàng thừa (-)
-        (a, b, c, d) => [a, b, c, d],
-      ),
+      stream: _inventoryStream, // Sử dụng cached stream
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting ||
             !snapshot.hasData) {
@@ -1230,7 +1291,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
   Widget _buildInventoryContainer(int qty) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: qty > 0 ? Colors.green.shade50 : Colors.grey.shade100,
         border: Border.all(
@@ -1483,9 +1545,9 @@ class _MarketImportViewState extends State<_MarketImportView> {
               }
 
               // Lấy thông tin từ invoice theo cách lưu mới:
-              // - totalWeight = TL Chợ
-              // - deduction = TL Trại (lưu trong truckCost DB)
-              // - discount = Cước xe
+              // - totalWeight = TL Trại (dùng để tính thành tiền)
+              // - deduction = TL Chợ (lưu để so sánh)
+              // - discount = Chiết khấu
               // - details[0].pigType = Loại heo
               // - details[0].batchNumber = Lô
               String farmName = '-';
@@ -1498,13 +1560,12 @@ class _MarketImportViewState extends State<_MarketImportView> {
                 batchNumber = inv.details.first.batchNumber ?? '-';
               }
 
-              double farmWeight =
-                  inv.deduction; // TL Trại (lưu trong deduction/truckCost)
-              double marketWeight = inv.totalWeight; // TL Chợ
+              double farmWeight = inv.totalWeight; // TL Trại
+              double marketWeight = inv.deduction; // TL Chợ
               double hao = (farmWeight - marketWeight)
                   .clamp(0, double.infinity); // Hao = TL Trại - TL Chợ
-              double subtotal = marketWeight *
-                  inv.pricePerKg; // Thành tiền = TL Chợ × Đơn giá
+              double subtotal = farmWeight *
+                  inv.pricePerKg; // Thành tiền = TL Trại × Đơn giá
               double discount = inv.discount; // Chiết khấu (số tiền giảm)
               double totalAmount =
                   subtotal - discount; // Tổng tiền = Thành tiền - Chiết khấu
@@ -1702,8 +1763,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
     for (final inv in batchInvoices) {
       totalQuantity += inv.totalQuantity;
-      totalWeight += inv.totalWeight; // TL Chợ
-      final subtotal = inv.totalWeight * inv.pricePerKg; // Thành tiền
+      totalWeight += inv.totalWeight; // TL Trại (dùng để tính thành tiền)
+      final subtotal = inv.totalWeight * inv.pricePerKg; // Thành tiền = TL Trại × Đơn giá
       final discount = inv.discount; // Chiết khấu
       invoiceTotal += subtotal - discount; // Tổng phiếu = Thành tiền - Chiết khấu
       // Lấy tên NCC từ invoice đầu tiên
@@ -1756,7 +1817,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child:
@@ -1882,8 +1943,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
         color: isAddition 
-            ? Colors.green.withOpacity(0.15) 
-            : Colors.red.withOpacity(0.15),
+            ? Colors.green.withValues(alpha: 0.15) 
+            : Colors.red.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: isAddition ? Colors.green.shade300 : Colors.red.shade300,
@@ -1893,55 +1954,111 @@ class _MarketImportViewState extends State<_MarketImportView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Row chính: Icon + Label + Số tiền (chiếm nhiều không gian hơn)
+          InkWell(
+            onTap: () {
+              // Focus vào ô số tiền khi tap vào row
+              FocusScope.of(context).requestFocus(FocusNode());
+              Future.delayed(const Duration(milliseconds: 50), () {
+                controller.selection = TextSelection(
+                  baseOffset: 0,
+                  extentOffset: controller.text.length,
+                );
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(icon, color: Colors.white70, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${isAddition ? '+' : '-'} $label:',
+                    style: TextStyle(
+                      color: isAddition ? Colors.green.shade100 : Colors.red.shade100,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: TextField(
+                        controller: controller,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.right,
+                        cursorColor: Colors.white,
+                        cursorWidth: 2,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                          hintText: '0',
+                          hintStyle: TextStyle(color: Colors.white38),
+                        ),
+                        onTap: () {
+                          // Select all khi tap vào để dễ nhập đè
+                          if (controller.text == '0' || controller.text.isEmpty) {
+                            controller.selection = TextSelection(
+                              baseOffset: 0,
+                              extentOffset: controller.text.length,
+                            );
+                          }
+                        },
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Dấu phân cách giữa số tiền và ghi chú
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            height: 2,
+            decoration: BoxDecoration(
+              color: Colors.white54,
+              borderRadius: BorderRadius.circular(1),
+            ),
+          ),
+          // Row ghi chú: nhỏ hơn, màu nhạt hơn
           Row(
             children: [
-              Icon(icon, color: Colors.white70, size: 14),
-              const SizedBox(width: 4),
-              Text(
-                '${isAddition ? '+' : '-'} $label:',
-                style: TextStyle(
-                  color: isAddition ? Colors.green.shade100 : Colors.red.shade100,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              Icon(Icons.notes, size: 10, color: Colors.white30),
               const SizedBox(width: 4),
               Expanded(
                 child: TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
+                  controller: noteController,
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
+                    color: Colors.white54,
+                    fontSize: 9,
+                    fontStyle: FontStyle.italic,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
+                    hintText: noteHint,
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      fontSize: 9,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
-                  onChanged: (_) => setState(() {}),
                 ),
               ),
             ],
-          ),
-          // Note field
-          TextField(
-            controller: noteController,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 10,
-            ),
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-              hintText: noteHint,
-              hintStyle: TextStyle(
-                color: Colors.white.withOpacity(0.4),
-                fontSize: 10,
-              ),
-            ),
           ),
         ],
       ),
@@ -1958,8 +2075,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: isAddition 
-            ? Colors.green.withOpacity(0.15) 
-            : Colors.red.withOpacity(0.15),
+            ? Colors.green.withValues(alpha: 0.15) 
+            : Colors.red.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: isAddition ? Colors.green.shade300 : Colors.red.shade300,
@@ -1995,6 +2112,15 @@ class _MarketImportViewState extends State<_MarketImportView> {
                 hintText: '0',
                 hintStyle: TextStyle(color: Colors.white38),
               ),
+              onTap: () {
+                // Select all khi tap vào để dễ nhập đè
+                if (controller.text == '0' || controller.text.isEmpty) {
+                  controller.selection = TextSelection(
+                    baseOffset: 0,
+                    extentOffset: controller.text.length,
+                  );
+                }
+              },
               onChanged: (_) => setState(() {}),
             ),
           ),
@@ -2037,8 +2163,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
   Widget _buildInvoiceTotalsRow(List<InvoiceEntity> invoices, double fontSize) {
     // Tính theo cách lưu mới:
-    // - totalWeight = TL Chợ
-    // - deduction = TL Trại (lưu trong truckCost DB)
+    // - totalWeight = TL Trại (dùng để tính thành tiền)
+    // - deduction = TL Chợ (lưu để so sánh)
     // - discount = Chiết khấu
     double totalMarketWeight = 0;
     double totalFarmWeight = 0;
@@ -2049,10 +2175,10 @@ class _MarketImportViewState extends State<_MarketImportView> {
     int totalQuantity = 0;
 
     for (final inv in invoices) {
-      final marketWeight = inv.totalWeight; // TL Chợ
-      final farmWeight = inv.deduction; // TL Trại
+      final farmWeight = inv.totalWeight; // TL Trại
+      final marketWeight = inv.deduction; // TL Chợ
       final hao = (farmWeight - marketWeight).clamp(0.0, double.infinity);
-      final subtotal = marketWeight * inv.pricePerKg; // Thành tiền
+      final subtotal = farmWeight * inv.pricePerKg; // Thành tiền = TL Trại × Đơn giá
       final discount = inv.discount; // Chiết khấu
       final amount = subtotal - discount; // Tổng tiền = Thành tiền - Chiết khấu
 
@@ -2352,9 +2478,9 @@ class _MarketImportViewState extends State<_MarketImportView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2376,9 +2502,9 @@ class _MarketImportViewState extends State<_MarketImportView> {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.5), width: 1.5),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2580,11 +2706,11 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
     double totalDebt = 0;
     for (final inv in partnerInvoices) {
-      // Tính thành tiền = TL Chợ × Đơn giá + Cước xe
-      final marketWeight = inv.totalWeight;
-      final subtotal = marketWeight * inv.pricePerKg;
-      final transportFee = inv.discount;
-      totalDebt += subtotal + transportFee;
+      // Tính thành tiền = TL Trại × Đơn giá (inv.totalWeight = TL Trại)
+      final farmWeight = inv.totalWeight;
+      final subtotal = farmWeight * inv.pricePerKg;
+      final discount = inv.discount;
+      totalDebt += subtotal - discount;
     }
 
     // Get all payments (transactions) for this supplier
@@ -2606,6 +2732,9 @@ class _MarketImportViewState extends State<_MarketImportView> {
   }
 
   Future<void> _saveSupplierPayment(BuildContext context) async {
+    // Capture before async
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
     if (_selectedPartner == null) return;
 
     final partnerId = _selectedPartner!.id;
@@ -2621,7 +2750,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
     }
 
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(
             content: Text('❌ Vui lòng nhập số tiền'),
             backgroundColor: Colors.red),
@@ -2685,7 +2814,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text(
                 '✅ Đã ghi nhận: ${_currencyFormat.format(amount)} - $note'),
@@ -2695,7 +2824,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(content: Text('❌ Lỗi: $e'), backgroundColor: Colors.red),
         );
       }
@@ -2836,7 +2965,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 4, vertical: 1),
                               decoration: BoxDecoration(
-                                color: typeColor.withOpacity(0.1),
+                                color: typeColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(2),
                               ),
                               child: Text(
@@ -2906,7 +3035,8 @@ class _MarketImportViewState extends State<_MarketImportView> {
 
   // ==================== SAVE BUTTON ====================
   Widget _buildSaveButton(BuildContext context) {
-    final canSave = _marketWeight > 0;
+    // Kiểm tra TL Trại thay vì TL Chợ vì Thành tiền = Đơn giá × TL Trại
+    final canSave = _farmWeight > 0;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: ElevatedButton.icon(
@@ -3062,13 +3192,12 @@ class _MarketImportViewState extends State<_MarketImportView> {
                     '${NumberFormat('#,###').format(dailyTransportFee)} đ',
                     color: Colors.blue),
               ],
-              if (dailyReject > 0) ...[
-                _buildDialogRow(
-                  '- Thải loại${_dailyRejectNoteController.text.isNotEmpty ? ' (${_dailyRejectNoteController.text})' : ''}:',
-                  '${NumberFormat('#,###').format(dailyReject)} đ',
-                  color: Colors.red,
-                ),
-              ],
+              // Luôn hiển thị dòng Thải loại để người dùng thấy rõ
+              _buildDialogRow(
+                '- Thải loại${_dailyRejectNoteController.text.isNotEmpty ? ' (${_dailyRejectNoteController.text})' : ''}:',
+                '${NumberFormat('#,###').format(dailyReject)} đ',
+                color: Colors.red,
+              ),
               const Divider(height: 20),
               _buildDialogRow('TỔNG TIỀN:', 
                   '${NumberFormat('#,###').format(totalAmount)} đ',
@@ -3312,13 +3441,12 @@ class _MarketImportViewState extends State<_MarketImportView> {
                   color: Colors.blue,
                 ),
               ],
-              if (rejectAmount > 0) ...[
-                _buildDialogRow(
-                  '- Thải loại${rejectNote.isNotEmpty ? ' ($rejectNote)' : ''}:',
-                  '${NumberFormat('#,###').format(rejectAmount)} đ',
-                  color: Colors.red,
-                ),
-              ],
+              // Luôn hiển thị dòng Thải loại
+              _buildDialogRow(
+                '- Thải loại${rejectNote.isNotEmpty ? ' ($rejectNote)' : ''}:',
+                '${NumberFormat('#,###').format(rejectAmount)} đ',
+                color: Colors.red,
+              ),
               const Divider(height: 20),
               _buildDialogRow(
                 'TỔNG TIỀN TRẢ NCC:',
@@ -3458,11 +3586,12 @@ class _MarketImportViewState extends State<_MarketImportView> {
   }
 
   void _saveInvoice(BuildContext context) async {
-    if (_marketWeight <= 0) {
+    // Kiểm tra TL Trại thay vì TL Chợ vì Thành tiền = Đơn giá × TL Trại
+    if (_farmWeight <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content:
-              Text('⚠️ Vui lòng nhập trọng lượng chợ (TL Chợ) trước khi lưu!'),
+              Text('⚠️ Vui lòng nhập trọng lượng trại (TL Trại) trước khi lưu!'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -3493,20 +3622,20 @@ class _MarketImportViewState extends State<_MarketImportView> {
     final quantity = int.tryParse(_quantityController.text) ?? 1;
 
     // Create invoice với đầy đủ thông tin
-    // - totalWeight = TL Chợ (trọng lượng sau cân tại chợ)
-    // - deduction = TL Trại (trọng lượng gốc từ trại, lưu vào truckCost trong DB)
+    // - totalWeight = TL Trại (trọng lượng gốc từ trại - dùng để tính thành tiền)
+    // - deduction = TL Chợ (trọng lượng sau cân tại chợ)
     // - discount = Chiết khấu (số tiền giảm)
-    // - finalAmount = Tổng tiền (TL Chợ × Đơn giá - Chiết khấu)
+    // - finalAmount = Tổng tiền (TL Trại × Đơn giá - Chiết khấu)
     final invoice = InvoiceEntity(
       id: isEditing ? _editingInvoiceId! : DateTime.now().millisecondsSinceEpoch.toString(),
       invoiceCode: invoiceCode, // null khi sửa (giữ code cũ)
       type: 3, // Nhập chợ
       partnerId: _selectedPartner?.id,
       partnerName: _selectedPartner?.name,
-      totalWeight: _marketWeight, // TL Chợ
+      totalWeight: _farmWeight, // TL Trại (dùng để tính thành tiền)
       totalQuantity: quantity,
       pricePerKg: _pricePerKg, // Đơn giá
-      deduction: _farmWeight, // TL Trại (lưu vào truckCost trong DB)
+      deduction: _marketWeight, // TL Chợ (lưu vào deduction để so sánh với TL Trại)
       discount: _discount, // Chiết khấu (số tiền giảm)
       finalAmount: _totalAmount, // Tổng tiền = Thành tiền - Chiết khấu
       paidAmount:
@@ -3528,7 +3657,7 @@ class _MarketImportViewState extends State<_MarketImportView> {
     final weighingItem = WeighingItemEntity(
       id: '${invoice.id}_1',
       sequence: 1,
-      weight: _marketWeight,
+      weight: _farmWeight, // Lưu TL Trại vào weight
       quantity: quantity,
       time: DateTime.now(),
       batchNumber: _batchNumberController.text.isNotEmpty
@@ -3587,9 +3716,10 @@ class _MarketImportViewState extends State<_MarketImportView> {
       // Lưu ID phiếu đang sửa
       _editingInvoiceId = inv.id;
       
-      _scaleInputController.text = inv.totalWeight.toString(); // TL Chợ
-      _farmWeightController.text =
-          inv.deduction.toString(); // TL Trại (lưu trong deduction/truckCost)
+      // TL Trại = totalWeight (dùng để tính thành tiền)
+      _farmWeightController.text = inv.totalWeight.toString();
+      // TL Chợ = deduction (lưu để so sánh)
+      _scaleInputController.text = inv.deduction.toString();
       _priceController.text = inv.pricePerKg.toStringAsFixed(0);
       _quantityController.text = inv.totalQuantity.toString();
       _manualDiscount = inv.discount; // Chiết khấu

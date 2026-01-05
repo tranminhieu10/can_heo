@@ -24,22 +24,88 @@ class CostSummary extends Equatable {
   List<Object?> get props => [otherCost, transportFee, rejectAmount, otherCostNote, rejectNote];
 }
 
+/// Model cho công nợ từng đối tác (NCC hoặc Khách hàng)
+class CustomerDebt extends Equatable {
+  final String partnerId;
+  final String partnerName;
+  final int debtType;           // 0: Nợ NCC (ta nợ), 1: Nợ Khách (khách nợ ta)
+  final double totalAmount;     // Tổng tiền giao dịch
+  final double totalPaid;       // Đã thanh toán (lúc giao dịch)
+  final double debtAmount;      // Nợ phát sinh
+  final double debtPaid;        // Đã trả nợ
+  final double remaining;       // Còn nợ
+  final int invoiceCount;       // Số phiếu
+  final DateTime? lastTransaction; // Giao dịch gần nhất
+
+  const CustomerDebt({
+    required this.partnerId,
+    required this.partnerName,
+    this.debtType = 0,
+    this.totalAmount = 0,
+    this.totalPaid = 0,
+    this.debtAmount = 0,
+    this.debtPaid = 0,
+    this.remaining = 0,
+    this.invoiceCount = 0,
+    this.lastTransaction,
+  });
+
+  /// true nếu là NCC (ta nợ NCC)
+  bool get isSupplierDebt => debtType == 0;
+  
+  /// true nếu là Khách hàng (khách nợ ta)
+  bool get isCustomerDebt => debtType == 1;
+
+  @override
+  List<Object?> get props => [
+    partnerId, partnerName, debtType, totalAmount, totalPaid,
+    debtAmount, debtPaid, remaining, invoiceCount, lastTransaction
+  ];
+}
+
 /// Model cho công nợ
 class DebtSummary extends Equatable {
-  final double totalDebt;       // Tổng nợ phát sinh
-  final double totalPaid;       // Đã thanh toán
-  final double totalDebtPaid;   // Đã trả nợ
-  final double remaining;       // Còn lại
+  // Công nợ NCC (ta nợ NCC)
+  final double totalSupplierDebt;     // Tổng nợ NCC
+  final double totalSupplierPaid;     // Đã trả NCC
+  final double supplierRemaining;     // Còn nợ NCC
+  
+  // Công nợ Khách hàng (khách nợ ta)
+  final double totalCustomerDebt;     // Tổng nợ khách
+  final double totalCustomerPaid;     // Khách đã trả
+  final double customerRemaining;     // Khách còn nợ
+  
+  // Legacy fields (giữ tương thích)
+  final double totalDebt;       
+  final double totalPaid;       
+  final double totalDebtPaid;   
+  final double remaining;       
+  
+  final List<CustomerDebt> supplierDebts;   // Chi tiết nợ NCC
+  final List<CustomerDebt> customerDebts;   // Chi tiết nợ Khách hàng
 
   const DebtSummary({
+    this.totalSupplierDebt = 0,
+    this.totalSupplierPaid = 0,
+    this.supplierRemaining = 0,
+    this.totalCustomerDebt = 0,
+    this.totalCustomerPaid = 0,
+    this.customerRemaining = 0,
     this.totalDebt = 0,
     this.totalPaid = 0,
     this.totalDebtPaid = 0,
     this.remaining = 0,
+    this.supplierDebts = const [],
+    this.customerDebts = const [],
   });
 
   @override
-  List<Object?> get props => [totalDebt, totalPaid, totalDebtPaid, remaining];
+  List<Object?> get props => [
+    totalSupplierDebt, totalSupplierPaid, supplierRemaining,
+    totalCustomerDebt, totalCustomerPaid, customerRemaining,
+    totalDebt, totalPaid, totalDebtPaid, remaining,
+    supplierDebts, customerDebts
+  ];
 }
 
 /// Model cho tổng hợp

@@ -1,7 +1,7 @@
 name: can_heo
 description: Phan mem quan ly Can Heo - Nhap/Xuat Kho va Cho.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.5+5
 
 environment:
   sdk: '>=3.1.0 <4.0.0'
@@ -72,7 +72,7 @@ msix_config:
   display_name: Can Heo Manager
   publisher_display_name: Can Heo Team
   identity_name: com.canheo.manager
-  msix_version: 1.0.0.0
+  msix_version: 1.0.3.0
   logo_path: windows/runner/resources/app_icon.ico
   capabilities: 'internetClient,removableStorage'
   # Tạo và cài đặt chứng chỉ tự động (giảm cảnh báo)

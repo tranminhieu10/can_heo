@@ -62,7 +62,7 @@ class _FinanceView extends StatelessWidget {
                   color: Colors.teal[800],
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
-                    BoxShadow(color: Colors.teal.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))
+                    BoxShadow(color: Colors.teal.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 5))
                   ],
                 ),
                 child: Row(
@@ -266,29 +266,26 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
               ),
               const SizedBox(height: 16),
 
-              // 2. Hình thức thanh toán (Mới)
+              // 2. Hình thức thanh toán
               const Text("Hình thức thanh toán:", style: TextStyle(fontSize: 12, color: Colors.grey)),
-              Row(
-                children: [
-                  Expanded(
-                    child: RadioListTile<int>(
-                      title: const Text("Tiền mặt"),
-                      value: 0,
-                      groupValue: _paymentMethod,
-                      onChanged: (v) => setState(() => _paymentMethod = v!),
-                      contentPadding: EdgeInsets.zero,
-                    ),
+              const SizedBox(height: 8),
+              SegmentedButton<int>(
+                segments: const [
+                  ButtonSegment<int>(
+                    value: 0,
+                    label: Text("Tiền mặt"),
+                    icon: Icon(Icons.money),
                   ),
-                  Expanded(
-                    child: RadioListTile<int>(
-                      title: const Text("Chuyển khoản"),
-                      value: 1,
-                      groupValue: _paymentMethod,
-                      onChanged: (v) => setState(() => _paymentMethod = v!),
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                  ButtonSegment<int>(
+                    value: 1,
+                    label: Text("Chuyển khoản"),
+                    icon: Icon(Icons.account_balance),
                   ),
                 ],
+                selected: {_paymentMethod},
+                onSelectionChanged: (Set<int> selected) {
+                  setState(() => _paymentMethod = selected.first);
+                },
               ),
 
               // 3. Chọn đối tác
@@ -296,7 +293,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                 builder: (context, state) {
                    final safeValue = (state.partners.contains(_selectedPartner)) ? _selectedPartner : null;
                   return DropdownButtonFormField<PartnerEntity>(
-                    value: safeValue,
+                    initialValue: safeValue,
                     isExpanded: true,
                     decoration: InputDecoration(
                       labelText: _type == 0 ? "Khách hàng" : "Nhà cung cấp",

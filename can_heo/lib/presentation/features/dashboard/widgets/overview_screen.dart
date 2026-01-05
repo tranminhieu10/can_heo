@@ -39,7 +39,7 @@ class _DashboardTheme {
     borderRadius: BorderRadius.circular(16),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.04),
+        color: Colors.black.withValues(alpha: 0.04),
         blurRadius: 20,
         offset: const Offset(0, 4),
       ),
@@ -51,7 +51,7 @@ class _DashboardTheme {
     borderRadius: BorderRadius.circular(16),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.08),
+        color: Colors.black.withValues(alpha: 0.08),
         blurRadius: 30,
         offset: const Offset(0, 8),
       ),
@@ -192,7 +192,7 @@ class _HeaderSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF667eea).withOpacity(0.3),
+            color: const Color(0xFF667eea).withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -209,7 +209,7 @@ class _HeaderSection extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -236,7 +236,7 @@ class _HeaderSection extends StatelessWidget {
                           dateFormat.format(now),
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -250,7 +250,7 @@ class _HeaderSection extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(30),
             ),
             child: Row(
@@ -264,7 +264,7 @@ class _HeaderSection extends StatelessWidget {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.greenAccent.withOpacity(0.5),
+                        color: Colors.greenAccent.withValues(alpha: 0.5),
                         blurRadius: 6,
                       ),
                     ],
@@ -336,12 +336,12 @@ class _AnimatedActionButtonState extends State<_AnimatedActionButton> {
           decoration: BoxDecoration(
             color: widget.isPrimary
                 ? Colors.white
-                : Colors.white.withOpacity(_isHovered ? 0.25 : 0.15),
+                : Colors.white.withValues(alpha: _isHovered ? 0.25 : 0.15),
             borderRadius: BorderRadius.circular(12),
             boxShadow: _isHovered
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -663,7 +663,7 @@ class _ModernStatCardState extends State<_ModernStatCard> {
             ? _DashboardTheme.cardDecorationHover
             : _DashboardTheme.cardDecoration,
         transform: _isHovered
-            ? (Matrix4.identity()..translate(0.0, -4.0, 0.0))
+            ? Matrix4.translationValues(0.0, -4.0, 0.0)
             : Matrix4.identity(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -681,7 +681,7 @@ class _ModernStatCardState extends State<_ModernStatCard> {
                         color: (widget.gradient as LinearGradient)
                             .colors
                             .first
-                            .withOpacity(0.3),
+                            .withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       ),
@@ -759,8 +759,8 @@ class _TrendBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: isPositive
-            ? const Color(0xFF10B981).withOpacity(0.1)
-            : const Color(0xFFEF4444).withOpacity(0.1),
+            ? const Color(0xFF10B981).withValues(alpha: 0.1)
+            : const Color(0xFFEF4444).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -818,7 +818,7 @@ class _StatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 10,
           ),
@@ -833,7 +833,7 @@ class _StatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: color, size: 24),
@@ -841,7 +841,7 @@ class _StatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
+                  color: Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -907,7 +907,7 @@ class _WeeklyChartSectionState extends State<_WeeklyChartSection> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4facfe).withOpacity(0.1),
+                      color: const Color(0xFF4facfe).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
@@ -1045,7 +1045,7 @@ class _PeriodSelector extends StatelessWidget {
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -1145,15 +1145,15 @@ class _ModernBarChart extends StatelessWidget {
                         colors: isHovered
                             ? [const Color(0xFF4facfe), const Color(0xFF00f2fe)]
                             : [
-                                const Color(0xFF4facfe).withOpacity(0.7),
-                                const Color(0xFF00f2fe).withOpacity(0.7)
+                                const Color(0xFF4facfe).withValues(alpha: 0.7),
+                                const Color(0xFF00f2fe).withValues(alpha: 0.7)
                               ],
                       ),
                       borderRadius: BorderRadius.circular(6),
                       boxShadow: isHovered
                           ? [
                               BoxShadow(
-                                color: const Color(0xFF4facfe).withOpacity(0.4),
+                                color: const Color(0xFF4facfe).withValues(alpha: 0.4),
                                 blurRadius: 12,
                                 offset: const Offset(0, 4),
                               ),
@@ -1331,7 +1331,7 @@ class _DetailedBarnInventorySection extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withOpacity(0.1),
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -1502,7 +1502,7 @@ class _ModernDataTable extends StatelessWidget {
             dataRowMinHeight: 48,
             dataRowMaxHeight: 56,
             headingRowColor:
-                WidgetStateProperty.all(headerColor.withOpacity(0.08)),
+                WidgetStateProperty.all(headerColor.withValues(alpha: 0.08)),
             columns: columns
                 .map((col) => DataColumn(
                       label: Text(
@@ -1550,7 +1550,7 @@ class _QuantityBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -1580,7 +1580,7 @@ class _DetailedMarketStatsSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 10,
           ),
@@ -1773,7 +1773,7 @@ class _ReturnedFromMarketSection extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -1915,7 +1915,7 @@ class _MarketSummaryStatsSection extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withOpacity(0.1),
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -2110,14 +2110,14 @@ class _ModernMarketStatCardState extends State<_ModernMarketStatCard> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: gradientColors.first.withOpacity(_isHovered ? 0.4 : 0.2),
+              color: gradientColors.first.withValues(alpha: _isHovered ? 0.4 : 0.2),
               blurRadius: _isHovered ? 20 : 12,
               offset: Offset(0, _isHovered ? 8 : 4),
             ),
           ],
         ),
         transform: _isHovered
-            ? (Matrix4.identity()..translate(0.0, -4.0, 0.0))
+            ? Matrix4.translationValues(0.0, -4.0, 0.0)
             : Matrix4.identity(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2127,7 +2127,7 @@ class _ModernMarketStatCardState extends State<_ModernMarketStatCard> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(widget.icon, color: Colors.white, size: 22),
@@ -2159,7 +2159,7 @@ class _ModernMarketStatCardState extends State<_ModernMarketStatCard> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Column(
@@ -2178,7 +2178,7 @@ class _ModernMarketStatCardState extends State<_ModernMarketStatCard> {
                             entry.key,
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -2187,7 +2187,7 @@ class _ModernMarketStatCardState extends State<_ModernMarketStatCard> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -2238,9 +2238,9 @@ class _MarketStatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -2320,7 +2320,7 @@ class _BarnInventorySection extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 10,
           ),
@@ -2409,7 +2409,7 @@ class _MarketInventorySection extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 10,
           ),
@@ -2582,7 +2582,7 @@ class _TopPartnersSection extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withOpacity(0.1),
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -2717,7 +2717,7 @@ class _ModernPartnerItemState extends State<_ModernPartnerItem> {
                         ? LinearGradient(
                             colors: [
                               rankColor,
-                              rankColor.withOpacity(0.7),
+                              rankColor.withValues(alpha: 0.7),
                             ],
                           )
                         : null,
@@ -2726,7 +2726,7 @@ class _ModernPartnerItemState extends State<_ModernPartnerItem> {
                     boxShadow: widget.rank <= 3
                         ? [
                             BoxShadow(
-                              color: rankColor.withOpacity(0.3),
+                              color: rankColor.withValues(alpha: 0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -2886,7 +2886,7 @@ class _RecentTransactionsSection extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withOpacity(0.1),
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
@@ -3007,7 +3007,7 @@ class _ModernTransactionItemState extends State<_ModernTransactionItem> {
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: (typeInfo['color'] as Color).withOpacity(0.2),
+                    color: (typeInfo['color'] as Color).withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -3030,7 +3030,7 @@ class _ModernTransactionItemState extends State<_ModernTransactionItem> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: (typeInfo['color'] as Color).withOpacity(0.1),
+                          color: (typeInfo['color'] as Color).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -3164,7 +3164,7 @@ class _TransactionItem extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: typeInfo['color'].withOpacity(0.1),
+              color: typeInfo['color'].withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(

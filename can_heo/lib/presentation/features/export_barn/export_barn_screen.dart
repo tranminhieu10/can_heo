@@ -85,7 +85,6 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
 
   // Scale data - nhập trực tiếp từ người dùng
   double _totalWeight = 0.0;
-  int _totalQuantity = 0;
 
   @override
   void initState() {
@@ -278,7 +277,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                 return DropdownButtonFormField<PartnerEntity>(
                   isExpanded: true,
                   decoration: _mobileInputDecoration('Chọn NCC'),
-                  value: partners.contains(_selectedPartner) ? _selectedPartner : null,
+                  initialValue: partners.contains(_selectedPartner) ? _selectedPartner : null,
                   items: partners.map((p) => DropdownMenuItem(
                     value: p,
                     child: Text(p.name),
@@ -550,9 +549,9 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
           return Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: color.withOpacity(0.3)),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -587,8 +586,6 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
   }
 
   Widget _buildInvoiceDetailsSection(BuildContext context) {
-    const fieldHeight = 42.0;
-
     return Card(
       elevation: 2,
       child: Padding(
@@ -672,7 +669,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                                   contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 10),
                                 ),
-                                value: safeValue,
+                                initialValue: safeValue,
                                 style: const TextStyle(
                                     fontSize: 13, color: Colors.black),
                                 items: partners
@@ -838,7 +835,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
         }
 
         return DropdownButtonFormField<FarmEntity>(
-          value: _selectedFarm,
+          initialValue: _selectedFarm,
           isExpanded: true,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.home_work, size: 18),
@@ -923,7 +920,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
-                value: safeValue,
+                initialValue: safeValue,
                 style: const TextStyle(fontSize: 13, color: Colors.black),
                 items: partners
                     .map((p) => DropdownMenuItem(
@@ -1083,7 +1080,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
         final cages = snapshot.data ?? [];
 
         return DropdownButtonFormField<CageEntity>(
-          value: _selectedCage != null && cages.any((c) => c.id == _selectedCage!.id) 
+          initialValue: _selectedCage != null && cages.any((c) => c.id == _selectedCage!.id) 
               ? cages.firstWhere((c) => c.id == _selectedCage!.id) 
               : null,
           isExpanded: true,
@@ -1123,7 +1120,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
                 orElse: () => types.first);
 
         return DropdownButtonFormField<PigTypeEntity?>(
-          value: selected,
+          initialValue: selected,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.pets, size: 18),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
@@ -1174,16 +1171,18 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
         // + Nhập kho (Type 0)
         for (final inv in importBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available += item.quantity;
+            }
           }
         }
         
         // - Xuất kho (Type 1)
         for (final inv in exportBarn) {
           for (final item in inv.details) {
-            if ((item.pigType ?? '').trim() == pigType)
+            if ((item.pigType ?? '').trim() == pigType) {
               available -= item.quantity;
+            }
           }
         }
         
@@ -1314,11 +1313,15 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
   }
 
   void _saveInvoice(BuildContext context) async {
+    // Capture scaffold messenger before async operations
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final weighingBloc = context.read<WeighingBloc>();
+    
     final weight =
         double.tryParse(_scaleInputController.text.replaceAll(',', '.')) ?? 0;
 
     if (weight <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(
           content: Text('⚠️ Vui lòng nhập số cân!'),
           backgroundColor: Colors.orange,
@@ -1332,7 +1335,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
     });
 
     if (!_canSaveInvoice()) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(
           content: Text('⚠️ Vui lòng điền đầy đủ thông tin!'),
           backgroundColor: Colors.orange,
@@ -1371,7 +1374,8 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
       final available = imported - exported;
 
       if (quantity > available) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text(
                 '❌ Không đủ tồn kho! Chỉ còn $available con $pigType trong kho.'),
@@ -1381,8 +1385,10 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
         return;
       }
 
+      if (!mounted) return;
+      
       // Thêm invoice item
-      context.read<WeighingBloc>().add(
+      weighingBloc.add(
             WeighingItemAdded(
               weight: _totalWeight,
               quantity: quantity,
@@ -1404,7 +1410,7 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
       final note = noteParts.join(' | ');
 
       // Chỉ lưu thông tin cơ bản - không tính tiền
-      context.read<WeighingBloc>().add(
+      weighingBloc.add(
             WeighingInvoiceUpdated(
               partnerId: _selectedPartner!.id,
               partnerName: _selectedPartner!.name,
@@ -1417,10 +1423,10 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
             ),
           );
 
-      context.read<WeighingBloc>().add(const WeighingSaved());
+      weighingBloc.add(const WeighingSaved());
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text('❌ Lỗi: $e'),
             backgroundColor: Colors.brown,
@@ -1447,7 +1453,6 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
       _selectedInvoice = null;
       _isEditMode = false;
       _totalWeight = 0;
-      _totalQuantity = 0;
     });
     context.read<WeighingBloc>().add(const WeighingStarted(1));
     _scaleInputFocus.requestFocus();
@@ -1506,7 +1511,6 @@ class _ExportBarnViewState extends State<_ExportBarnView> {
 
       _scaleInputController.text = weight.toStringAsFixed(1);
       _totalWeight = weight;
-      _totalQuantity = invoice.totalQuantity;
     });
   }
 

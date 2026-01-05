@@ -253,7 +253,7 @@ class _LicenseManagerScreenState extends State<LicenseManagerScreen> {
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.1),
+            color: statusColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
@@ -412,7 +412,7 @@ class _LicenseManagerScreenState extends State<LicenseManagerScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
-                    value: days,
+                    initialValue: days,
                     decoration: const InputDecoration(labelText: 'Thời hạn'),
                     items: const [
                       DropdownMenuItem(value: 7, child: Text('7 ngày (dùng thử)')),
@@ -426,7 +426,7 @@ class _LicenseManagerScreenState extends State<LicenseManagerScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: licenseType,
+                    initialValue: licenseType,
                     decoration: const InputDecoration(labelText: 'Loại license'),
                     items: const [
                       DropdownMenuItem(value: 'trial', child: Text('Trial (dùng thử)')),
@@ -515,7 +515,7 @@ class _LicenseManagerScreenState extends State<LicenseManagerScreen> {
       builder: (context) => AlertDialog(
         title: Text('Gia hạn license cho ${license.customerName}'),
         content: DropdownButtonFormField<int>(
-          value: days,
+          initialValue: days,
           decoration: const InputDecoration(labelText: 'Thêm thời gian'),
           items: const [
             DropdownMenuItem(value: 7, child: Text('7 ngày')),

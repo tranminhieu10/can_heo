@@ -1,9 +1,9 @@
 {
-  "version": "1.0.1",
-  "build_number": 2,
-  "download_url": "https://your-server.com/updates/can_heo_1.0.1.msix",
-  "release_notes": "Bản cập nhật 1.0.1:\n- Cải thiện giao diện responsive\n- Thêm chức năng đăng nhập\n- Sửa lỗi tính toán tồn kho\n- Tối ưu hiệu năng",
+  "version": "1.0.5",
+  "build_number": 5,
+  "download_url": "https://github.com/tranminhieu10/can_heo/releases/download/v1.0.5/CanHeo_Setup_1.0.5.exe",
+  "release_notes": "Bản cập nhật 1.0.5:\n- Sửa lỗi deprecated API (RadioListTile → SegmentedButton)\n- Tối ưu async/context safety\n- Xóa code không sử dụng\n- Cải thiện code style và hiệu suất\n- Giảm 54% warnings trong flutter analyze",
   "file_size": 52428800,
-  "release_date": "2024-12-22",
+  "release_date": "2026-01-05",
   "force_update": false
 }

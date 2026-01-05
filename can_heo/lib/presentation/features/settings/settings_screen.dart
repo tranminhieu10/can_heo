@@ -248,7 +248,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Version: 1.0.0',
+                    'Version: 1.0.3',
                     style: TextStyle(fontSize: 14, color: Colors.black54),
                   ),
                   const Divider(height: 24),
