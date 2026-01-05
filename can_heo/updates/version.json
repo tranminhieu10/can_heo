@@ -1,8 +1,8 @@
 {
-  "version": "1.0.5",
-  "build_number": 5,
-  "download_url": "https://github.com/tranminhieu10/can_heo/releases/download/v1.0.5/CanHeo_Setup_1.0.5.exe",
-  "release_notes": "Bản cập nhật 1.0.5:\n- Sửa lỗi deprecated API (RadioListTile → SegmentedButton)\n- Tối ưu async/context safety\n- Xóa code không sử dụng\n- Cải thiện code style và hiệu suất\n- Giảm 54% warnings trong flutter analyze",
+  "version": "1.0.6",
+  "build_number": 6,
+  "download_url": "https://github.com/tranminhieu10/can_heo/releases/download/v1.0.6/CanHeo_Setup_1.0.6.exe",
+  "release_notes": "Bản cập nhật 1.0.6:\n- Thay đổi nhập khách hàng: cho phép tự nhập tên với gợi ý từ DB\n- Xóa tab Khách hàng khỏi màn hình Đối tác\n- Số lô xuất chợ: chuyển sang dropdown lấy từ phiếu nhập chợ\n- Cải thiện UX nhập liệu",
   "file_size": 52428800,
   "release_date": "2026-01-05",
   "force_update": false

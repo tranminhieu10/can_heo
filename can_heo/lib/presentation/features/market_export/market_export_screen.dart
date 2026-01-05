@@ -73,6 +73,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
   final TextEditingController _discountController =
       TextEditingController(text: '0');
   final TextEditingController _marketWeightController = TextEditingController();
+  final TextEditingController _customerNameController = TextEditingController(); // Tên khách hàng nhập tay
 
   // Search controllers
   final TextEditingController _searchPartnerController =
@@ -87,7 +88,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
   final NumberFormat _currencyFormat =
       NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
-  PartnerEntity? _selectedPartner; // Khách hàng
+  // Khách hàng - giờ dùng tên nhập tay thay vì chọn từ danh sách
+  String? _selectedPartnerId; // ID nếu khách hàng đã có trong DB
   final _invoiceRepo = sl<IInvoiceRepository>();
   final _db = sl<AppDatabase>();
 
@@ -170,6 +172,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
     _deductionController.dispose();
     _discountController.dispose();
     _marketWeightController.dispose();
+    _customerNameController.dispose();
     _searchPartnerController.dispose();
     _searchPigTypeController.dispose();
     _searchQuantityController.dispose();
@@ -462,8 +465,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
     _deductionController.text = '0';
     _discountController.text = '0';
     _paymentAmountController.clear();
+    _customerNameController.clear();
     setState(() {
-      _selectedPartner = null;
+      _selectedPartnerId = null;
       _lockedWeight = 0;
       _isWeightLocked = false;
       _selectedPaymentMethod = 0;
@@ -1101,40 +1105,118 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildFormRow1() {
-    // Row 1: Khách hàng (cùng size với Số lô - 1/3 chiều rộng)
+    // Row 1: Khách hàng - Autocomplete với gợi ý từ DB
     return BlocBuilder<PartnerBloc, PartnerState>(
       builder: (context, state) {
         final customers = state.partners; // Khách hàng (isSupplier=false)
-        final safeCustomer =
-            (customers.contains(_selectedPartner)) ? _selectedPartner : null;
+        
+        // Lấy danh sách tên khách hàng đã có
+        final customerNames = customers.map((p) => p.name).toList();
 
         return Row(
           children: [
             Expanded(
-              child: DropdownButtonFormField<PartnerEntity>(
-                isExpanded: true,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.person, size: 18),
-                  hintText: 'Chọn khách hàng',
-                  hintStyle: const TextStyle(fontSize: 13),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6)),
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                ),
-                initialValue: safeCustomer,
-                style: const TextStyle(fontSize: 13, color: Colors.black),
-                items: customers
-                    .map((p) => DropdownMenuItem(
-                        value: p,
-                        child:
-                            Text(p.name, style: const TextStyle(fontSize: 13))))
-                    .toList(),
-                onChanged: (value) {
+              child: Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text.isEmpty) {
+                    return customerNames; // Hiện tất cả khi ô trống
+                  }
+                  return customerNames.where((name) =>
+                      name.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+                },
+                onSelected: (String selection) {
+                  _customerNameController.text = selection;
+                  // Tìm ID nếu khách hàng đã tồn tại
+                  final existingCustomer = customers.firstWhere(
+                    (p) => p.name == selection,
+                    orElse: () => PartnerEntity(
+                      id: '',
+                      name: selection,
+                      isSupplier: false,
+                      currentDebt: 0,
+                    ),
+                  );
                   setState(() {
-                    _selectedPartner = value;
+                    _selectedPartnerId = existingCustomer.id.isNotEmpty 
+                        ? existingCustomer.id 
+                        : null;
                   });
+                },
+                fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                  // Sync controller text
+                  if (controller.text != _customerNameController.text && _customerNameController.text.isNotEmpty) {
+                    controller.text = _customerNameController.text;
+                  }
+                  
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.person, size: 18),
+                      hintText: 'Nhập tên khách hàng',
+                      hintStyle: const TextStyle(fontSize: 13),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6)),
+                      isDense: true,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                      suffixIcon: controller.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 16),
+                              onPressed: () {
+                                controller.clear();
+                                _customerNameController.clear();
+                                setState(() => _selectedPartnerId = null);
+                              },
+                            )
+                          : null,
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                    onChanged: (value) {
+                      _customerNameController.text = value;
+                      // Reset partner ID khi nhập tên mới
+                      final existingCustomer = customers.firstWhere(
+                        (p) => p.name.toLowerCase() == value.toLowerCase(),
+                        orElse: () => PartnerEntity(
+                          id: '',
+                          name: value,
+                          isSupplier: false,
+                          currentDebt: 0,
+                        ),
+                      );
+                      setState(() {
+                        _selectedPartnerId = existingCustomer.id.isNotEmpty 
+                            ? existingCustomer.id 
+                            : null;
+                      });
+                    },
+                  );
+                },
+                optionsViewBuilder: (context, onSelected, options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      elevation: 4,
+                      borderRadius: BorderRadius.circular(8),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 200, maxWidth: 300),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          itemBuilder: (context, index) {
+                            final option = options.elementAt(index);
+                            return ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.person_outline, size: 18),
+                              title: Text(option, style: const TextStyle(fontSize: 13)),
+                              onTap: () => onSelected(option),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
                 },
               ),
             ),
@@ -1212,21 +1294,9 @@ class _MarketExportViewState extends State<_MarketExportView> {
     // Row 2: Số lô + Loại heo + (Tồn kho + Số lượng)
     return Row(
       children: [
-        // Số lô
+        // Số lô - Dropdown từ phiếu nhập chợ
         Expanded(
-          child: TextField(
-            controller: _batchNumberController,
-            decoration: InputDecoration(
-              hintText: 'Số lô',
-              hintStyle: const TextStyle(fontSize: 13),
-              isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-            ),
-            style: const TextStyle(fontSize: 13),
-          ),
+          child: _buildBatchNumberDropdown(),
         ),
         const SizedBox(width: 8),
         // Loại heo
@@ -1587,7 +1657,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildPartnerDebtFieldCompact() {
-    if (_selectedPartner == null) {
+    // Chỉ hiển thị công nợ nếu khách hàng đã có trong DB
+    if (_selectedPartnerId == null || _selectedPartnerId!.isEmpty) {
       return _buildCompactField(
         'Công nợ',
         const Text('0 đ', style: TextStyle(fontSize: 13)),
@@ -1597,7 +1668,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
     }
 
     return FutureBuilder<Map<String, dynamic>>(
-      future: _calculatePartnerDebt(_selectedPartner!.id),
+      future: _calculatePartnerDebt(_selectedPartnerId!),
       builder: (context, snapshot) {
         final debtInfo = snapshot.data ?? {};
         final remaining = (debtInfo['remaining'] as num?)?.toDouble() ?? 0.0;
@@ -1652,6 +1723,63 @@ class _MarketExportViewState extends State<_MarketExportView> {
               .toList(),
           onChanged: (v) {
             if (v != null) setState(() => _pigTypeController.text = v.name);
+          },
+        );
+      },
+    );
+  }
+
+  // Dropdown chọn Số lô từ phiếu nhập chợ (type 3)
+  Widget _buildBatchNumberDropdown() {
+    return StreamBuilder<List<InvoiceEntity>>(
+      stream: _invoiceRepo.watchInvoices(type: 3), // Phiếu nhập chợ
+      builder: (context, snapshot) {
+        // Lấy danh sách số lô unique từ các phiếu nhập chợ
+        final invoices = snapshot.data ?? [];
+        final batchSet = <String>{};
+        for (final inv in invoices) {
+          for (final detail in inv.details) {
+            final batch = detail.batchNumber;
+            if (batch != null && batch.isNotEmpty) {
+              batchSet.add(batch);
+            }
+          }
+        }
+        // Sắp xếp theo thứ tự giảm dần (mới nhất trước)
+        final batchList = batchSet.toList()..sort((a, b) => b.compareTo(a));
+        
+        // Kiểm tra giá trị hiện tại có trong list không
+        final currentBatch = _batchNumberController.text.trim();
+        final String? selectedValue = currentBatch.isNotEmpty && batchList.contains(currentBatch) 
+            ? currentBatch 
+            : null;
+
+        return DropdownButtonFormField<String>(
+          initialValue: selectedValue,
+          decoration: InputDecoration(
+            hintText: 'Chọn số lô',
+            hintStyle: const TextStyle(fontSize: 13),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          ),
+          style: const TextStyle(fontSize: 13, color: Colors.black),
+          isExpanded: true,
+          items: batchList.isEmpty 
+              ? [const DropdownMenuItem(
+                  value: null,
+                  enabled: false,
+                  child: Text('Chưa có lô nhập', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                )]
+              : batchList.map((batch) => DropdownMenuItem(
+                  value: batch,
+                  child: Text(batch, style: const TextStyle(fontSize: 13)),
+                )).toList(),
+          onChanged: batchList.isEmpty ? null : (value) {
+            if (value != null) {
+              setState(() => _batchNumberController.text = value);
+            }
           },
         );
       },
@@ -2167,7 +2295,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
 
   // Helper: Build partner debt display field
   Widget _buildPartnerDebtField() {
-    if (_selectedPartner == null) {
+    if (_selectedPartnerId == null || _selectedPartnerId!.isEmpty) {
       return _buildGridLockedField(
         label: 'Công nợ',
         value: '0 đ',
@@ -2175,7 +2303,7 @@ class _MarketExportViewState extends State<_MarketExportView> {
     }
 
     return FutureBuilder<Map<String, dynamic>>(
-      future: _calculatePartnerDebt(_selectedPartner!.id),
+      future: _calculatePartnerDebt(_selectedPartnerId!),
       builder: (context, snapshot) {
         final debtInfo = snapshot.data ?? {};
         final remaining = (debtInfo['remaining'] as num?)?.toDouble() ?? 0.0;
@@ -2769,30 +2897,53 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   Widget _buildPartnerSelector(BuildContext context) {
+    // Đã không còn sử dụng - thay bằng _buildFormRow1 với Autocomplete
     return BlocBuilder<PartnerBloc, PartnerState>(
       builder: (context, state) {
         final partners = state.partners;
-        final safeValue =
-            (partners.contains(_selectedPartner)) ? _selectedPartner : null;
+        final customerNames = partners.map((p) => p.name).toList();
 
-        return DropdownButtonFormField<PartnerEntity>(
-          isExpanded: true,
-          decoration: const InputDecoration(
-            labelText: 'Khách hàng',
-            labelStyle: TextStyle(fontSize: 10),
-            border: OutlineInputBorder(),
-            isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          ),
-          initialValue: safeValue,
-          style: const TextStyle(fontSize: 13, color: Colors.black),
-          items: partners
-              .map((p) => DropdownMenuItem(
-                  value: p,
-                  child: Text(p.name, style: const TextStyle(fontSize: 13))))
-              .toList(),
-          onChanged: (value) {
-            setState(() => _selectedPartner = value);
+        return Autocomplete<String>(
+          optionsBuilder: (TextEditingValue textEditingValue) {
+            if (textEditingValue.text.isEmpty) {
+              return customerNames;
+            }
+            return customerNames.where((name) =>
+                name.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+          },
+          onSelected: (String selection) {
+            _customerNameController.text = selection;
+            final existingCustomer = partners.firstWhere(
+              (p) => p.name == selection,
+              orElse: () => PartnerEntity(id: '', name: selection, isSupplier: false, currentDebt: 0),
+            );
+            setState(() {
+              _selectedPartnerId = existingCustomer.id.isNotEmpty ? existingCustomer.id : null;
+            });
+          },
+          fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+            return TextField(
+              controller: controller,
+              focusNode: focusNode,
+              decoration: const InputDecoration(
+                labelText: 'Khách hàng',
+                labelStyle: TextStyle(fontSize: 10),
+                border: OutlineInputBorder(),
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              ),
+              style: const TextStyle(fontSize: 13),
+              onChanged: (value) {
+                _customerNameController.text = value;
+                final existingCustomer = partners.firstWhere(
+                  (p) => p.name.toLowerCase() == value.toLowerCase(),
+                  orElse: () => PartnerEntity(id: '', name: value, isSupplier: false, currentDebt: 0),
+                );
+                setState(() {
+                  _selectedPartnerId = existingCustomer.id.isNotEmpty ? existingCustomer.id : null;
+                });
+              },
+            );
           },
         );
       },
@@ -2816,7 +2967,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
   }
 
   bool _canAddInvoice() {
-    return _selectedPartner != null &&
+    // Chỉ cần có tên khách hàng (không cần có sẵn trong DB)
+    return _customerNameController.text.trim().isNotEmpty &&
         _pigTypeController.text.isNotEmpty &&
         _pricePerKg > 0 &&
         (int.tryParse(_quantityController.text) ?? 0) > 0;
@@ -2916,11 +3068,14 @@ class _MarketExportViewState extends State<_MarketExportView> {
             ),
           );
 
+      // Lấy tên khách hàng từ controller
+      final customerName = _customerNameController.text.trim();
+      
       // Update invoice info with new fields
       weighingBloc.add(
             WeighingInvoiceUpdated(
-              partnerId: _selectedPartner!.id,
-              partnerName: _selectedPartner!.name,
+              partnerId: _selectedPartnerId, // Có thể null nếu khách mới
+              partnerName: customerName,
               pricePerKg: _pricePerKg,
               deduction: _deduction,
               discount: _discount,
@@ -2943,8 +3098,8 @@ class _MarketExportViewState extends State<_MarketExportView> {
           deduction: _deduction,
           discount: _discount,
           finalAmount: _totalAmount,
-          partnerId: _selectedPartner!.id,
-          partnerName: _selectedPartner!.name,
+          partnerId: _selectedPartnerId,
+          partnerName: customerName,
         );
         _paymentAmountController.text = _totalAmount.toStringAsFixed(0);
       });
@@ -2991,9 +3146,11 @@ class _MarketExportViewState extends State<_MarketExportView> {
   // ==================== DEBT SECTION ====================
 
   Widget _buildDebtSection(BuildContext context) {
-    final hasPartner = _selectedPartner != null;
-    final partnerId = _selectedPartner?.id;
-    final partnerName = _selectedPartner?.name ?? 'Chưa chọn khách hàng';
+    final hasPartner = _selectedPartnerId != null && _selectedPartnerId!.isNotEmpty;
+    final partnerId = _selectedPartnerId;
+    final partnerName = _customerNameController.text.trim().isNotEmpty 
+        ? _customerNameController.text.trim() 
+        : 'Chưa chọn khách hàng';
 
     return FutureBuilder<Map<String, dynamic>>(
       future: hasPartner ? _calculatePartnerDebt(partnerId!) : Future.value({}),
@@ -4075,12 +4232,16 @@ class _MarketExportViewState extends State<_MarketExportView> {
     // Capture before async
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     
-    if (_lastSavedInvoice?.partnerId == null && _selectedPartner == null) {
+    // Kiểm tra có partner ID hay không (chỉ lưu thanh toán nếu khách đã có trong DB)
+    final partnerId = _lastSavedInvoice?.partnerId ?? _selectedPartnerId;
+    if (partnerId == null || partnerId.isEmpty) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+            content: Text('❌ Chỉ có thể lưu thanh toán cho khách hàng đã có trong hệ thống'),
+            backgroundColor: Colors.orange),
+      );
       return;
     }
-
-    final partnerId = _lastSavedInvoice?.partnerId ?? _selectedPartner?.id;
-    if (partnerId == null) return;
 
     // Get amount based on payment method
     final amount = (_selectedPaymentMethod >= 3)

@@ -2,7 +2,7 @@
 ; Chạy file này bằng Inno Setup Compiler để tạo file cài đặt
 
 #define MyAppName "Cân Heo"
-#define MyAppVersion "1.0.5"
+#define MyAppVersion "1.0.6"
 #define MyAppPublisher "Your Company Name"
 #define MyAppURL "https://yourwebsite.com"
 #define MyAppExeName "can_heo.exe"

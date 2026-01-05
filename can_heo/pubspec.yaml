@@ -1,7 +1,7 @@
 name: can_heo
 description: Phan mem quan ly Can Heo - Nhap/Xuat Kho va Cho.
 publish_to: 'none'
-version: 1.0.5+5
+version: 1.0.6+6
 
 environment:
   sdk: '>=3.1.0 <4.0.0'

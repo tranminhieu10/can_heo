@@ -17,7 +17,7 @@ class PartnersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => sl<PartnerBloc>()..add(const LoadPartners(false)),
+      create: (_) => sl<PartnerBloc>()..add(const LoadPartners(true)), // Mặc định load NCC
       child: const _PartnersView(),
     );
   }
@@ -29,7 +29,7 @@ class _PartnersView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 2, // Chỉ còn 2 tab: NCC & TRẠI và CHUỒNG KHO
       child: Scaffold(
         backgroundColor: Colors.grey[100],
         appBar: AppBar(
@@ -42,41 +42,23 @@ class _PartnersView extends StatelessWidget {
             indicatorColor: Colors.blue,
             onTap: (index) {
               if (index == 0) {
-                context.read<PartnerBloc>().add(const LoadPartners(false)); // Khách hàng
-              } else if (index == 1) {
                 context.read<PartnerBloc>().add(const LoadPartners(true)); // NCC
               }
-              // Tab 2 (Chuồng kho) không cần load partners
+              // Tab 1 (Chuồng kho) không cần load partners
             },
             tabs: const [
-              Tab(icon: Icon(Icons.people), text: "KHÁCH HÀNG"),
               Tab(icon: Icon(Icons.business), text: "NCC & TRẠI"),
               Tab(icon: Icon(Icons.warehouse), text: "CHUỒNG KHO"),
             ],
           ),
         ),
-        body: TabBarView(
+        body: const TabBarView(
           children: [
-            _buildPartnerTab(context, false), // Khách hàng
-            const CompanyFarmScreen(), // NCC & Trại
-            const WarehouseCageScreen(), // Chuồng Kho
+            CompanyFarmScreen(), // NCC & Trại
+            WarehouseCageScreen(), // Chuồng Kho
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildPartnerTab(BuildContext context, bool isSupplier) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: isSupplier ? 'supplier_fab' : 'customer_fab',
-        onPressed: () => _showAddPartnerDialog(context, isSupplier),
-        label: const Text("THÊM MỚI"),
-        icon: const Icon(Icons.add),
-        backgroundColor: Colors.blue,
-      ),
-      body: const _PartnerList(),
     );
   }
 
